@@ -275,7 +275,7 @@ $("#btn").onclick = async () => {
 
     localStorage.setItem("token", j.token);
     localStorage.setItem("me", JSON.stringify(j.user));
-    location.href = "app.html";
+    location.href = "/app";
   } catch {
     msg.textContent = "Error de conexion con el servidor";
     msg.className = "loginMsg bad";

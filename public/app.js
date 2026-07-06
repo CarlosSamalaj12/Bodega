@@ -1,7 +1,7 @@
 const token = localStorage.getItem("token");
 const me = JSON.parse(localStorage.getItem("me") || "null");
 
-if (!token) location.href = "login.html";
+if (!token) location.href = "/login";
 
 const $ = (s) => document.querySelector(s);
 let appWritePendingCount = 0;
@@ -1382,7 +1382,7 @@ function performLogout() {
   const deviceKey = (localStorage.getItem("device_key") || "").trim();
   localStorage.clear();
   if (deviceKey) localStorage.setItem("device_key", deviceKey);
-  location.href = "login.html";
+  location.href = "/login";
 }
 
 function resetInactivityLogoutTimer() {
