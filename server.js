@@ -1,4 +1,4 @@
-﻿import express from "express";
+import express from "express";
 import cors from "cors";
 import { createServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
@@ -46,6 +46,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/imagenes", express.static(path.join(__dirname, "imagenes")));
+
+app.get("/", (req, res) => {
+  res.redirect("/login.html");
+});
 
 const OPS_ALERT_WINDOW_MS = 5 * 60 * 1000;
 const OPS_PIN_WINDOW_MS = 15 * 60 * 1000;
