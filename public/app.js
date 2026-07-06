@@ -1758,7 +1758,7 @@ async function applyWarehouseBranding(idWarehouse = me?.id_warehouse) {
   const logoData = await fetchWarehouseLogoData(idWarehouse);
   const railImg = $("#railLogoImg");
   const stageImg = $("#stageHeadLogoImg");
-  const fallbackSrc = "../imagenes/Oficial_JDL_blanco.png";
+  const fallbackSrc = "/imagenes/Oficial_JDL_blanco.png";
   if (railImg) railImg.src = logoData || fallbackSrc;
   if (stageImg) stageImg.src = logoData || fallbackSrc;
 }
