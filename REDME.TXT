@@ -1,0 +1,255 @@
+README — Sistema de Bodega / Inventario (MariaDB)
+1) ¿Qué es este sistema?
+
+Este sistema es una base de datos para manejar inventario tipo Kardex, con:
+
+Bodegas (principal / receptora / operativas)
+
+Productos con categorías, medidas y proveedores
+
+Movimientos (entradas, salidas, transferencias, ajustes)
+
+Kardex como historial que calcula el stock real
+
+Pedidos (solicitudes) desde bodegas operativas hacia la bodega surtidora (normalmente la principal) 
+
+script bodega
+
+ 
+
+script bodega
+
+2) Estructura general (lo más importante)
+Roles / Usuarios / Bodegas
+
+roles: define perfiles (Admin, Bodeguero, Solicitante). 
+
+script bodega
+
+usuarios: cada usuario tiene un rol y puede estar asociado a una bodega (por ejemplo, Cocina). 
+
+script bodega
+
+bodegas: cada bodega tiene un tipo: PRINCIPAL, RECEPTORA, OPERATIVA. 
+
+script bodega
+
+Configuración por bodega
+
+En configuracion_bodega definís el “comportamiento” de cada bodega:
+
+maneja_stock: si esa bodega lleva kardex/stock
+
+puede_recibir: si puede recibir movimientos
+
+puede_despachar: si puede sacar productos
+
+modo_despacho_auto: si cuando “despacha” se registra como SALIDA o como TRANSFERENCIA 
+
+script bodega
+
+3) Tipos de bodega (cómo interpretarlo)
+Bodega PRINCIPAL
+
+Es la bodega “madre”.
+
+Normalmente concentra el stock y surte pedidos de otras bodegas.
+
+Puede recibir compras y despachar a operativas.
+
+Bodega RECEPTORA
+
+Es la “puerta de entrada” (recepción).
+
+Puede existir si querés separar “recibo” vs “almacenaje”.
+
+En tu script está prevista por el ENUM, pero vos decidís si la usás en la operación. 
+
+script bodega
+
+Bodega OPERATIVA
+
+Es la bodega del día a día (Cocina, Restaurante, Camarería).
+
+Puede manejar stock propio y recibir transferencias desde la principal. 
+
+script bodega
+
+4) Catálogos (antes de mover inventario)
+
+Para que todo funcione, primero cargás:
+
+categorias / subcategorias (clasificación)
+
+medidas (unidad: lb, unidad, caja, etc.)
+
+proveedores
+
+productos (ligados a medida + categoría + subcategoría) 
+
+script bodega
+
+Opcional:
+
+limites_producto_bodega: mínimos y máximos por bodega+producto (útil para alertas). 
+
+script bodega
+
+reglas_subcategoria: reglas por “edad” (vida útil) para alertas por vencimiento/rotación. 
+
+script bodega
+
+5) Movimientos (el corazón del sistema)
+Tablas clave
+
+movimiento_encabezado: información general (tipo, bodega origen/destino, proveedor, observaciones, estado). 
+
+script bodega
+
+movimiento_detalle: líneas del movimiento (producto, lote, vencimiento, cantidad, costo). 
+
+script bodega
+
+kardex: se guarda el efecto real del movimiento por bodega (delta + o -). 
+
+script bodega
+
+Tipos de movimiento
+
+Tu sistema contempla:
+
+ENTRADA (compra, donación, stock inicial)
+
+SALIDA (consumo interno, merma)
+
+TRANSFERENCIA (mover de bodega A → bodega B)
+
+AJUSTE (corrección de inventario) 
+
+script bodega
+
+Motivos
+
+La tabla motivos_movimiento clasifica por qué pasa el movimiento (ej. Compra, Consumo Interno, Merma). 
+
+script bodega
+
+
+Además el script te deja motivos iniciales listos. 
+
+script bodega
+
+6) ¿Cómo se calcula el stock?
+
+El stock NO se guarda “fijo” en una tabla de productos.
+
+Se calcula sumando el kardex:
+
+v_stock_resumen: stock total por bodega + producto. 
+
+script bodega
+
+v_stock_por_lote: stock por lote y vencimiento. 
+
+script bodega
+
+v_stock_disponible: solo lotes con stock > 0 y marca si está vencido o no. 
+
+script bodega
+
+ 
+
+script bodega
+
+7) Pedidos (solicitudes internas)
+
+El módulo de pedidos permite que una bodega operativa pida a una surtidora.
+
+Tablas
+
+pedido_encabezado: quién solicita, bodega que solicita, bodega que surte, estado. 
+
+script bodega
+
+pedido_detalle: productos solicitados y cuánto se surtió. 
+
+script bodega
+
+pedido_movimiento_vinculo: relaciona lo surtido con el movimiento real (para trazabilidad). 
+
+script bodega
+
+Estados del pedido
+
+PENDIENTE → APROBADO → PARCIAL/COMPLETADO (o CANCELADO). 
+
+script bodega
+
+8) Reglas de seguridad / control (importante)
+
+El script incluye triggers para que NO se puedan editar ni eliminar movimientos de fechas pasadas.
+
+Bloquea update/delete de movimiento_encabezado
+
+Bloquea update/delete de movimiento_detalle si el encabezado es de fecha anterior 
+
+script bodega
+
+Esto es buenísimo para auditoría: si alguien la regó, lo correcto sería hacer un AJUSTE o un movimiento correctivo, no “borrar el pasado”.
+
+9) Datos iniciales que ya te crea
+
+El script inserta:
+
+Roles: Admin, Bodeguero, Solicitante
+
+Bodegas ejemplo: Bodega Principal, Cocina, Restaurante, Camareria
+
+Configuración inicial para esas bodegas
+
+Motivos de movimiento básicos 
+
+script bodega
+
+10) Flujo típico de operación (ejemplos)
+A) Compra / Entrada
+
+Crear movimiento_encabezado tipo ENTRADA con motivo Compra, proveedor y documento.
+
+Agregar líneas en movimiento_detalle (producto, lote, vencimiento, cantidad, costo).
+
+Confirmar: se refleja en kardex y sube el stock.
+
+B) Consumo / Salida
+
+Crear movimiento tipo SALIDA (motivo Consumo Interno).
+
+Se descuenta en kardex (delta negativo).
+
+C) Transferencia Principal → Cocina
+
+Movimiento tipo TRANSFERENCIA con bodega origen=Principal y destino=Cocina.
+
+Kardex registra: sale de Principal (–) y entra a Cocina (+).
+
+D) Pedido Cocina → Principal
+
+Cocina crea pedido (PENDIENTE).
+
+Bodeguero aprueba.
+
+Al surtir, el sistema genera el movimiento (normalmente transferencia o salida según tu regla) y lo vincula al pedido.
+
+11) Próximos pasos (para que quede “redondo” en app)
+
+Si vos lo vas a conectar a una web/app, lo usual es:
+
+Pantallas CRUD para catálogos (productos, medidas, categorías, bodegas, proveedores)
+
+Pantalla de movimientos (borrador → confirmar)
+
+Pantalla de stock (usando las vistas)
+
+Pantalla de pedidos (solicitar → aprobar → surtir)
+
+Alertas: mínimos/máximos y vencimientos (con las tablas de límites/reglas)

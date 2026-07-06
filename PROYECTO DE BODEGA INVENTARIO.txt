@@ -1,0 +1,68 @@
+PROYECTO DE BODEGA INVENTARIO
+
+// TODOS ESTOS TIENEN QUE DEJAR EDITAR ELIMINAR Y AGREGAR
+
+Creación de tablas de Usuarios ,Contrasena, Bodega, Rol, Activo
+
+que se pueda crear usuarios editarlos eliminarlos desactivarlos 
+Creación de tabla de Categorías IdCategoria Nombre Categoria, Activo
+Creación de tabla de Subcategorias IdSubCat, Nombresubcategoria,Activo
+Creación de Bodegas IdBodega, Nombre Bodega, Activo
+Creación de Medidas IdMedida,NombreMedida,Activo
+Creación de Proveedores IdProveedores, NombreProveedor, Teléfono Proveedor,Direccion,Activo
+Creación de Productos IdProducto,Producto,Medida, Categoria,subcategoria,Activo
+Creacion de Motivos IdMotivo (aca sera los motivos por lo que se realiza los movimientos si es por merma o descomposición reposición etc algún parámetro si tiene que restar o sumar dependiendo el motivo
+Creacion de Bodega IdBodega Bodega (quisiera que unas bodegas solo puedan recibir producto y cuando cambie el tipo de bodega entonces que ellos puedan ver sus entradas existencias puedan realizar entradas salidas manuales como la bodega principal)
+
+
+//REPORTES
+Reporte de Transferencias
+Reportes de Salidas
+Reportes de Entradas
+Reporte de Existencias
+por bodega por articulo por categoría por subcategoria por rango de fechas por usuario que solicito por bodeguero que solicito 
+
+
+
+
+No se puede revertir o modificar o eliminar entradas salidas o despachos de algún movimiento que no sea de la misma fecha para no afectar 
+Hay usuarios que tienen su propia bodega que llegan a realizar pedidos dependiendo su rol si es bodeguero encargado entonces el producto se le transferirá es decir se crea su misma bodega y lógicamente los productos que no cuenten con stock no se pueden despachar 
+
+quiero visualizar el stock de los productos de solo los productos que cuenten con stock quiero manejar minimos y máximo pro producto y por bodega que pueda establecer
+el mínimo y máximo por bodega aunque sea el mismo producto 
+
+tambien quiero manejar fechas de vencimientos de productos quiero alertas dinámicas que no me deje despachar producto vencido.
+tambien quiero manejar lotes de productos para despachar un producto que me sugiera los primeros lotes que vencerán antes 
+
+la lógica del sistema es la siguiente nosotros somos un hotel que cuenta con varias areas 
+
+Restaurante,Cocina,Camareria Tenemos una pc afuera de bodega donde los usuarios se loguen y realizan un pedido ala bodega principal 
+el bodeguero Encargado Revisa el pedido y va dándole salida o transferencia dependiendo de como este configurada
+su bodega si bodega va a manejar entradas salidas stock como la bodega principal hay bodegas que solo reciben su producto pero no le dan entradas ni nada ósea el producto ahi termina su trazabilidad pero hay bodegas que si cuando le trasferimos ellos tendrán su stock para hacer su pedido de igual forma le mostrara el stock que 
+tiene del producto que solictara para no pedir de mas 
+los pedidos manejamos no de pedido la bodega y usuario que lo solicito dependiendo de la bodega se le da salida o transferencia de producto salida sale de bodega principal y ahi termina cambio transferencia se le envia ala otra bodega y entra en su tabla de entradas cuando se le transfirió que usuario le transfirió la hora cantidad producto lote etc datos relevandtes para reporteria 
+
+aunque no tengamos stock de productos en bodega principal ellos pueden pedir para que llegue el pedido en bodega principal y ver que hay que comprar
+cuando se compre e ingrese el producto en entradas entonces ahi es cuando ya deje despachar el producto
+
+tiene que generar un formato una lista de los productos solicitados puede poner una observación por cada producto solicitado la cantidad en el pedido va la fecha usario que solicito algunos datos que consideres relevantes el formato dependiendo como se le configure ala bodega puede ser tipo ticket o tipo hoja carta en horizontal 
+
+las entradas de producto cuando se alimenta la bodega tienen que tener dependiendo del usuario que se logue le aparecerá a que bodega alimentara el motivo si fue donación stock inicial compra transferencia etc alguna observación la interfzas sera tipo carrito de compras muy moderna e intuitivo tendrá que guardar la fecha de entrada fecha vencimiento lote cantidad no documento proveedor precio compra y poner el precio total si es tranfererencia de una bodega a otra tendría que llevar el precio ya de que bodega me lo esta transfiriendo en la compra o entrada me muestre el sotck total disponible de todos los lotes del producto que ingresare 
+
+en la salidas serian de dos formas posibles una seria que me soliciten el producto como los pedidos que habíamos dicho antes
+dependiendo de configuración de bodega y usuario tendría que ser automatico salida o transferencia de producto  la otra forma tipo carrito la misma forma escoger el producto el lote que traiga los datos de los productos si se le dará alguna bodega tambien tendría que reconocer la bodega si manejara su stock para ver si es salida normal o transferencia eso es automatico 
+
+quisiere algunas alertas pueda dependiendo las subcategorías de los productos pueda modificar cuando me de la alerta de que ya hay que darle salida al producto digamos de la fecha de entrada las carnes blancas solo pueden estar 7 dias de ahi hay que transferir o darle salida que me vaya alertando con alertas muy modernas geniales en el stock tendría que mostrarme o en mi reporte de existencias mostrarme ultima vez que tuvo movimiento si esta vigente 
+
+puedes crearme los script los campos y tablas que tendría que tener en maria db lo guardara dame el js css y express o no se que tecnologías aconsejas 
+hasi como hiciste con mi proyecto inspección de limpieza sorprendeme
+
+
+
+dependiendo del usario que se logue podrá ver solo lo que le corresponde a su bodega como su stock dar entrada y salida en su bodega
+
+
+
+
+
+

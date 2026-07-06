@@ -1,0 +1,406 @@
+/* =========================================================
+   BODEGA INVENTARIO - FULL SCRIPT (ESPAÑOL) MariaDB/HeidiSQL
+   - Tablas + Índices + Vistas + Triggers + Datos iniciales
+   - Nombres en español (sin acentos)
+========================================================= */
+
+-- =========================
+--  1) BASE DE DATOS
+-- =========================
+CREATE DATABASE IF NOT EXISTS bodega_hotel
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+
+USE bodega_hotel;
+
+-- =========================
+--  2) BORRAR VISTAS (SI EXISTEN)
+-- =========================
+DROP VIEW IF EXISTS v_stock_disponible;
+DROP VIEW IF EXISTS v_stock_por_lote;
+DROP VIEW IF EXISTS v_stock_resumen;
+
+-- =========================
+--  3) BORRAR TABLAS (ORDEN POR FK)
+-- =========================
+DROP TABLE IF EXISTS pedido_movimiento_vinculo;
+DROP TABLE IF EXISTS pedido_detalle;
+DROP TABLE IF EXISTS pedido_encabezado;
+
+DROP TABLE IF EXISTS kardex;
+DROP TABLE IF EXISTS movimiento_detalle;
+DROP TABLE IF EXISTS movimiento_encabezado;
+
+DROP TABLE IF EXISTS reglas_subcategoria;
+DROP TABLE IF EXISTS limites_producto_bodega;
+
+DROP TABLE IF EXISTS productos;
+DROP TABLE IF EXISTS proveedores;
+DROP TABLE IF EXISTS medidas;
+DROP TABLE IF EXISTS subcategorias;
+DROP TABLE IF EXISTS categorias;
+
+DROP TABLE IF EXISTS motivos_movimiento;
+
+DROP TABLE IF EXISTS usuarios;
+DROP TABLE IF EXISTS configuracion_bodega;
+DROP TABLE IF EXISTS bodegas;
+DROP TABLE IF EXISTS roles;
+
+-- =========================
+--  4) ROLES / BODEGAS / USUARIOS
+-- =========================
+CREATE TABLE roles (
+  id_rol INT AUTO_INCREMENT PRIMARY KEY,
+  nombre_rol VARCHAR(60) NOT NULL UNIQUE,
+  permisos_json JSON NULL,
+  activo TINYINT(1) NOT NULL DEFAULT 1,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE bodegas (
+  id_bodega INT AUTO_INCREMENT PRIMARY KEY,
+  nombre_bodega VARCHAR(80) NOT NULL UNIQUE,
+  tipo_bodega ENUM('PRINCIPAL','RECEPTORA','OPERATIVA') NOT NULL DEFAULT 'PRINCIPAL',
+  activo TINYINT(1) NOT NULL DEFAULT 1,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE configuracion_bodega (
+  id_bodega INT PRIMARY KEY,
+  maneja_stock TINYINT(1) NOT NULL DEFAULT 1,          -- si lleva kardex
+  puede_recibir TINYINT(1) NOT NULL DEFAULT 1,
+  puede_despachar TINYINT(1) NOT NULL DEFAULT 1,
+  modo_despacho_auto ENUM('SALIDA','TRANSFERENCIA') NOT NULL DEFAULT 'SALIDA',
+  id_bodega_destino_default INT NULL,
+  actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_cb_bodega FOREIGN KEY (id_bodega) REFERENCES bodegas(id_bodega),
+  CONSTRAINT fk_cb_destino FOREIGN KEY (id_bodega_destino_default) REFERENCES bodegas(id_bodega)
+) ENGINE=InnoDB;
+
+CREATE TABLE usuarios (
+  id_usuario INT AUTO_INCREMENT PRIMARY KEY,
+  usuario VARCHAR(50) NOT NULL UNIQUE,
+  nombre_completo VARCHAR(120) NOT NULL,
+  contrasena_hash VARCHAR(255) NOT NULL,
+  id_rol INT NOT NULL,
+  id_bodega INT NULL, -- bodega/area del usuario (cocina, restaurante, etc.)
+  activo TINYINT(1) NOT NULL DEFAULT 1,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_usr_rol FOREIGN KEY (id_rol) REFERENCES roles(id_rol),
+  CONSTRAINT fk_usr_bodega FOREIGN KEY (id_bodega) REFERENCES bodegas(id_bodega)
+) ENGINE=InnoDB;
+
+-- =========================
+--  5) CATALOGOS
+-- =========================
+CREATE TABLE categorias (
+  id_categoria INT AUTO_INCREMENT PRIMARY KEY,
+  nombre_categoria VARCHAR(80) NOT NULL UNIQUE,
+  activo TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB;
+
+CREATE TABLE subcategorias (
+  id_subcategoria INT AUTO_INCREMENT PRIMARY KEY,
+  id_categoria INT NOT NULL,
+  nombre_subcategoria VARCHAR(80) NOT NULL,
+  activo TINYINT(1) NOT NULL DEFAULT 1,
+  UNIQUE KEY uq_subcat (id_categoria, nombre_subcategoria),
+  CONSTRAINT fk_subcat_cat FOREIGN KEY (id_categoria) REFERENCES categorias(id_categoria)
+) ENGINE=InnoDB;
+
+CREATE TABLE medidas (
+  id_medida INT AUTO_INCREMENT PRIMARY KEY,
+  nombre_medida VARCHAR(40) NOT NULL UNIQUE,
+  activo TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB;
+
+CREATE TABLE proveedores (
+  id_proveedor INT AUTO_INCREMENT PRIMARY KEY,
+  nombre_proveedor VARCHAR(120) NOT NULL UNIQUE,
+  telefono VARCHAR(30) NULL,
+  direccion VARCHAR(200) NULL,
+  activo TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB;
+
+CREATE TABLE productos (
+  id_producto INT AUTO_INCREMENT PRIMARY KEY,
+  nombre_producto VARCHAR(160) NOT NULL,
+  sku VARCHAR(60) NULL,
+  id_medida INT NOT NULL,
+  id_categoria INT NOT NULL,
+  id_subcategoria INT NULL,
+  activo TINYINT(1) NOT NULL DEFAULT 1,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_producto (nombre_producto, id_medida, id_categoria, id_subcategoria),
+  CONSTRAINT fk_prod_med FOREIGN KEY (id_medida) REFERENCES medidas(id_medida),
+  CONSTRAINT fk_prod_cat FOREIGN KEY (id_categoria) REFERENCES categorias(id_categoria),
+  CONSTRAINT fk_prod_sub FOREIGN KEY (id_subcategoria) REFERENCES subcategorias(id_subcategoria)
+) ENGINE=InnoDB;
+
+-- minimo/maximo por bodega+producto
+CREATE TABLE limites_producto_bodega (
+  id_bodega INT NOT NULL,
+  id_producto INT NOT NULL,
+  minimo DECIMAL(18,3) NOT NULL DEFAULT 0,
+  maximo DECIMAL(18,3) NOT NULL DEFAULT 0,
+  activo TINYINT(1) NOT NULL DEFAULT 1,
+  PRIMARY KEY (id_bodega, id_producto),
+  CONSTRAINT fk_lpb_bodega FOREIGN KEY (id_bodega) REFERENCES bodegas(id_bodega),
+  CONSTRAINT fk_lpb_prod FOREIGN KEY (id_producto) REFERENCES productos(id_producto)
+) ENGINE=InnoDB;
+
+-- reglas por subcategoria (alertas por edad)
+CREATE TABLE reglas_subcategoria (
+  id_subcategoria INT PRIMARY KEY,
+  max_dias_vida INT NOT NULL DEFAULT 0,      -- 0 = sin regla
+  dias_alerta_antes INT NOT NULL DEFAULT 0,  -- avisar X dias antes
+  activo TINYINT(1) NOT NULL DEFAULT 1,
+  CONSTRAINT fk_rs_sub FOREIGN KEY (id_subcategoria) REFERENCES subcategorias(id_subcategoria)
+) ENGINE=InnoDB;
+
+-- =========================
+--  6) MOTIVOS DE MOVIMIENTO
+-- =========================
+CREATE TABLE motivos_movimiento (
+  id_motivo INT AUTO_INCREMENT PRIMARY KEY,
+  nombre_motivo VARCHAR(120) NOT NULL UNIQUE,
+  tipo_movimiento ENUM('ENTRADA','SALIDA','TRANSFERENCIA','AJUSTE') NOT NULL,
+  signo_cantidad TINYINT NOT NULL DEFAULT 1, -- ENTRADA:+1, SALIDA:-1
+  activo TINYINT(1) NOT NULL DEFAULT 1
+) ENGINE=InnoDB;
+
+-- =========================
+--  7) MOVIMIENTOS (ENCABEZADO + DETALLE)
+-- =========================
+CREATE TABLE movimiento_encabezado (
+  id_movimiento BIGINT AUTO_INCREMENT PRIMARY KEY,
+  tipo_movimiento ENUM('ENTRADA','SALIDA','TRANSFERENCIA','AJUSTE') NOT NULL,
+  id_motivo INT NOT NULL,
+  id_bodega_origen INT NULL,
+  id_bodega_destino INT NULL,
+  id_proveedor INT NULL,
+  no_documento VARCHAR(80) NULL,
+  observaciones VARCHAR(400) NULL,
+  creado_por INT NOT NULL,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  confirmado_en DATETIME NULL,
+  estado ENUM('BORRADOR','CONFIRMADO','ANULADO') NOT NULL DEFAULT 'BORRADOR',
+  CONSTRAINT fk_me_motivo FOREIGN KEY (id_motivo) REFERENCES motivos_movimiento(id_motivo),
+  CONSTRAINT fk_me_origen FOREIGN KEY (id_bodega_origen) REFERENCES bodegas(id_bodega),
+  CONSTRAINT fk_me_destino FOREIGN KEY (id_bodega_destino) REFERENCES bodegas(id_bodega),
+  CONSTRAINT fk_me_prov FOREIGN KEY (id_proveedor) REFERENCES proveedores(id_proveedor),
+  CONSTRAINT fk_me_usr FOREIGN KEY (creado_por) REFERENCES usuarios(id_usuario),
+  INDEX ix_me_tipo (tipo_movimiento),
+  INDEX ix_me_creado (creado_en)
+) ENGINE=InnoDB;
+
+CREATE TABLE movimiento_detalle (
+  id_detalle BIGINT AUTO_INCREMENT PRIMARY KEY,
+  id_movimiento BIGINT NOT NULL,
+  id_producto INT NOT NULL,
+  lote VARCHAR(60) NULL,
+  fecha_vencimiento DATE NULL,
+  cantidad DECIMAL(18,3) NOT NULL,
+  costo_unitario DECIMAL(18,4) NOT NULL DEFAULT 0,
+  observacion_linea VARCHAR(250) NULL,
+  CONSTRAINT fk_md_me FOREIGN KEY (id_movimiento) REFERENCES movimiento_encabezado(id_movimiento) ON DELETE CASCADE,
+  CONSTRAINT fk_md_prod FOREIGN KEY (id_producto) REFERENCES productos(id_producto),
+  INDEX ix_md_prod (id_producto),
+  INDEX ix_md_lote (lote),
+  INDEX ix_md_venc (fecha_vencimiento)
+) ENGINE=InnoDB;
+
+-- =========================
+--  8) KARDEX (UNA FILA POR BODEGA AFECTADA)
+-- =========================
+CREATE TABLE kardex (
+  id_kardex BIGINT AUTO_INCREMENT PRIMARY KEY,
+  id_movimiento BIGINT NOT NULL,
+  id_detalle BIGINT NOT NULL,
+  id_bodega INT NOT NULL,
+  id_producto INT NOT NULL,
+  lote VARCHAR(60) NULL,
+  fecha_vencimiento DATE NULL,
+  delta_cantidad DECIMAL(18,3) NOT NULL,     -- + entra, - sale
+  costo_unitario DECIMAL(18,4) NOT NULL DEFAULT 0,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_k_me FOREIGN KEY (id_movimiento) REFERENCES movimiento_encabezado(id_movimiento),
+  CONSTRAINT fk_k_md FOREIGN KEY (id_detalle) REFERENCES movimiento_detalle(id_detalle),
+  CONSTRAINT fk_k_bodega FOREIGN KEY (id_bodega) REFERENCES bodegas(id_bodega),
+  CONSTRAINT fk_k_prod FOREIGN KEY (id_producto) REFERENCES productos(id_producto),
+  INDEX ix_k_bod_prod (id_bodega, id_producto),
+  INDEX ix_k_bod_prod_lote (id_bodega, id_producto, lote),
+  INDEX ix_k_venc (fecha_vencimiento)
+) ENGINE=InnoDB;
+
+-- =========================
+--  9) PEDIDOS (SOLICITUDES)
+-- =========================
+CREATE TABLE pedido_encabezado (
+  id_pedido BIGINT AUTO_INCREMENT PRIMARY KEY,
+  id_usuario_solicita INT NOT NULL,
+  id_bodega_solicita INT NOT NULL,          -- area/bodega que pide
+  id_bodega_surtidor INT NOT NULL,          -- normalmente principal
+  estado ENUM('PENDIENTE','APROBADO','PARCIAL','COMPLETADO','CANCELADO') NOT NULL DEFAULT 'PENDIENTE',
+  observaciones VARCHAR(400) NULL,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  aprobado_por INT NULL,
+  aprobado_en DATETIME NULL,
+  CONSTRAINT fk_pe_usr FOREIGN KEY (id_usuario_solicita) REFERENCES usuarios(id_usuario),
+  CONSTRAINT fk_pe_bodsol FOREIGN KEY (id_bodega_solicita) REFERENCES bodegas(id_bodega),
+  CONSTRAINT fk_pe_bodsurt FOREIGN KEY (id_bodega_surtidor) REFERENCES bodegas(id_bodega),
+  CONSTRAINT fk_pe_apr FOREIGN KEY (aprobado_por) REFERENCES usuarios(id_usuario),
+  INDEX ix_pe_estado (estado),
+  INDEX ix_pe_creado (creado_en)
+) ENGINE=InnoDB;
+
+CREATE TABLE pedido_detalle (
+  id_pedido_detalle BIGINT AUTO_INCREMENT PRIMARY KEY,
+  id_pedido BIGINT NOT NULL,
+  id_producto INT NOT NULL,
+  cantidad_solicitada DECIMAL(18,3) NOT NULL,
+  cantidad_surtida DECIMAL(18,3) NOT NULL DEFAULT 0,
+  observacion_producto VARCHAR(250) NULL, -- observación por producto
+  CONSTRAINT fk_pd_pe FOREIGN KEY (id_pedido) REFERENCES pedido_encabezado(id_pedido) ON DELETE CASCADE,
+  CONSTRAINT fk_pd_prod FOREIGN KEY (id_producto) REFERENCES productos(id_producto),
+  INDEX ix_pd_pedido (id_pedido),
+  INDEX ix_pd_prod (id_producto)
+) ENGINE=InnoDB;
+
+CREATE TABLE pedido_movimiento_vinculo (
+  id_pedido_detalle BIGINT NOT NULL,
+  id_movimiento BIGINT NOT NULL,
+  id_detalle BIGINT NOT NULL,
+  PRIMARY KEY (id_pedido_detalle, id_detalle),
+  CONSTRAINT fk_pmv_pd FOREIGN KEY (id_pedido_detalle) REFERENCES pedido_detalle(id_pedido_detalle),
+  CONSTRAINT fk_pmv_me FOREIGN KEY (id_movimiento) REFERENCES movimiento_encabezado(id_movimiento),
+  CONSTRAINT fk_pmv_md FOREIGN KEY (id_detalle) REFERENCES movimiento_detalle(id_detalle)
+) ENGINE=InnoDB;
+
+-- =========================
+--  10) VISTAS DE STOCK
+-- =========================
+CREATE OR REPLACE VIEW v_stock_por_lote AS
+SELECT
+  k.id_bodega,
+  k.id_producto,
+  k.lote,
+  k.fecha_vencimiento,
+  SUM(k.delta_cantidad) AS stock
+FROM kardex k
+GROUP BY k.id_bodega, k.id_producto, k.lote, k.fecha_vencimiento;
+
+CREATE OR REPLACE VIEW v_stock_disponible AS
+SELECT
+  s.*,
+  CASE
+    WHEN s.fecha_vencimiento IS NULL THEN 1
+    WHEN s.fecha_vencimiento >= CURDATE() THEN 1
+    ELSE 0
+  END AS no_vencido
+FROM v_stock_por_lote s
+WHERE s.stock > 0;
+
+CREATE OR REPLACE VIEW v_stock_resumen AS
+SELECT
+  k.id_bodega,
+  k.id_producto,
+  SUM(k.delta_cantidad) AS stock
+FROM kardex k
+GROUP BY k.id_bodega, k.id_producto;
+
+-- =========================
+--  11) TRIGGERS (BLOQUE COMPLETO - HeidiSQL)
+--  - No permitir editar/eliminar movimientos de fechas pasadas
+-- =========================
+DELIMITER //
+
+DROP TRIGGER IF EXISTS trg_me_no_update_pasado//
+CREATE TRIGGER trg_me_no_update_pasado
+BEFORE UPDATE ON movimiento_encabezado
+FOR EACH ROW
+BEGIN
+  IF DATE(OLD.creado_en) <> CURDATE() THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'No se puede modificar un movimiento de fecha anterior.';
+  END IF;
+END//
+
+DROP TRIGGER IF EXISTS trg_me_no_delete_pasado//
+CREATE TRIGGER trg_me_no_delete_pasado
+BEFORE DELETE ON movimiento_encabezado
+FOR EACH ROW
+BEGIN
+  IF DATE(OLD.creado_en) <> CURDATE() THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'No se puede eliminar un movimiento de fecha anterior.';
+  END IF;
+END//
+
+DROP TRIGGER IF EXISTS trg_md_no_update_pasado//
+CREATE TRIGGER trg_md_no_update_pasado
+BEFORE UPDATE ON movimiento_detalle
+FOR EACH ROW
+BEGIN
+  DECLARE v_creado DATETIME;
+  SELECT creado_en INTO v_creado
+  FROM movimiento_encabezado
+  WHERE id_movimiento = OLD.id_movimiento;
+
+  IF DATE(v_creado) <> CURDATE() THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'No se puede modificar detalle de un movimiento de fecha anterior.';
+  END IF;
+END//
+
+DROP TRIGGER IF EXISTS trg_md_no_delete_pasado//
+CREATE TRIGGER trg_md_no_delete_pasado
+BEFORE DELETE ON movimiento_detalle
+FOR EACH ROW
+BEGIN
+  DECLARE v_creado DATETIME;
+  SELECT creado_en INTO v_creado
+  FROM movimiento_encabezado
+  WHERE id_movimiento = OLD.id_movimiento;
+
+  IF DATE(v_creado) <> CURDATE() THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'No se puede eliminar detalle de un movimiento de fecha anterior.';
+  END IF;
+END//
+
+DELIMITER ;
+
+-- =========================
+--  12) DATOS INICIALES (OPCIONAL)
+-- =========================
+INSERT IGNORE INTO roles(nombre_rol) VALUES ('Admin'),('Bodeguero'),('Solicitante');
+
+-- Bodegas ejemplo (ajustalas a tu hotel)
+INSERT IGNORE INTO bodegas(nombre_bodega, tipo_bodega, activo) VALUES
+('Bodega Principal','PRINCIPAL',1),
+('Cocina','OPERATIVA',1),
+('Restaurante','OPERATIVA',1),
+('Camareria','OPERATIVA',1);
+
+-- Config principal
+INSERT IGNORE INTO configuracion_bodega(id_bodega, maneja_stock, puede_recibir, puede_despachar, modo_despacho_auto, id_bodega_destino_default)
+SELECT id_bodega, 1, 1, 1, 'SALIDA', NULL
+FROM bodegas WHERE nombre_bodega='Bodega Principal';
+
+-- Config operativas (si querés que reciban y mantengan stock)
+INSERT IGNORE INTO configuracion_bodega(id_bodega, maneja_stock, puede_recibir, puede_despachar, modo_despacho_auto, id_bodega_destino_default)
+SELECT id_bodega, 1, 1, 1, 'TRANSFERENCIA', NULL
+FROM bodegas
+WHERE nombre_bodega IN ('Cocina','Restaurante','Camareria');
+
+-- Motivos
+INSERT IGNORE INTO motivos_movimiento(nombre_motivo, tipo_movimiento, signo_cantidad) VALUES
+('Compra','ENTRADA', 1),
+('Donacion','ENTRADA', 1),
+('Stock Inicial','ENTRADA', 1),
+('Merma/Descomposicion','SALIDA', -1),
+('Consumo Interno','SALIDA', -1),
+('Transferencia','TRANSFERENCIA', 0),
+('Ajuste Inventario','AJUSTE', 1);

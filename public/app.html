@@ -1,0 +1,2393 @@
+﻿<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <title>Bodega - Principal</title>
+  <link rel="manifest" href="./manifest.webmanifest"/>
+  <meta name="theme-color" content="#0f172a"/>
+  <link rel="icon" type="image/x-icon" href="./pw.ico"/>
+  <link rel="shortcut icon" type="image/x-icon" href="./pw.ico"/>
+  <link rel="apple-touch-icon" href="./pw.ico"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css"/>
+  <link rel="stylesheet" href="./styles.css"/>
+</head>
+<body class="app">
+  <div class="appShell">
+    <aside class="rail">
+<div class="railBrand">
+<img class="railLogo" id="railLogoImg" src="../imagenes/Oficial_JDL_blanco.png" alt="Logo oficial" />
+</div>
+<div class="railHint">MENU</div>
+</aside>
+    <aside class="menu">
+      <div class="menuHeader">
+<div class="menuAvatarWrap">
+<div class="menuInitialBadge" id="menuAvatarFallback">U</div>
+<img class="menuAvatarImg hidden" id="menuAvatarImg" alt="Avatar usuario" />
+</div>
+<div class="brandTitle">Bodega</div>
+<div class="brandWelcome">Hola - Bienvenido</div>
+<div class="brandSub" id="meName">
+</div>
+</div>
+      <div class="menuGroup">
+<div class="menuTitle">General</div>
+<button class="menuBtn" data-section="home">Inicio</button>
+</div>
+      <div class="menuGroup menuAccordion is-collapsed" data-menu-group="movimientos">
+<button class="menuGroupToggle" data-menu-group-toggle type="button" aria-expanded="false">
+<span class="menuTitle">Movimientos</span>
+<span class="menuGroupCaret" aria-hidden="true">v</span>
+</button>
+<div class="menuGroupBody">
+<button class="menuBtn" data-section="entradas">Entradas</button>
+<button class="menuBtn" data-section="salidas">Salidas</button>
+<button class="menuBtn" data-section="ajustes">Ajustes</button>
+<button class="menuBtn" data-section="pedidos">Realizar pedidos</button>
+<button class="menuBtn" data-section="pedidos-despachar">Pedidos x Despachar</button>
+<button class="menuBtn" data-section="cuadre-caja">Cuadre de caja</button>
+</div>
+</div>
+      <div class="menuGroup menuAccordion is-collapsed" data-menu-group="agregar">
+<button class="menuGroupToggle" data-menu-group-toggle type="button" aria-expanded="false">
+<span class="menuTitle">Agregar</span>
+<span class="menuGroupCaret" aria-hidden="true">v</span>
+</button>
+<div class="menuGroupBody">
+<button class="menuBtn" data-section="categorias">Categorias</button>
+<button class="menuBtn" data-section="subcategorias">Subcategorias</button>
+<button class="menuBtn" data-section="motivos-movimiento">Motivo movimiento</button>
+<button class="menuBtn" data-section="proveedores">Proveedores</button>
+<button class="menuBtn" data-section="productos">Productos</button>
+<button class="menuBtn" data-section="limites">Min/Max</button>
+<button class="menuBtn" data-section="reglas-subcategorias">Reglas subcategorias</button>
+<button class="menuBtn" data-section="usuarios">Usuarios</button>
+<button class="menuBtn" data-section="bodegas">Bodegas</button>
+</div>
+</div>
+      <div class="menuGroup menuAccordion is-collapsed" data-menu-group="reportes">
+<button class="menuGroupToggle" data-menu-group-toggle type="button" aria-expanded="false">
+<span class="menuTitle">Reportes</span>
+<span class="menuGroupCaret" aria-hidden="true">v</span>
+</button>
+<div class="menuGroupBody">
+<button class="menuBtn" data-section="r-corte-diario">Corte diario</button>
+<button class="menuBtn" data-section="r-cuadres-caja">Cuadres de caja</button>
+<button class="menuBtn" data-section="r-entradas">Entradas</button>
+<button class="menuBtn" data-section="r-salidas">Salidas</button>
+<button class="menuBtn" data-section="r-pedidos">Pedidos</button>
+<button class="menuBtn" data-section="r-tendencia-producto">Tendencia producto</button>
+<button class="menuBtn" data-section="r-transferencias">Kardex</button>
+<button class="menuBtn" data-section="r-existencias">Existencias</button>
+<button class="menuBtn" data-section="r-auditoria-sensibles">Auditoria sensible</button>
+</div>
+</div>
+      <div class="menuSpacer">
+</div>
+<button class="menuBtn danger" id="logout">Salir</button>
+    </aside>
+    <main class="stage">
+      <header class="stageTop">
+<div class="stageHeadText">
+<div class="stageTitle" id="stageTitle">Inicio</div>
+<div class="stageSub">Selecciona una seccion del menu lateral</div>
+<div class="supervisorBadge hidden" id="supervisorAuthBadge">
+</div>
+</div>
+<div class="stageHeadLogoWrap">
+<img class="stageHeadLogo" id="stageHeadLogoImg" src="../imagenes/Oficial_JDL_blanco.png" alt="Logo oficial" />
+</div>
+</header>
+      <section class="stageBody">
+        <div class="view" id="view-home">
+<div class="card light">
+<div class="row" style="justify-content:space-between; align-items:center; margin-bottom:10px;">
+<button class="btn soft btn-sm" id="homeDashRefresh" type="button" style="display:none">Refrescar</button>
+<div>
+<div class="cardTitle">Panel principal</div>
+<div class="note" id="homeDashScope">Cargando resumen...</div>
+</div>
+</div>
+<div class="homeDashGrid" id="homeDashCards">
+<button class="homeDashCard" type="button" data-kind="vigentes">
+<div class="k">Productos vigentes</div>
+<div class="v" id="homeCardVigentes">0</div>
+<div class="s" id="homeCardVigentesQty">Cantidad: 0</div>
+</button>
+<button class="homeDashCard bad" type="button" data-kind="vencidos">
+<div class="k">Productos vencidos</div>
+<div class="v" id="homeCardVencidos">0</div>
+<div class="s" id="homeCardVencidosQty">Cantidad: 0</div>
+</button>
+<button class="homeDashCard warn" type="button" data-kind="proximos">
+<div class="k">Proximos a vencer</div>
+<div class="v" id="homeCardProximos">0</div>
+<div class="s" id="homeCardProximosQty">Cantidad: 0</div>
+</button>
+<button class="homeDashCard info" type="button" data-kind="rotar">
+<div class="k">Productos por rotar</div>
+<div class="v" id="homeCardRotar">0</div>
+<div class="s">Click para ver detalle</div>
+</button>
+<button class="homeDashCard stock" type="button" data-kind="stock_minimo">
+<div class="k">Control de stock minimo</div>
+<div class="v" id="homeCardBajoMinimo">0</div>
+<div class="s">Bajo minimo</div>
+<div class="s" id="homeCardEntreMinimoIdeal">Proximo a minimo: 0</div>
+</button>
+<button class="homeDashCard money" type="button" data-kind="vigentes">
+<div class="k">Total dinero en bodega</div>
+<div class="v" id="homeCardDinero">0.00</div>
+<div class="s">Segun stock actual</div>
+</button>
+<button class="homeDashCard up" type="button" data-kind="mas_mov">
+<div class="k">Mayor movimiento</div>
+<div class="v sm" id="homeCardMasMov">-</div>
+<div class="s" id="homeCardMasMovQty">Cantidad: 0</div>
+</button>
+<button class="homeDashCard down" type="button" data-kind="menos_mov">
+<div class="k">Menor movimiento</div>
+<div class="v sm" id="homeCardMenosMov">-</div>
+<div class="s" id="homeCardMenosMovQty">Cantidad: 0</div>
+</button>
+</div>
+<div class="divider">
+</div>
+<div class="row" style="justify-content:space-between; align-items:center;">
+<div class="cardTitle" id="homeDashDetailTitle">Detalle: productos vigentes</div>
+<div class="note" id="homeDashDetailMeta">
+</div>
+</div>
+<div class="tableWrap repTableScroll" style="margin-top:8px;">
+<table class="tbl grid">
+<thead>
+<tr id="homeDashHead">
+</tr>
+</thead>
+<tbody id="homeDashBody">
+<tr>
+<td>Cargando...</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+        <div class="view hidden" id="view-entradas">
+<div class="card light">
+<div class="cardTitle">Entrada de productos</div>
+<div class="grid3">
+<div>
+<label class="lbl">Bodega asignada</label>
+<input class="in" id="entBodega" disabled />
+</div>
+<div>
+<label class="lbl">Fecha</label>
+<input class="in" id="entFecha" type="date"/>
+</div>
+<div>
+<label class="lbl">Hora</label>
+<input class="in" id="entHora" type="time" readonly />
+</div>
+</div>
+<div class="grid3">
+<div>
+<label class="lbl">Motivo</label>
+<select class="in" id="entMotivo">
+<option value="">Seleccione</option>
+</select>
+</div>
+<div>
+<label class="lbl">Pagado</label>
+<select class="in" id="entPagado">
+<option value="">Seleccione</option>
+<option>Si</option>
+<option>No</option>
+</select>
+</div>
+<div>
+<label class="lbl">No. documento</label>
+<input class="in" id="entDocumento" />
+</div>
+</div>
+<div class="grid3">
+<div>
+<label class="lbl">Proveedor</label>
+<select class="in" id="entProveedor">
+<option value="">Seleccione proveedor</option>
+</select>
+</div>
+<div>
+<label class="lbl">Observacion</label>
+<input class="in" id="entObservacion" />
+</div>
+<div>
+</div>
+</div>
+<div class="divider">
+</div>
+<div class="cardTitle">Detalle de producto</div>
+<div class="grid4">
+<div>
+<label class="lbl">Buscar producto</label>
+<div class="row" style="gap:8px">
+<input class="in" id="entProducto" />
+<button class="btn soft btn-sm" id="entSearchBtn" type="button">Buscar</button>
+</div>
+</div>
+<div>
+<label class="lbl">No. lote</label>
+<input class="in" id="entLote" />
+</div>
+<div>
+<label class="lbl">Caducidad</label>
+<input class="in" id="entCaducidad" type="date" />
+</div>
+<div>
+<label class="lbl">Cantidad</label>
+<input class="in" id="entCantidad" type="number" min="0" step="1" />
+</div>
+</div>
+<div class="grid4">
+<div>
+<label class="lbl">Precio compra <button class="entPriceChip" id="entPrecioSugeridoChip" type="button" style="display:none">
+</button>
+</label>
+<input class="in" id="entPrecio" type="number" min="0" step="0.01" />
+</div>
+<div>
+<label class="lbl">Stock</label>
+<input class="in" id="entStock" disabled />
+</div>
+<div>
+<label class="lbl">Total</label>
+<input class="in" id="entTotal" disabled />
+</div>
+<div style="align-self:end">
+<button class="btn soft" id="entAdd" type="button">Agregar</button>
+</div>
+</div>
+<div class="tableWrap repTableScroll" style="margin-top:10px;">
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Producto</th>
+<th>Lote</th>
+<th>Caducidad</th>
+<th>Cantidad</th>
+<th>Precio</th>
+<th>Total</th>
+<th>Accion</th>
+</tr>
+</thead>
+<tbody id="entList">
+<tr>
+<td colspan="7">Sin productos</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="addRow" style="gap:8px; margin-top:10px; justify-content:flex-end;">
+<button class="btn soft" id="entClear" type="button">Limpiar</button>
+<button class="btn soft" id="entStickerPrint" type="button">Imprimir stickers</button>
+<button class="btn ok" id="entSave" type="button">Guardar entrada</button>
+</div>
+</div>
+</div>
+        <div class="view hidden" id="view-salidas">
+<div class="card light">
+<div class="cardTitle">Salida de productos</div>
+<div class="grid4">
+<div>
+<label class="lbl">Bodega</label>
+<input class="in" id="salBodega" disabled />
+</div>
+<div>
+<label class="lbl">Fecha</label>
+<input class="in" id="salFecha" type="date"/>
+</div>
+<div>
+<label class="lbl">Hora</label>
+<input class="in" id="salHora" type="time" readonly />
+</div>
+<div>
+<label class="lbl">Tipo</label>
+<select class="in" id="salTipoMov">
+<option value="SALIDA">Salida</option>
+<option value="TRANSFERENCIA">Transferencia</option>
+</select>
+</div>
+</div>
+<div class="grid4">
+<div>
+<label class="lbl">Motivo</label>
+<select class="in" id="salMotivo">
+<option value="">Seleccione</option>
+</select>
+</div>
+<div>
+<label class="lbl">Destino</label>
+<select class="in" id="salDestino">
+<option value="">Seleccione</option>
+</select>
+</div>
+<div>
+<label class="lbl">No. documento</label>
+<input class="in" id="salDocumento" />
+</div>
+<div>
+<label class="lbl" id="salObservacionLabel">Observacion</label>
+<input class="in" id="salObservacion" />
+</div>
+</div>
+<div class="divider">
+</div>
+<div class="grid4">
+<div>
+<label class="lbl">Producto</label>
+<div class="row" style="gap:8px">
+<input class="in" id="salProducto" />
+<button class="btn soft btn-sm" id="salSearchBtn" type="button">Buscar</button>
+</div>
+</div>
+<div>
+<label class="lbl">Stock</label>
+<input class="in" id="salStock" disabled />
+</div>
+<div>
+<label class="lbl">Cantidad</label>
+<input class="in" id="salCantidad" type="number" min="0" step="1" />
+</div>
+<div>
+<label class="lbl" id="salPrecioLabel">Precio salida</label>
+<input class="in" id="salPrecio" type="number" min="0" step="0.01" />
+</div>
+<div>
+<label class="lbl">Obs. linea</label>
+<input class="in" id="salLineaObs" />
+</div>
+</div>
+<div class="addRow" style="justify-content:flex-end">
+<button class="btn soft" id="salAdd" type="button">Agregar</button>
+</div>
+<div class="tableWrap repTableScroll" style="margin-top:10px;">
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Producto</th>
+<th>Cantidad</th>
+<th>Precio salida</th>
+<th>Observacion</th>
+<th>Accion</th>
+</tr>
+</thead>
+<tbody id="salList">
+<tr>
+<td colspan="5">Sin productos</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="addRow" style="gap:8px; margin-top:10px; justify-content:flex-end;">
+<button class="btn soft" id="salClear" type="button">Limpiar</button>
+<button class="btn ok" id="salSave" type="button">Guardar salida</button>
+</div>
+<div class="card light hidden" id="salCountPanel" style="margin-top:12px;">
+<div class="cardTitle">Conteo final</div>
+<div class="note" id="salCountHint">Usa este bloque para registrar conteo final por producto.</div>
+<div class="grid4" style="margin-top:8px;">
+<div>
+<label class="lbl">Bodega</label>
+<select class="in" id="salCountWarehouse">
+</select>
+</div>
+<div>
+<label class="lbl">Producto</label>
+<input class="in" id="salCountPickProduct" />
+</div>
+<div>
+<label class="lbl">Buscar</label>
+<input class="in" id="salCountQuery" />
+</div>
+<div style="display:flex; align-items:flex-end;">
+<label class="row" style="gap:8px; align-items:center;">
+<input id="salCountShowAll" type="checkbox" />
+<span>Mostrar todos</span>
+</label>
+</div>
+</div>
+<div class="addRow" style="gap:8px; margin-top:8px; justify-content:flex-end;">
+<button class="btn soft btn-sm" id="salCountClear" type="button">Limpiar</button>
+<button class="btn soft btn-sm" id="salCountSearch" type="button">Buscar</button>
+<button class="btn ok btn-sm" id="salCountSave" type="button">Guardar conteo</button>
+</div>
+<div class="row" style="gap:8px; flex-wrap:wrap; margin-top:8px;">
+<span class="pill" id="salCountMeta">Sin datos</span>
+<span class="pill" id="salCountResume">Sin resumen</span>
+</div>
+<div class="tableWrap repTableScroll" style="margin-top:8px;">
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Producto</th>
+<th>Lote</th>
+<th>Caducidad</th>
+<th>Ayer</th>
+<th id="salCountOutCol">Salida</th>
+<th id="salCountFinalCol">Final</th>
+<th>Diferencia</th>
+<th>Accion</th>
+</tr>
+</thead>
+<tbody id="salCountList">
+<tr>
+<td colspan="8">Usa los filtros y presiona Buscar.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+        <div class="view hidden" id="view-ajustes">
+<div class="card light">
+<div class="cardTitle">Ajustes</div>
+<div class="ajFlowCard" id="ajFlowCard">
+<div class="ajFlowTitle" id="ajFlowTitle">Ajuste de entrada (+): suma unidades al stock</div>
+<div class="ajFlowDesc" id="ajFlowDesc">Usa este tipo cuando recibes producto fisico al inventario. Requiere lote para trazabilidad.</div>
+</div>
+<div class="ajMiniHelp" id="ajMiniHelp">
+<div class="ajMiniHelpTitle">Guia rapida (3 pasos)</div>
+<div class="ajMiniHelpStep"><strong>1.</strong> Elige <span id="ajMiniHelpType">Entrada (+)</span>, motivo y bodega.</div>
+<div class="ajMiniHelpStep"><strong>2.</strong> Busca producto, define cantidad y agrega la linea.</div>
+<div class="ajMiniHelpStep" id="ajMiniHelpStep3"><strong>3.</strong> Revisa el impacto total y presiona Guardar ajuste.</div>
+</div>
+<div class="note" id="ajResume">Sin lineas agregadas.</div>
+<div class="grid4">
+<div>
+<label class="lbl">Tipo de ajuste</label>
+<select class="in" id="ajDireccion">
+<option value="ENTRADA">Entrada (+ suma stock)</option>
+<option value="SALIDA">Salida (- resta stock)</option>
+</select>
+</div>
+<div>
+<label class="lbl">Motivo (obligatorio)</label>
+<select class="in" id="ajMotivo">
+</select>
+</div>
+<div>
+<label class="lbl">Bodega afectada</label>
+<select class="in" id="ajWarehouse">
+</select>
+</div>
+<div>
+<label class="lbl">Observacion general</label>
+<input class="in" id="ajObservacion" />
+</div>
+</div>
+<div class="grid4">
+<div>
+<label class="lbl">Producto</label>
+<div class="row" style="gap:8px">
+<input class="in" id="ajProducto" placeholder="Busca y selecciona un producto" />
+<button class="btn soft btn-sm" id="ajSearchBtn" type="button">Buscar</button>
+</div>
+</div>
+<div class="ajEntradaOnly" id="ajLoteWrap">
+<label class="lbl">Lote</label>
+<div class="note">Obligatorio en entrada</div>
+<input class="in" id="ajLote" />
+</div>
+<div class="ajEntradaOnly" id="ajCaducidadWrap">
+<label class="lbl">Caducidad</label>
+<input class="in" id="ajCaducidad" type="date" />
+</div>
+<div class="ajEntradaOnly" id="ajCostoWrap">
+<label class="lbl">Costo</label>
+<input class="in" id="ajCosto" type="number" min="0" step="0.01" />
+</div>
+</div>
+<div class="grid4">
+<div>
+<label class="lbl">Cantidad (unidades)</label>
+<input class="in" id="ajCantidad" type="number" min="0" step="1" />
+<div class="note ajImpactBox" id="ajImpactBox">Impacto por linea: +0 unidades al stock.</div>
+</div>
+<div>
+<label class="lbl">Stock actual (bodega)</label>
+<input class="in" id="ajStockActual" disabled />
+<div class="note">Se calcula por producto y bodega seleccionada.</div>
+</div>
+<div>
+<label class="lbl">Stock proyectado</label>
+<input class="in" id="ajStockProyectado" disabled />
+<div class="note">Asi quedara al agregar esta linea.</div>
+</div>
+<div>
+<label class="lbl">Observacion de linea</label>
+<input class="in" id="ajObsLinea" />
+</div>
+<div style="align-self:end">
+<button class="btn soft" id="ajAdd" type="button">Agregar linea</button>
+</div>
+</div>
+<div class="tableWrap repTableScroll">
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Producto</th>
+<th>Lote</th>
+<th>Caducidad</th>
+<th id="ajQtyHead">Cantidad (+)</th>
+<th>Costo</th>
+<th>Obs. linea</th>
+<th>Accion</th>
+</tr>
+</thead>
+<tbody id="ajList">
+<tr>
+<td colspan="7">Sin lineas</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="addRow" style="justify-content:flex-end; gap:8px">
+<button class="btn soft" id="ajClear" type="button">Limpiar</button>
+<button class="btn ok" id="ajSave" type="button">Guardar ajuste</button>
+</div>
+</div>
+</div>
+        <div class="view hidden" id="view-pedidos">
+<div class="card light orderWrap">
+<div class="orderHeader">
+  <div>
+    <div class="cardTitle">Realizar pedidos</div>
+    <div class="orderSub">Formulario y busqueda a la izquierda, carrito/lista a la derecha.</div>
+  </div>
+  <div class="orderMeta"><div class="pill" id="pedCount">0 lineas</div></div>
+</div>
+
+<div class="orderWorkspace">
+  <div class="orderComposer">
+    <div class="orderPanel">
+      <div class="panelTitle">Datos del pedido</div>
+      <div class="grid3">
+        <div><label class="lbl">Desde bodega (despacha)</label><select class="in" id="pedFromWarehouse"></select></div>
+        <div><label class="lbl">Fecha</label><input class="in" id="pedFecha" type="date"/></div>
+        <div><label class="lbl">Hora</label><input class="in" id="pedHora" type="time" readonly /></div>
+      </div>
+      <input type="hidden" id="pedRequesterType" value="USUARIO" />
+
+      <div class="grid3">
+        <div>
+          <label class="lbl">Usuario solicitante</label>
+          <div class="searchWrap"><input class="in" id="pedUserSearch" /><button class="btn soft btn-sm" id="pedUserSearchBtn" type="button">Buscar</button></div>
+          <select class="in" id="pedUser"></select>
+        </div>
+        <div><label class="lbl">PIN usuario</label><input class="in" id="pedUserPin" type="password" /></div>
+        <div><label class="lbl">Bodega del usuario</label><input class="in" id="pedRequesterWarehouseName" disabled /></div>
+      </div>
+      <input type="hidden" id="pedRequesterWarehouseId" />
+    </div>
+
+    <div class="orderPanel" style="margin-top:14px;">
+      <div class="panelTitle">Agregar producto</div>
+      <div class="grid4">
+        <div>
+          <label class="lbl">Producto</label>
+          <div class="searchWrap"><input class="in" id="pedProducto" /><button class="btn soft btn-sm" id="pedSearchBtn" type="button">Buscar</button></div>
+        </div>
+        <div><label class="lbl">Stock</label><input class="in" id="pedStock" disabled /></div>
+        <div><label class="lbl">Cantidad</label><input class="in" id="pedCantidad" type="number" min="0" step="1" /></div>
+        <div><label class="lbl">Nota linea</label><input class="in" id="pedLineaNota" /></div>
+      </div>
+      <div class="addRow" style="justify-content:flex-end; margin-top:8px;"><button class="btn soft" id="pedAdd" type="button">Agregar</button></div>
+    </div>
+  </div>
+
+  <div class="orderSide">
+    <div class="orderCart">
+      <div class="panelTitle">Mi lista</div>
+      <div class="cartList" id="pedList">
+        <div class="note">Sin productos en el carro.</div>
+      </div>
+
+      <label class="lbl">Notas generales</label>
+      <textarea class="ta" id="pedNotes"></textarea>
+
+      <div class="orderSubmitProgress hidden" id="pedSubmitProgress" aria-live="polite">
+        <div class="orderSubmitProgressHead">
+          <span class="orderSubmitProgressTitle">Enviando pedido...</span>
+          <span class="orderSubmitProgressPct" id="pedSubmitProgressPct">0%</span>
+        </div>
+        <div class="orderSubmitProgressBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Progreso de envio del pedido">
+          <div class="orderSubmitProgressFill" id="pedSubmitProgressFill"></div>
+        </div>
+        <div class="orderSubmitProgressNote" id="pedSubmitProgressNote">Estamos enviando el pedido. No cierres esta ventana.</div>
+      </div>
+
+      <div class="addRow orderActions" style="justify-content:flex-end; gap:8px; margin-top:8px;">
+        <button class="btn soft" id="pedClear" type="button">Limpiar</button>
+        <button class="btn soft" id="pedRefresh" type="button">Actualizar</button>
+        <button class="btn soft" id="pedPrintPos" type="button">Imprimir POS</button>
+        <button class="btn ok" id="pedSave" type="button">Guardar pedido</button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+<div class="view hidden" id="view-pedidos-despachar">
+<div class="card light">
+<div class="cardTitle">Pedidos x Despachar</div>
+<div class="tableWrap repTableScroll">
+<table class="tbl grid">
+<thead>
+<tr>
+<th>ID</th>
+<th>Solicitante</th>
+<th>Bodega</th>
+<th>Estado</th>
+<th>Tipo</th>
+<th>Fecha</th>
+<th>Acciones</th>
+</tr>
+</thead>
+<tbody id="pedOrdersList">
+<tr>
+<td colspan="7">Sin pedidos</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+        <div class="view hidden" id="view-cuadre-caja">
+<div class="card light">
+<div class="cuadreStickyHead">
+<div class="cardTitle">Cuadre de caja</div>
+<div class="grid4">
+<div>
+<label class="lbl">Fecha</label>
+<input class="in" id="cuadreFecha" type="date" />
+</div>
+<div>
+<label class="lbl">Bodega</label>
+<select class="in" id="cuadreWarehouse">
+</select>
+</div>
+<div>
+<label class="lbl">Sede</label>
+<input class="in" id="cuadreSede" />
+</div>
+<div>
+<label class="lbl">Responsable</label>
+<input class="in" id="cuadreResponsable" readonly aria-readonly="true" tabindex="-1" />
+</div>
+</div>
+<div class="addRow cuadreActions">
+<button class="btn soft" id="cuadreClear" type="button">Limpiar</button>
+<button class="btn soft" id="cuadreSearch" type="button">Cargar</button>
+<button class="btn soft" id="cuadrePrintPos" type="button">Imprimir POS 80mm</button>
+<button class="btn soft" id="cuadrePrintCarta" type="button">Imprimir Carta</button>
+<select class="in" id="cuadrePdfFormat">
+<option value="pos">PDF POS 80mm</option>
+<option value="carta" selected>PDF Carta</option>
+</select>
+<button class="btn soft" id="cuadreSavePdf" type="button">Guardar PDF</button>
+<button class="btn ok" id="cuadreSave" type="button">Guardar cuadre</button>
+</div>
+<div class="cuadreResumeGrid">
+<div class="cuadreResumeCard">
+<span class="cuadreResumeLabel">Total efectivo</span>
+<strong id="cuadreTotalEfectivo">Q0.00</strong>
+</div>
+<div class="cuadreResumeCard">
+<span class="cuadreResumeLabel">Total cobro</span>
+<strong id="cuadreTotalCobro">Q0.00</strong>
+</div>
+<div class="cuadreResumeCard">
+<span class="cuadreResumeLabel">Venta por ambiente</span>
+<strong id="cuadreTotalVentaAmbiente">Q0.00</strong>
+</div>
+<div class="cuadreResumeCard accent">
+<span class="cuadreResumeLabel">Gran total reporte</span>
+<strong id="cuadreGranTotal">Q0.00</strong>
+</div>
+</div>
+</div>
+<div class="cuadreShell">
+<div class="cuadreMain">
+<section class="cuadreBlock">
+<div class="cuadreBlockHead">
+<div>
+<div class="cardTitle">Efectivo</div>
+<div class="note">Agrega denominaciones dinamicamente. Incluye una fila fija de $20 con cambio a Q7.30.</div>
+</div>
+<div class="addRow">
+<input class="in cuadreDenomInput" id="cuadreNewDenom" type="number" min="0.01" step="0.01" placeholder="Nueva denominacion" />
+<button class="btn soft btn-sm" id="cuadreAddDenom" type="button">Agregar denominacion</button>
+</div>
+</div>
+<div class="tableWrap repTableScroll cuadreDenomTableWrap">
+<table class="tbl grid cuadreDenomTable">
+<thead>
+<tr>
+<th>Denominacion</th>
+<th>Cantidad</th>
+<th>Subtotal</th>
+<th>Accion</th>
+</tr>
+</thead>
+<tbody id="cuadreCashRows">
+</tbody>
+</table>
+</div>
+<div class="cuadreMiniGrid">
+<div>
+<label class="lbl">Visa</label>
+<input class="in" id="cuadreVisa" type="number" min="0" step="0.01" placeholder="0.00" />
+</div>
+<div>
+<label class="lbl">Bancos</label>
+<input class="in" id="cuadreBancos" type="number" min="0" step="0.01" placeholder="0.00" />
+</div>
+<div>
+<label class="lbl">CxC Trabajadores</label>
+<input class="in" id="cuadreCxcTrabajadores" type="number" min="0" step="0.01" placeholder="0.00" />
+</div>
+<div>
+<label class="lbl">CxC Habitaciones</label>
+<input class="in" id="cuadreCxcHabitaciones" type="number" min="0" step="0.01" placeholder="0.00" />
+</div>
+<div>
+<label class="lbl">Pase Consumible</label>
+<input class="in" id="cuadrePaseConsumible" type="number" min="0" step="0.01" placeholder="0.00" />
+</div>
+</div>
+</section>
+<section class="cuadreBlock">
+<div class="cuadreBlockHead">
+<div>
+<div class="cardTitle">Ventas por ambiente</div>
+<div class="note">Aqui llenas el nombre del ambiente y su monto. Si no existe, usa "Agregar ambiente".</div>
+</div>
+<button class="btn soft btn-sm" id="cuadreAddVentaRow" type="button">Agregar ambiente</button>
+</div>
+<div class="tableWrap repTableScroll">
+<table class="tbl grid">
+<tbody id="cuadreVentasList">
+</tbody>
+</table>
+</div>
+</section>
+<section class="cuadreBlock">
+<div>
+<div class="cardTitle">Pedidos y cortesia</div>
+<div class="note">La cortesia se llena en este bloque, no en la tabla de detalle.</div>
+</div>
+<div class="grid2">
+<div>
+<label class="lbl">Pedidos Nilas</label>
+<input class="in" id="cuadrePedidosNilas" type="number" min="0" step="0.01" placeholder="0.00" />
+</div>
+<div>
+<label class="lbl">Cortesias</label>
+<input class="in" id="cuadreCortesias" type="number" min="0" step="0.01" placeholder="0.00" />
+</div>
+</div>
+</section>
+<section class="cuadreBlock">
+<div class="cuadreBlockHead">
+<div>
+<div class="cardTitle">Detalle adicional</div>
+<div class="note">Observaciones o desglose adicional para el cierre.</div>
+</div>
+<button class="btn soft btn-sm" id="cuadreAddDetailRow" type="button">Agregar fila</button>
+</div>
+<div class="tableWrap repTableScroll">
+<table class="tbl grid">
+<tbody id="cuadreDetailList">
+</tbody>
+</table>
+</div>
+</section>
+<div class="pill" id="cuadreMeta">Sin datos</div>
+</div>
+<aside class="cuadrePreviewWrap">
+<div class="cuadrePreviewCard">
+<div class="cuadrePreviewHead">
+<span class="cuadrePreviewEyebrow">Vista previa</span>
+<strong>Ticket de cuadre</strong>
+</div>
+<div class="cuadreTicket" id="cuadreTicketPreview">
+<div class="cuadreTicketBrand">Jardines del Lago</div>
+<div class="cuadreTicketMeta">
+<div><span>Fecha</span><strong id="cuadrePreviewFecha">-</strong></div>
+<div><span>Bodega</span><strong id="cuadrePreviewBodega">-</strong></div>
+<div><span>Responsable</span><strong id="cuadrePreviewResponsable">-</strong></div>
+</div>
+<div class="cuadreTicketSection">
+<div class="cuadreTicketTitle">Efectivo</div>
+<div class="cuadreTicketLines" id="cuadrePreviewCashLines"></div>
+<div class="cuadreTicketLine total"><span>Dolares a quetzales</span><strong id="cuadrePreviewTotalDolaresQtz">Q0.00</strong></div>
+<div class="cuadreTicketLine total strong"><span>Total efectivo</span><strong id="cuadrePreviewTotalEfectivo">Q0.00</strong></div>
+</div>
+<div class="cuadreTicketSection">
+<div class="cuadreTicketTitle">Otros cobros</div>
+<div class="cuadreTicketLines" id="cuadrePreviewPaymentLines"></div>
+<div class="cuadreTicketLine total"><span>Total cobro</span><strong id="cuadrePreviewTotalCobro">Q0.00</strong></div>
+</div>
+<div class="cuadreTicketSection">
+<div class="cuadreTicketTitle">Ventas y extras</div>
+<div class="cuadreTicketLines" id="cuadrePreviewVentasLines"></div>
+<div class="cuadreTicketLine total"><span>Pedidos Nilas</span><strong id="cuadrePreviewPedidosNilas">Q0.00</strong></div>
+<div class="cuadreTicketLine total"><span>Cortesias</span><strong id="cuadrePreviewCortesias">Q0.00</strong></div>
+<div class="cuadreTicketLine total strong"><span>Gran total</span><strong id="cuadrePreviewGranTotal">Q0.00</strong></div>
+</div>
+<div class="cuadreTicketFooter" id="cuadrePreviewMetaNote">Borrador local del usuario actual.</div>
+</div>
+</div>
+</aside>
+</div>
+</div>
+</div>
+        <div class="view hidden" id="view-categorias">
+<div class="card light">
+<div class="cardTitle">Categorias</div>
+<div class="grid4">
+<div>
+<label class="lbl">Nombre</label>
+<input id="catNombre" />
+</div>
+<div>
+<label class="lbl">Activo</label>
+<select id="catActivo">
+<option value="1">Si</option>
+<option value="0">No</option>
+</select>
+</div>
+<div>
+<label class="lbl">Archivo CSV</label>
+<input id="catImportFile" type="file" />
+<div id="catImportFileName">
+</div>
+</div>
+<div>
+<label class="lbl">Separador</label>
+<select id="catImportDelimiter">
+<option value=",">,</option>
+<option value=";">;</option>
+</select>
+</div>
+</div>
+<div class="addRow" style="justify-content:flex-end; gap:8px">
+<button id="catTemplateBtn">
+</button>
+<button id="catImportBtn">
+</button>
+<button id="catRefresh">
+</button>
+<button id="catSave">
+</button>
+</div>
+<table class="tbl grid">
+<thead>
+<tr>
+<th>ID</th>
+<th>Categoria</th>
+<th>Activo</th>
+<th>Accion</th>
+</tr>
+</thead>
+<tbody id="catManageList">
+</tbody>
+</table>
+<input id="catEditId" />
+<input id="catEditNombre" />
+<input id="catEditActivo" />
+<button id="catEditSave">
+</button>
+</div>
+</div>
+        <div class="view hidden" id="view-subcategorias">
+<div class="card light">
+<div class="cardTitle">Subcategorias</div>
+<div class="grid4">
+<div>
+<label class="lbl">Nombre</label>
+<input id="subCatNombre" />
+</div>
+<div>
+<label class="lbl">Categoria</label>
+<select id="subCatCategoria">
+</select>
+</div>
+<div>
+<label class="lbl">Activo</label>
+<select id="subCatActivo">
+</select>
+</div>
+<div>
+<label class="lbl">Archivo CSV</label>
+<input id="subCatImportFile" type="file" />
+<div id="subCatImportFileName">
+</div>
+</div>
+</div>
+<div class="grid4">
+<div>
+<label class="lbl">Separador</label>
+<select id="subCatImportDelimiter">
+</select>
+</div>
+</div>
+<div class="addRow" style="justify-content:flex-end; gap:8px">
+<button id="subCatTemplateBtn">
+</button>
+<button id="subCatImportBtn">
+</button>
+<button id="subCatRefresh">
+</button>
+<button id="subCatSave">
+</button>
+</div>
+<table class="tbl grid">
+<thead>
+<tr>
+<th>ID</th>
+<th>Categoria</th>
+<th>Subcategoria</th>
+<th>Activo</th>
+<th>Accion</th>
+</tr>
+</thead>
+<tbody id="subCatManageList">
+</tbody>
+</table>
+<input id="subCatEditId" />
+<input id="subCatEditNombre" />
+<input id="subCatEditCategoria" />
+<input id="subCatEditActivo" />
+<button id="subCatEditSave">
+</button>
+</div>
+</div>
+        <div class="view hidden" id="view-motivos-movimiento">
+<div class="card light">
+<input id="motNombre" />
+<select id="motTipo">
+</select>
+<select id="motSigno">
+</select>
+<select id="motActivo">
+</select>
+<button id="motRefresh">
+</button>
+<button id="motSave">
+</button>
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Motivo</th>
+<th>Tipo</th>
+<th>Signo</th>
+<th>Activo</th>
+<th>Accion</th>
+</tr>
+</thead>
+<tbody id="motList">
+</tbody>
+</table>
+</div>
+</div>
+        <div class="view hidden" id="view-proveedores">
+<div class="card light">
+<input id="provNombre" />
+<input id="provTelefono" />
+<input id="provDireccion" />
+<select id="provActivo">
+</select>
+<input id="provImportFile" type="file" />
+<div id="provImportFileName">
+</div>
+<select id="provImportDelimiter">
+</select>
+<button id="provTemplateBtn">
+</button>
+<button id="provImportBtn">
+</button>
+<button id="provRefresh">
+</button>
+<button id="provSave">
+</button>
+<table class="tbl grid">
+<thead>
+<tr>
+<th>ID</th>
+<th>Proveedor</th>
+<th>Telefono</th>
+<th>Direccion</th>
+<th>Activo</th>
+<th>Accion</th>
+</tr>
+</thead>
+<tbody id="provManageList">
+</tbody>
+</table>
+<input id="provEditId" />
+<input id="provEditNombre" />
+<input id="provEditTelefono" />
+<input id="provEditDireccion" />
+<input id="provEditActivo" />
+<button id="provEditSave">
+</button>
+</div>
+</div>
+        <div class="view hidden" id="view-productos">
+<div class="card light">
+<div class="cardTitle">Productos</div>
+<div class="note prdFlowHint">Flujo recomendado: 1) Captura manual para crear producto, 2) Listado productos para buscar, 3) Editar producto para actualizar.</div>
+
+<div class="grid4">
+  <div><label class="lbl">Nombre producto</label><input class="in" id="prdNombre" /></div>
+  <div><label class="lbl">SKU</label><input class="in" id="prdSku" /></div>
+  <div><label class="lbl">Medida</label><select class="in" id="prdMedida"></select></div>
+  <div><label class="lbl">Estado</label><select class="in" id="prdActivo"></select></div>
+</div>
+
+<div class="grid4">
+  <div><label class="lbl">Categoria</label><select class="in" id="prdCategoria"></select></div>
+  <div><label class="lbl">Subcategoria</label><select class="in" id="prdSubcategoria"></select></div>
+  <div style="grid-column: span 2;"><label class="lbl">Bodegas visibles (activar/desactivar por bodega)</label><div class="warehouseCheckList" id="prdVisibleWarehouses"></div><label class="warehouseCheckItem" id="prdMyWarehouseToggleWrap"><input type="checkbox" id="prdVisibleInMyWarehouse" checked /><span>Habilitado en mi bodega</span></label><div class="note" id="prdMyWarehouseHint">Puedes habilitar o inhabilitar el producto en tu bodega desde la lista.</div></div>
+</div>
+
+<div class="grid4 importGrid">
+  <div class="searchWrap" style="grid-column: span 2;"><input class="in" id="prdSearch" placeholder="Buscar por nombre o SKU" /><button class="btn soft btn-sm" id="prdSearchBtn" type="button">Buscar</button></div>
+  <div><label class="lbl">CSV productos</label><input id="prdImportFile" type="file" /><div class="note" id="prdImportFileName">Ningun archivo seleccionado</div></div>
+  <div><label class="lbl">Separador</label><select class="in" id="prdImportDelimiter"></select></div>
+</div>
+
+<div class="grid4 importGrid">
+  <div><label class="lbl">CSV stock</label><input id="prdStockImportFile" type="file" /><div class="note" id="prdStockImportFileName">Ningun archivo seleccionado</div></div>
+  <div><label class="lbl">Separador stock</label><select class="in" id="prdStockImportDelimiter"></select></div>
+  <div><label class="lbl">Motivo importacion</label><select class="in" id="prdStockImportMotivo"></select></div>
+  <div><label class="lbl">Observacion importacion</label><input class="in" id="prdStockImportObs" /></div>
+</div>
+
+<div class="addRow" style="justify-content:flex-end; gap:8px; flex-wrap:wrap;">
+  <button class="btn soft btn-sm" id="prdTemplateBtn" type="button">Plantilla productos</button>
+  <button class="btn soft btn-sm" id="prdImportBtn" type="button">Importar productos</button>
+  <button class="btn soft btn-sm" id="prdStockTemplateBtn" type="button">Plantilla stock</button>
+  <button class="btn soft btn-sm" id="prdStockImportBtn" type="button">Importar stock</button>
+  <button class="btn soft btn-sm" id="prdRefresh" type="button">Actualizar</button>
+  <button class="btn ok" id="prdSave" type="button">Guardar producto</button>
+</div>
+
+<div class="tableWrap repTableScroll" style="margin-top:10px;">
+<table class="tbl grid">
+<thead>
+<tr>
+<th>ID</th><th>Producto</th><th>SKU</th><th>Medida</th><th>Categoria</th><th>Subcategoria</th><th>Bodegas visibles</th><th>Mi bodega</th><th>Estado</th><th>Accion</th>
+</tr>
+</thead>
+<tbody id="prdManageList"><tr><td colspan="10">Escribe un producto para buscar.</td></tr></tbody>
+</table>
+</div>
+
+<input type="hidden" id="prdEditId" />
+<div class="grid4">
+  <div><label class="lbl">Nombre producto</label><input class="in" id="prdEditNombre" /></div>
+  <div><label class="lbl">SKU</label><input class="in" id="prdEditSku" /></div>
+  <div><label class="lbl">Medida</label><select class="in" id="prdEditMedida"></select></div>
+  <div><label class="lbl">Estado</label><select class="in" id="prdEditActivo"></select></div>
+</div>
+<div class="grid4">
+  <div><label class="lbl">Categoria</label><select class="in" id="prdEditCategoria"></select></div>
+  <div><label class="lbl">Subcategoria</label><select class="in" id="prdEditSubcategoria"></select></div>
+  <div style="grid-column: 1 / -1;"><label class="lbl">Bodegas visibles</label><div class="warehouseCheckList" id="prdEditVisibleWarehouses"></div></div>
+</div>
+<div class="addRow" style="justify-content:flex-end;">
+  <button class="btn ok" id="prdEditSave" type="button">Guardar cambios</button>
+</div>
+</div>
+</div>
+<div class="view hidden" id="view-limites">
+<div class="card light">
+<select id="limWarehouse">
+</select>
+<select id="limProduct">
+</select>
+<input id="limMin" type="number" min="0" step="1" />
+<input id="limMax" type="number" min="0" step="1" />
+<select id="limActive">
+</select>
+<input id="limImportFile" type="file" />
+<div id="limImportFileName">
+</div>
+<select id="limImportDelimiter">
+</select>
+<button id="limTemplateBtn">
+</button>
+<button id="limImportBtn">
+</button>
+<button id="limRefresh">
+</button>
+<button id="limSave">
+</button>
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Bodega</th>
+<th>Producto</th>
+<th>SKU</th>
+<th>Minimo</th>
+<th>Maximo</th>
+<th>Activo</th>
+<th>Accion</th>
+</tr>
+</thead>
+<tbody id="limList">
+</tbody>
+</table>
+<input id="limEditWarehouse" type="hidden" />
+<input id="limEditWarehouseName" />
+<input id="limEditProduct" type="hidden" />
+<input id="limEditProductName" />
+<input id="limEditMin" type="number" min="0" step="1" />
+<input id="limEditMax" type="number" min="0" step="1" />
+<select id="limEditActive">
+</select>
+<button id="limEditSave">
+</button>
+</div>
+</div>
+        <div class="view hidden" id="view-reglas-subcategorias">
+<div class="card light">
+<select id="regSubcat">
+</select>
+<input id="regMaxDays" />
+<input id="regAlertDays" />
+<select id="regActive">
+</select>
+<button id="regRefresh">
+</button>
+<button id="regSave">
+</button>
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Categoria</th>
+<th>Subcategoria</th>
+<th>Dias max</th>
+<th>Dias alerta</th>
+<th>Activo</th>
+<th>Estado regla</th>
+<th>Accion</th>
+</tr>
+</thead>
+<tbody id="regList">
+</tbody>
+</table>
+<input id="regEditSubcatId" />
+<input id="regEditSubcatName" />
+<input id="regEditMaxDays" />
+<input id="regEditAlertDays" />
+<input id="regEditActive" />
+<button id="regEditSave">
+</button>
+</div>
+</div>
+        <div class="view hidden" id="view-usuarios">
+<div class="card light">
+<input id="usrUsername" />
+<input id="usrFullName" />
+<select id="usrRole">
+</select>
+<select id="usrWarehouse">
+</select>
+<input id="usrPassword" />
+<input id="usrOrderPin" />
+<select id="usrActive">
+</select>
+<select id="usrCanSupervisor">
+</select>
+<select id="usrNoAutoLogout">
+</select>
+<input id="usrAvatarFile" type="file" accept="image/*" />
+<input id="usrAvatarData" type="hidden" />
+<img id="usrAvatarPreviewImg" />
+<div id="usrAvatarPreviewFallback">
+</div>
+<button id="usrAvatarClear">
+</button>
+<button id="usrRefresh">
+</button>
+<button id="usrSave">
+</button>
+<table class="tbl grid">
+<thead>
+<tr>
+<th>ID</th>
+<th>Avatar</th>
+<th>Usuario</th>
+<th>Nombre</th>
+<th>Rol</th>
+<th>Bodega</th>
+<th>Supervisor</th>
+<th>Estado</th>
+<th>Accion</th>
+</tr>
+</thead>
+<tbody id="usrManageList">
+</tbody>
+</table>
+<select id="usrResetUser">
+</select>
+<input id="usrResetPassword" />
+<input id="usrResetPassword2" />
+<input id="usrResetOrderPin" />
+<input id="usrResetOrderPin2" />
+<button id="usrResetOrderPinSave">
+</button>
+<button id="usrResetSave">
+</button>
+<select id="usrPermUser">
+</select>
+<table class="tbl grid">
+<tbody id="usrPermList">
+</tbody>
+</table>
+<button id="usrPermReload">
+</button>
+<button id="usrPermSave">
+</button>
+<select id="usrWhAccessUser">
+</select>
+<table class="tbl grid">
+<tbody id="usrWhAccessList">
+</tbody>
+</table>
+<button id="usrWhAccessReload">
+</button>
+<button id="usrWhAccessSave">
+</button>
+<input id="usrEditId" />
+<input id="usrEditUsername" />
+<input id="usrEditFullName" />
+<select id="usrEditRole">
+</select>
+<select id="usrEditWarehouse">
+</select>
+<select id="usrEditActive">
+</select>
+<select id="usrEditCanSupervisor">
+</select>
+<select id="usrEditNoAutoLogout">
+</select>
+<input id="usrEditAvatarData" type="hidden" />
+<input id="usrEditAvatarFile" type="file" accept="image/*" />
+<div id="usrEditAvatarPreviewFallback">
+</div>
+<img id="usrEditAvatarPreviewImg" />
+<button id="usrEditAvatarClear">
+</button>
+<button id="usrEditSave">
+</button>
+</div>
+</div>
+        <div class="view hidden" id="view-bodegas">
+<div class="card light">
+<input id="bodNombre" />
+<select id="bodTipo">
+</select>
+<input id="bodTelefono" />
+<input id="bodDireccion" />
+<select id="bodActivo">
+</select>
+<select id="bodStock">
+</select>
+<select id="bodRecibir">
+</select>
+<select id="bodDespachar">
+</select>
+<select id="bodModo">
+</select>
+<select id="bodDestino">
+</select>
+<select id="bodConteoFinal">
+</select>
+<select id="bodPrecioSalida">
+</select>
+<input id="bodLogoAppFile" type="file" />
+<input id="bodLogoAppData" />
+<img id="bodLogoAppPreviewImg" />
+<div id="bodLogoAppPreviewFallback">
+</div>
+<button id="bodLogoAppClear">
+</button>
+<input id="bodLogoPrintFile" type="file" />
+<input id="bodLogoPrintData" />
+<img id="bodLogoPrintPreviewImg" />
+<div id="bodLogoPrintPreviewFallback">
+</div>
+<button id="bodLogoPrintClear">
+</button>
+<button id="bodLogoSave">
+</button>
+<button id="bodRefresh">
+</button>
+<button id="bodSave">
+</button>
+<table class="tbl grid">
+<thead>
+<tr>
+<th>ID</th>
+<th>Bodega</th>
+<th>Tipo</th>
+<th>Estado</th>
+<th>Modo despacho</th>
+<th>Destino default</th>
+<th>Accion</th>
+</tr>
+</thead>
+<tbody id="bodManageList">
+</tbody>
+</table>
+<input id="bodEditId" />
+<input id="bodEditNombre" />
+<select id="bodEditTipo"></select>
+<input id="bodEditTelefono" />
+<input id="bodEditDireccion" />
+<select id="bodEditActivo"></select>
+<select id="bodEditStock"></select>
+<select id="bodEditRecibir"></select>
+<select id="bodEditDespachar"></select>
+<select id="bodEditModo"></select>
+<select id="bodEditDestino"></select>
+<select id="bodEditConteoFinal"></select>
+<select id="bodEditPrecioSalida"></select>
+<button id="bodEditSave">
+</button>
+</div>
+</div>
+        <div class="view hidden" id="view-r-corte-diario">
+<div class="card light">
+<div class="cardTitle">Reporte corte diario</div>
+<div class="grid4">
+<div>
+<label class="lbl">Bodega</label>
+<select class="in" id="repDiaWarehouse">
+</select>
+</div>
+<div>
+<label class="lbl">Fecha</label>
+<input class="in" id="repDiaQuery" type="date" />
+</div>
+<div>
+<label class="lbl">Producto</label>
+<input class="in" id="repDiaPickProduct" />
+</div>
+<div>
+<label class="row" style="gap:8px;align-items:center;">
+<input id="repDiaShowAll" type="checkbox" />
+<span>Mostrar todo</span>
+</label>
+</div>
+</div>
+<div class="addRow" style="justify-content:flex-end; gap:8px">
+<button class="btn soft" id="repDiaClear" type="button">Limpiar</button>
+<button class="btn soft" id="repDiaSearch" type="button">Buscar</button>
+<button class="btn soft" id="repDiaPdf" type="button">Imprimir carta</button>
+<button class="btn soft" id="repDiaApplyCount" type="button">Aplicar conteo</button>
+<button class="btn soft" id="repDiaHistory" type="button">Historial</button>
+<button class="btn soft" id="repDiaClose" type="button">Cerrar dia</button>
+</div>
+<div class="note" id="repDiaManualHint" style="display:none"></div>
+<div class="note repDiaValidationNote" id="repDiaValidation" style="display:none"></div>
+<div class="note" id="repDiaMeta">
+</div>
+<div class="note" id="repDiaResume">
+</div>
+<div id="repDiaFinalColLegacy" class="hidden">
+</div>
+<div class="tableWrap repTableScroll">
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Producto</th>
+<th>SKU</th>
+<th>Inicial</th>
+<th>Entradas</th>
+<th>Salidas</th>
+<th>Final</th>
+<th id="repDiaFinalCol" style="display:none">Final manual</th>
+</tr>
+</thead>
+<tbody id="repDiaList">
+<tr>
+<td colspan="7">Sin datos</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+        <div class="view hidden" id="view-r-cuadres-caja">
+<div class="card light">
+<div class="cardTitle">Reporte cuadres de caja</div>
+<div class="grid4">
+<div>
+<label class="lbl">Fecha</label>
+<input class="in" id="repCuadreFecha" type="date" />
+</div>
+<div>
+<label class="lbl">Bodega</label>
+<select class="in" id="repCuadreWarehouse">
+</select>
+</div>
+<div>
+<label class="lbl">Responsable</label>
+<input class="in" id="repCuadreResponsable" placeholder="Nombre del responsable" />
+</div>
+<div>
+<label class="lbl">Acciones</label>
+<div class="addRow" style="justify-content:flex-start; gap:8px">
+<button class="btn soft" id="repCuadreClear" type="button">Limpiar</button>
+<button class="btn soft" id="repCuadreSearch" type="button">Buscar</button>
+</div>
+</div>
+</div>
+<div class="note" id="repCuadreResume"><span class="pill ghost">Usa los filtros y presiona Buscar.</span></div>
+<div class="tableWrap repTableScroll" style="margin-top:10px;">
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Fecha</th>
+<th>Bodega</th>
+<th>Responsable</th>
+<th>Total efectivo</th>
+<th>Total cobro</th>
+<th>Venta ambiente</th>
+<th>Gran total</th>
+<th>Actualizado</th>
+<th>Acciones</th>
+</tr>
+</thead>
+<tbody id="repCuadreList">
+<tr>
+<td colspan="9">Usa los filtros y presiona Buscar.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+        <div class="view hidden" id="view-r-entradas">
+<div class="card light">
+<div class="cardTitle">Reporte entradas</div>
+<div class="grid4">
+<div>
+<label class="lbl">Bodega</label>
+<select class="in" id="repEntWarehouse">
+</select>
+</div>
+<div>
+<label class="lbl">Desde</label>
+<input class="in" id="repEntDateFrom" type="date" />
+</div>
+<div>
+<label class="lbl">Hasta</label>
+<input class="in" id="repEntDateTo" type="date" />
+</div>
+<div>
+<label class="lbl">Documento</label>
+<input class="in" id="repEntDocumento" />
+</div>
+</div>
+<div class="grid4">
+<div>
+<label class="lbl">Categoria</label>
+<select class="in" id="repEntCategoria">
+</select>
+</div>
+<div>
+<label class="lbl">Subcategoria</label>
+<select class="in" id="repEntSubcategoria">
+</select>
+</div>
+<div>
+<label class="lbl">Motivo</label>
+<select class="in" id="repEntMotivo">
+</select>
+</div>
+<div>
+<label class="lbl">Lote</label>
+<input class="in" id="repEntLote" />
+</div>
+</div>
+<div class="grid4">
+<div>
+<label class="lbl">Producto</label>
+<input class="in" id="repEntPickProduct" />
+</div>
+</div>
+<input id="repEntQuery" type="hidden" />
+<div class="addRow" style="justify-content:flex-end; gap:8px">
+<button class="btn soft" id="repEntClear" type="button">Limpiar</button>
+<button class="btn soft" id="repEntSearch" type="button">Buscar</button>
+<button class="btn soft" id="repEntExport" type="button">Exportar</button>
+</div>
+<div class="note" id="repEntResume">
+</div>
+<div class="tableWrap repTableScroll">
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Fecha</th>
+<th>Hora</th>
+<th>Movimiento</th>
+<th>Bodega</th>
+<th>Producto</th>
+<th>SKU</th>
+<th>Categoria</th>
+<th>Subcategoria</th>
+<th>Lote</th>
+<th>Caducidad</th>
+<th>Cantidad</th>
+<th>Precio entrada</th>
+<th>Total</th>
+<th>Motivo</th>
+<th>Documento</th>
+<th>Usuario</th>
+<th id="repEntPanelHead">Panel principal</th>
+</tr>
+</thead>
+<tbody id="repEntList">
+<tr>
+<td colspan="17">Sin datos</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+        <div class="view hidden" id="view-r-salidas">
+<div class="card light">
+<div class="cardTitle">Reporte salidas</div>
+<div class="grid4">
+<div>
+<label class="lbl">Bodega origen</label>
+<select class="in" id="repSalWarehouse">
+</select>
+</div>
+<div>
+<label class="lbl">Bodega destino</label>
+<select class="in" id="repSalWarehouseDestino">
+</select>
+</div>
+<div>
+<label class="lbl">Desde</label>
+<input class="in" id="repSalDateFrom" type="date" />
+</div>
+<div>
+<label class="lbl">Hasta</label>
+<input class="in" id="repSalDateTo" type="date" />
+</div>
+</div>
+<div class="grid4">
+<div>
+<label class="lbl">Categoria</label>
+<select class="in" id="repSalCategoria">
+</select>
+</div>
+<div>
+<label class="lbl">Subcategoria</label>
+<select class="in" id="repSalSubcategoria">
+</select>
+</div>
+<div>
+<label class="lbl">Motivo</label>
+<select class="in" id="repSalMotivo">
+</select>
+</div>
+<div>
+<label class="lbl">Documento</label>
+<input class="in" id="repSalDocumento" />
+</div>
+</div>
+<div class="grid4">
+<div>
+<label class="lbl">Lote</label>
+<input class="in" id="repSalLote" />
+</div>
+<div>
+<label class="lbl">Producto</label>
+<input class="in" id="repSalPickProduct" />
+</div>
+</div>
+<input id="repSalQuery" type="hidden" />
+<div class="addRow" style="justify-content:flex-end; gap:8px">
+<button class="btn soft" id="repSalClear" type="button">Limpiar</button>
+<button class="btn soft" id="repSalSearch" type="button">Buscar</button>
+<button class="btn soft" id="repSalExport" type="button">Exportar</button>
+</div>
+<div class="note" id="repSalResume">
+</div>
+<div class="tableWrap repTableScroll">
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Fecha</th>
+<th>Hora</th>
+<th>Movimiento</th>
+<th>Tipo salida</th>
+<th>Bodega origen</th>
+<th>Bodega destino</th>
+<th>Producto</th>
+<th>SKU</th>
+<th>Categoria</th>
+<th>Subcategoria</th>
+<th>Lote</th>
+<th>Caducidad</th>
+<th>Cantidad</th>
+<th>Costo unit.</th>
+<th>Total</th>
+<th>Motivo</th>
+<th>Documento</th>
+<th>Solicitante</th>
+<th>Usuario</th>
+</tr>
+</thead>
+<tbody id="repSalList">
+<tr>
+<td colspan="19">Sin datos</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+        <div class="view hidden" id="view-r-pedidos">
+<div class="card light">
+<div class="cardTitle">Reporte pedidos</div>
+<div class="uiFormLayout">
+<div class="grid4">
+<div>
+<label class="lbl" for="repPedId">Pedido</label>
+<input class="in" id="repPedId" />
+</div>
+<div>
+<label class="lbl" for="repPedEstado">Estado</label>
+<select class="in" id="repPedEstado">
+</select>
+</div>
+<div>
+<label class="lbl" for="repPedDateFrom">Desde</label>
+<input class="in" id="repPedDateFrom" type="date" />
+</div>
+<div>
+<label class="lbl" for="repPedDateTo">Hasta</label>
+<input class="in" id="repPedDateTo" type="date" />
+</div>
+</div>
+<div class="grid4">
+<div>
+<label class="lbl" for="repPedDateMode">Tipo de fecha</label>
+<select class="in" id="repPedDateMode">
+</select>
+</div>
+<div>
+<label class="lbl" for="repPedWarehouseReq">Bodega solicitante</label>
+<select class="in" id="repPedWarehouseReq">
+</select>
+</div>
+<div>
+<label class="lbl" for="repPedWarehouseDesp">Bodega despacho</label>
+<select class="in" id="repPedWarehouseDesp">
+</select>
+</div>
+<div>
+<label class="lbl" for="repPedLote">Lote</label>
+<input class="in" id="repPedLote" />
+</div>
+</div>
+<div class="grid4">
+<div>
+<label class="lbl" for="repPedRequesterUser">Solicitante</label>
+<select class="in" id="repPedRequesterUser">
+</select>
+</div>
+<div>
+<label class="lbl" for="repPedDispatchUser">Usuario despacho</label>
+<select class="in" id="repPedDispatchUser">
+</select>
+</div>
+<div>
+<label class="lbl" for="repPedCategoria">Categoria</label>
+<select class="in" id="repPedCategoria">
+</select>
+</div>
+<div>
+<label class="lbl" for="repPedSubcategoria">Subcategoria</label>
+<select class="in" id="repPedSubcategoria">
+</select>
+</div>
+</div>
+<div class="grid4">
+<div>
+<label class="lbl" for="repPedPickProduct">Producto</label>
+<input class="in" id="repPedPickProduct" />
+</div>
+</div>
+<input id="repPedQuery" type="hidden" />
+<div class="actionRow">
+<button id="repPedClear">
+</button>
+<button id="repPedSearch">
+</button>
+<button id="repPedExport">
+</button>
+</div>
+</div>
+<div id="repPedResume">
+</div>
+<div class="tableWrap repTableScroll" style="margin-top:10px;">
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Pedido</th>
+<th>Fecha</th>
+<th>Hora</th>
+<th>Estado</th>
+<th>Solicitante</th>
+<th>Bodega solicitante</th>
+<th>Bodega despacho</th>
+<th>Producto</th>
+<th>SKU</th>
+<th>Categoria</th>
+<th>Subcategoria</th>
+<th>Cant. solicitada</th>
+<th>Cant. surtida</th>
+<th>Pendiente</th>
+<th>Total</th>
+<th>Tipo salida</th>
+<th>Lotes despachados</th>
+<th>Ult. salida</th>
+<th>Usuario despacho</th>
+<th>Imprimir</th>
+</tr>
+</thead>
+<tbody id="repPedList">
+<tr>
+<td colspan="20">Sin datos</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+        <div class="view hidden" id="view-r-tendencia-producto">
+<div class="card light">
+<div class="cardTitle">Tendencia por producto</div>
+<div class="note">Visualiza fechas de aumento de precio y dias con mayor demanda desde otras bodegas para un producto.</div>
+<div class="uiFormLayout">
+<div class="grid4">
+<div>
+<label class="lbl" for="repTrendWarehouse">Bodega base</label>
+<select class="in" id="repTrendWarehouse"></select>
+</div>
+<div>
+<label class="lbl" for="repTrendPickProduct">Producto</label>
+<input class="in" id="repTrendPickProduct" placeholder="Selecciona producto" />
+</div>
+<div>
+<label class="lbl" for="repTrendDateFrom">Desde</label>
+<input class="in" id="repTrendDateFrom" type="date" />
+</div>
+<div>
+<label class="lbl" for="repTrendDateTo">Hasta</label>
+<input class="in" id="repTrendDateTo" type="date" />
+</div>
+</div>
+<input id="repTrendQuery" type="hidden" />
+<div class="actionRow">
+<button id="repTrendClear">Limpiar</button>
+<button id="repTrendSearch">Buscar</button>
+</div>
+</div>
+<div id="repTrendResume"><span class="pill ghost">Selecciona un producto y presiona Buscar.</span></div>
+<div class="repTrendCharts">
+<div class="repTrendChartCard">
+<div class="repTrendChartTitle">Fechas de aumento de precio (%)</div>
+<div class="repTrendChartBars price" id="repTrendPriceChart"><div class="note">Sin datos</div></div>
+<div class="tableWrap repTableScroll" style="margin-top:8px;">
+<table class="tbl grid">
+<thead><tr><th>Fecha</th><th>Precio anterior</th><th>Precio nuevo</th><th>% aumento</th></tr></thead>
+<tbody id="repTrendPriceRows"><tr><td colspan="4">Sin datos</td></tr></tbody>
+</table>
+</div>
+</div>
+<div class="repTrendChartCard">
+<div class="repTrendChartTitle">Bodegas con mayor consumo (otras bodegas)</div>
+<div class="repTrendChartBars demand" id="repTrendDemandChart"><div class="note">Sin datos</div></div>
+<div class="tableWrap repTableScroll" style="margin-top:8px;">
+<table class="tbl grid">
+<thead><tr><th>Bodega</th><th>Cantidad sacada</th><th>Pedidos</th><th>% participacion</th></tr></thead>
+<tbody id="repTrendDemandRows"><tr><td colspan="4">Sin datos</td></tr></tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+        <div class="view hidden" id="view-r-transferencias">
+<div class="card light">
+<div class="cardTitle">Kardex</div>
+<div class="uiFormLayout">
+<div class="grid4">
+<div>
+<label class="lbl" for="repKarWarehouse">Bodega</label>
+<select class="in" id="repKarWarehouse">
+</select>
+</div>
+<div>
+<label class="lbl" for="repKarDateFrom">Desde</label>
+<input class="in" id="repKarDateFrom" type="date" />
+</div>
+<div>
+<label class="lbl" for="repKarDateTo">Hasta</label>
+<input class="in" id="repKarDateTo" type="date" />
+</div>
+<div>
+<label class="lbl" for="repKarTipo">Tipo</label>
+<select class="in" id="repKarTipo">
+</select>
+</div>
+</div>
+<div class="grid4">
+<div>
+<label class="lbl" for="repKarMovimiento">Movimiento</label>
+<input class="in" id="repKarMovimiento" />
+</div>
+<div>
+<label class="lbl" for="repKarCategoria">Categoria</label>
+<select class="in" id="repKarCategoria">
+</select>
+</div>
+<div>
+<label class="lbl" for="repKarSubcategoria">Subcategoria</label>
+<select class="in" id="repKarSubcategoria">
+</select>
+</div>
+<div>
+<label class="lbl" for="repKarDocumento">Documento</label>
+<input class="in" id="repKarDocumento" />
+</div>
+</div>
+<div class="grid4">
+<div>
+<label class="lbl" for="repKarUsuario">Usuario</label>
+<input class="in" id="repKarUsuario" />
+</div>
+<div>
+<label class="lbl" for="repKarSolicitante">Solicitante</label>
+<input class="in" id="repKarSolicitante" />
+</div>
+<div>
+<label class="lbl" for="repKarLote">Lote</label>
+<input class="in" id="repKarLote" />
+</div>
+<div>
+<label class="lbl" for="repKarPickProduct">Producto</label>
+<input class="in" id="repKarPickProduct" />
+</div>
+</div>
+<input id="repKarQuery" type="hidden" />
+<div class="actionRow">
+<button id="repKarClear">
+</button>
+<button id="repKarSearch">
+</button>
+<button id="repKarExport">
+</button>
+</div>
+</div>
+<div id="repKarResume">
+</div>
+<div class="tableWrap repTableScroll" style="margin-top:10px;">
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Fecha</th>
+<th>Hora</th>
+<th>Tipo</th>
+<th>Movimiento</th>
+<th>Pedido</th>
+<th>Bodega kardex</th>
+<th>Origen</th>
+<th>Destino</th>
+<th>Producto</th>
+<th>SKU</th>
+<th>Categoria</th>
+<th>Subcategoria</th>
+<th>Lote</th>
+<th>Caducidad</th>
+<th>Entrada</th>
+<th>Salida</th>
+<th>Costo unit.</th>
+<th>Total</th>
+<th>Usuario</th>
+<th>Solicitante</th>
+</tr>
+</thead>
+<tbody id="repKarList">
+<tr>
+<td colspan="20">Sin datos</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+        <div class="view hidden" id="view-r-existencias">
+<div class="card light">
+<div class="cardTitle">Reporte existencias</div>
+<div class="uiFormLayout">
+<div class="grid4">
+<div>
+<label class="lbl" for="repExistWarehouse">Bodega</label>
+<select class="in" id="repExistWarehouse">
+</select>
+</div>
+<div>
+<label class="lbl" for="repExistCategoria">Categoria</label>
+<select class="in" id="repExistCategoria">
+</select>
+</div>
+<div>
+<label class="lbl" for="repExistSubcategoria">Subcategoria</label>
+<select class="in" id="repExistSubcategoria">
+</select>
+</div>
+<div>
+<label class="lbl" for="repExistPickProduct">Producto</label>
+<input class="in" id="repExistPickProduct" />
+</div>
+</div>
+<input id="repExistQuery" type="hidden" />
+<div class="actionRow">
+<button id="repExistClear">Limpiar
+</button>
+<button id="repExistSearch">Buscar
+</button>
+<button id="repExistExport">Exportar
+</button>
+</div>
+</div>
+<div class="repExistPanel">
+<div class="repExistPanelHead">
+<div class="repExistPanelTitle">Filtros rapidos de existencias</div>
+<div class="repExistPanelSub">Ajusta filtros por texto, stock y estado operativo. Se aplican en tiempo real sobre la tabla.</div>
+</div>
+<div class="repHeadFilters">
+<label class="repFilterCard">
+<span class="repFilterLabel">Bodega</span>
+<input class="repHeadInput" id="repHeadBodega" placeholder="Escribe bodega..." />
+</label>
+<label class="repFilterCard">
+<span class="repFilterLabel">Producto</span>
+<input class="repHeadInput" id="repHeadProducto" placeholder="Escribe producto..." />
+</label>
+<label class="repFilterCard">
+<span class="repFilterLabel">Stock minimo</span>
+<input class="repHeadInput" id="repHeadStock" type="number" min="0" step="1" placeholder="0" />
+</label>
+<div class="repFilterCard">
+<span class="repFilterLabel">Estado fecha vencimiento</span>
+<details class="multiSelect" data-target="#repHeadEstado" data-placeholder="Todos">
+<summary class="multiSelectSummary">Todos</summary>
+<div class="multiSelectMenu">
+<label><input type="checkbox" value="Retirar" /> Retirar</label>
+<label><input type="checkbox" value="Mover ya" /> Mover ya</label>
+<label><input type="checkbox" value="Monitorear" /> Monitorear</label>
+<label><input type="checkbox" value="Revisar lote" /> Revisar lote</label>
+<div class="multiSelectActions">
+<button type="button" class="btn soft btn-sm" data-ms-clear>Limpiar</button>
+<button type="button" class="btn soft btn-sm" data-ms-all>Todos</button>
+</div>
+</div>
+</details>
+<input id="repHeadEstado" type="hidden" />
+</div>
+<div class="repFilterCard">
+<span class="repFilterLabel">Nivel</span>
+<details class="multiSelect" data-target="#repHeadNivel" data-placeholder="Todos">
+<summary class="multiSelectSummary">Todos</summary>
+<div class="multiSelectMenu">
+<label><input type="checkbox" value="Bajo Minimo" /> Bajo Minimo</label>
+<label><input type="checkbox" value="Por llegar al minimo" /> Por llegar al minimo</label>
+<label><input type="checkbox" value="Sobre maximo" /> Sobre maximo</label>
+<div class="multiSelectActions">
+<button type="button" class="btn soft btn-sm" data-ms-clear>Limpiar</button>
+<button type="button" class="btn soft btn-sm" data-ms-all>Todos</button>
+</div>
+</div>
+</details>
+<input id="repHeadNivel" type="hidden" />
+</div>
+<div class="repFilterCard">
+<span class="repFilterLabel">Regla rotacion subcategoria</span>
+<details class="multiSelect" data-target="#repHeadRegla" data-placeholder="Todas">
+<summary class="multiSelectSummary">Todas</summary>
+<div class="multiSelectMenu">
+<label><input type="checkbox" value="Excedido" /> Excedido</label>
+<label><input type="checkbox" value="Mover por regla" /> Mover por regla</label>
+<label><input type="checkbox" value="Vigente por regla" /> Vigente por regla</label>
+<label><input type="checkbox" value="Sin regla" /> Sin regla</label>
+<div class="multiSelectActions">
+<button type="button" class="btn soft btn-sm" data-ms-clear>Limpiar</button>
+<button type="button" class="btn soft btn-sm" data-ms-all>Todos</button>
+</div>
+</div>
+</details>
+<input id="repHeadRegla" type="hidden" />
+</div>
+</div>
+<div class="repExistLegendCards"> 
+<div class="repLegendCard estado">
+<div class="repLegendTitle">Estado fecha vencimiento</div>
+<div class="repLegendText">Retirar (&lt;0 dias), Mover ya (<= dias mover), Monitorear (&gt; dias mover), Revisar lote (sin fecha).</div>
+</div>
+<div class="repLegendCard nivel">
+<div class="repLegendTitle">Nivel</div>
+<div class="repLegendText">Bajo Minimo (&lt; minimo), Por llegar al minimo (= minimo + 1), Sobre maximo (&gt; maximo).</div>
+</div>
+<div class="repLegendCard regla">
+<div class="repLegendTitle">Regla rotacion subcategoria</div>
+<div class="repLegendText">Excedido (&lt;0), Mover por regla (<= alerta), Vigente por regla (&gt; alerta), Sin regla (no aplica).</div>
+</div>
+</div>
+</div>
+<div id="repExistResume">
+</div>
+<div class="tableWrap repTableScroll" style="margin-top:10px;">
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Bodega</th>
+<th>Producto</th>
+<th>SKU</th>
+<th>Stock</th>
+<th>Nivel</th>
+<th>Total dinero</th>
+<th>Estado fecha vencimiento</th>
+<th>Regla rotacion</th>
+<th>Lotes</th>
+</tr>
+</thead>
+<tbody id="repExistList">
+<tr>
+<td colspan="9">Sin datos</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+        <div class="view hidden" id="view-r-auditoria-sensibles">
+<div class="card light">
+<div class="cardTitle">Auditoria sensible</div>
+<div class="uiFormLayout">
+<div class="grid4">
+<div>
+<label class="lbl" for="repAudDateFrom">Desde</label>
+<input class="in" id="repAudDateFrom" type="date" />
+</div>
+<div>
+<label class="lbl" for="repAudDateTo">Hasta</label>
+<input class="in" id="repAudDateTo" type="date" />
+</div>
+<div>
+<label class="lbl" for="repAudAction">Accion</label>
+<input class="in" id="repAudAction" />
+</div>
+<div>
+<label class="lbl" for="repAudQuery">Busqueda</label>
+<input class="in" id="repAudQuery" />
+</div>
+</div>
+<div class="actionRow">
+<button id="repAudClear">
+</button>
+<button id="repAudSearch">
+</button>
+</div>
+</div>
+<div id="repAudMeta">
+</div>
+<div class="tableWrap repTableScroll" style="margin-top:10px;">
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Fecha</th>
+<th>Hora</th>
+<th>Accion</th>
+<th>Usuario actor</th>
+<th>Supervisor</th>
+<th>Metodo</th>
+<th>Referencia</th>
+<th>Bodega</th>
+</tr>
+</thead>
+<tbody id="repAudList">
+<tr>
+<td colspan="8">Sin datos</td>
+</tr>
+</tbody>
+</table>
+<span class="hidden" id="repMoveDays">
+</span>
+<span class="hidden" id="repDateFrom">
+</span>
+<span class="hidden" id="repDateTo">
+</span>
+</div>
+<div id="repAlertResume">
+</div>
+<div class="tableWrap repTableScroll" style="margin-top:10px;">
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Bodega</th>
+<th>Producto</th>
+<th>SKU</th>
+<th>Lote</th>
+<th>Caducidad</th>
+<th>Dias</th>
+<th>Stock</th>
+<th>Estado</th>
+</tr>
+</thead>
+<tbody id="repAlertList">
+<tr>
+<td colspan="8">Sin alertas</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+      </section>
+    </main>
+  </div>
+  <div class="toast" id="entToast">
+</div>
+<div class="toastStack" id="toastStack">
+</div>
+<div class="alertBar hidden" id="alertBar">
+</div>
+<div class="globalSaveProgress hidden" id="globalSaveProgress" aria-live="polite" aria-hidden="true">
+<div class="globalSaveProgressInner">
+<div class="globalSaveProgressLabel" id="globalSaveProgressLabel">Guardando cambios...</div>
+<div class="globalSaveProgressTrack"><div class="globalSaveProgressBar" id="globalSaveProgressBar"></div></div>
+</div>
+</div>
+  <div class="modal hidden" id="confirmModal">
+<div class="modalCard">
+<div class="cardTitle" id="confirmTitle">Confirmar accion</div>
+<div class="note" id="confirmText">
+</div>
+<div class="row" style="justify-content:flex-end; gap:8px; margin-top:10px;">
+<button class="btn soft" id="confirmCancel" type="button">Cancelar</button>
+<button class="btn ok" id="confirmOk" type="button">Confirmar</button>
+</div>
+</div>
+</div>
+  <div class="modal hidden" id="supervisorModal">
+<div class="modalCard">
+<div class="cardTitle" id="supervisorTitle">Validacion supervisor</div>
+<label class="lbl">PIN</label>
+<input class="in" id="supervisorPinInput" type="password" />
+<div class="row" style="justify-content:flex-end; gap:8px; margin-top:10px;">
+<button class="btn soft" id="supervisorCancel" type="button">Cancelar</button>
+<button class="btn ok" id="supervisorOk" type="button">Validar</button>
+</div>
+</div>
+</div>
+  <div class="modal hidden" id="closeDayPinModal">
+<div class="modalCard">
+<div class="cardTitle">PIN supervisor</div>
+<input class="in" id="closeDayPinInput" type="password" />
+<div class="row" style="justify-content:flex-end; gap:8px; margin-top:10px;">
+<button class="btn soft" id="closeDayPinCancel" type="button">Cancelar</button>
+<button class="btn ok" id="closeDayPinOk" type="button">Aceptar</button>
+</div>
+</div>
+</div>
+  <div class="modal hidden" id="itemSearchModal">
+<div class="modalCard">
+<div class="cardTitle" id="itemSearchTitle">Buscar producto</div>
+<div class="row" style="gap:8px;">
+<input class="in" id="itemSearchInput" />
+<button class="btn soft" id="itemSearchRun" type="button">Buscar</button>
+</div>
+<div class="tableWrap repTableScroll" style="margin-top:8px;">
+<table class="tbl grid">
+<tbody id="itemSearchList">
+<tr>
+<td colspan="9">Sin resultados</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="row" style="justify-content:flex-end; margin-top:8px;">
+<button class="btn soft" id="itemSearchCancel" type="button">Cerrar</button>
+</div>
+</div>
+</div>
+  <div class="modal hidden" id="pedDispatchModal">
+<div class="modalCard">
+<div class="cardTitle">Despachar pedido</div>
+<div class="note" id="pedDispatchInfo">
+</div>
+<div class="tableWrap repTableScroll" style="margin-top:8px;">
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Producto</th>
+<th>Solicitada</th>
+<th>Pendiente</th>
+<th>Stock</th>
+<th>Cantidad despachar</th>
+<th>Cantidad despachada</th>
+<th>Acciones</th>
+<th>Estado</th>
+</tr>
+</thead>
+<tbody id="pedDispatchLines">
+<tr>
+<td colspan="8">Sin lineas</td>
+</tr>
+</tbody>
+</table>
+</div>
+<label class="lbl">Justificacion</label>
+<textarea class="ta" id="pedDispatchJustificacion">
+</textarea>
+<div class="row" style="justify-content:flex-end; gap:8px; margin-top:10px;">
+<button class="btn soft" id="pedDispatchCancel" type="button">Cancelar</button>
+<button class="btn soft" id="pedDispatchClose" type="button">Cerrar</button>
+<button class="btn ok" id="pedDispatchConfirm" type="button">Confirmar</button>
+</div>
+</div>
+</div>
+  <div class="modal hidden" id="pedLotsModal">
+<div class="modalCard">
+<div class="cardTitle">Lotes disponibles</div>
+<div class="note" id="pedLotsInfo">
+</div>
+<div id="pedLotsList">
+</div>
+<div class="row" style="justify-content:flex-end; gap:8px; margin-top:10px;">
+<button class="btn soft" id="pedLotsClose" type="button">Cerrar</button>
+<button class="btn ok" id="pedLotsOk" type="button">Aceptar</button>
+</div>
+</div>
+</div>
+  <div class="modal hidden" id="repDiaHistoryModal">
+<div class="modalCard">
+<div class="cardTitle">Historial cierre diario</div>
+<div class="grid4">
+<div>
+<label class="lbl">Bodega cierre</label>
+<select class="in" id="repCloseWarehouse">
+</select>
+</div>
+<div>
+<label class="lbl">Fecha cierre</label>
+<input class="in" id="repCloseSearchDate" type="date" />
+</div>
+</div>
+<div class="addRow" style="justify-content:flex-end; gap:8px">
+<button class="btn soft" id="repCloseSearchBtn" type="button">Buscar cierre</button>
+<button class="btn soft" id="repCloseExport" type="button">Exportar</button>
+<button class="btn soft" id="repCloseAllBtn" type="button">Cerrar todos</button>
+</div>
+<div class="note" id="repCloseResume">
+</div>
+<div class="note" id="repCloseDetailMeta">
+</div>
+<div class="tableWrap repTableScroll">
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Producto</th>
+<th>SKU</th>
+<th>Inicial</th>
+<th>Entradas</th>
+<th>Salidas</th>
+<th>Final</th>
+</tr>
+</thead>
+<tbody id="repCloseDetailList">
+<tr>
+<td colspan="6">Sin detalle</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="tableWrap repTableScroll">
+<table class="tbl grid">
+<thead>
+<tr>
+<th>Fecha</th>
+<th>Bodega</th>
+<th>Entradas</th>
+<th>Salidas</th>
+<th>Existencia</th>
+<th>Lineas</th>
+<th>Usuario</th>
+<th>Creado</th>
+<th>Accion</th>
+</tr>
+</thead>
+<tbody id="repCloseHistoryList">
+<tr>
+<td colspan="9">Sin historial</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="row" style="justify-content:flex-end">
+<button class="btn soft" id="repDiaHistoryClose" type="button">Cerrar</button>
+</div>
+</div>
+</div>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr">
+</script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js">
+</script>
+  <script>
+    (function ensureCompatIds(){
+      try{var xhr=new XMLHttpRequest();xhr.open('GET','./app.js?v=20260525b',false);xhr.send(null);if(xhr.status<200||xhr.status>=300)return;var js=String(xhr.responseText||'');var rx=/#([A-Za-z][A-Za-z0-9_-]*)/g;var seen=Object.create(null);var m;var host=document.createElement('div');host.style.display='none';host.id='compatAutoIds';while((m=rx.exec(js))){var id=m[1];if(seen[id])continue;seen[id]=true;if(document.getElementById(id))continue;var el=document.createElement('div');el.id=id;host.appendChild(el);}if(host.childNodes.length)document.body.appendChild(host);}catch(e){}
+    })();
+  </script>
+  <script src="./app.js?v=20260525b">
+</script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
+
+
+
+

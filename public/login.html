@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <title>Bodega - Iniciar sesion</title>
+  <link rel="manifest" href="./manifest.webmanifest"/>
+  <meta name="theme-color" content="#0f172a"/>
+  <link rel="icon" type="image/x-icon" href="./pw.ico"/>
+  <link rel="shortcut icon" type="image/x-icon" href="./pw.ico"/>
+  <link rel="apple-touch-icon" href="./pw.ico"/>
+  <link rel="stylesheet" href="./styles.css"/>
+</head>
+<body class="loginPage">
+  <div class="loginWrap">
+    <div class="loginCard">
+      <div class="loginLogoWrap">
+        <img class="loginLogo" src="../imagenes/Oficial_JDL_blanco.png" alt="Logo JDL" />
+      </div>
+      <div class="loginTitle">BODEGA JARDINES</div>
+      <div class="loginAvatarPreviewWrap">
+        <img class="loginAvatarPreviewImg hidden" id="loginUserAvatar" alt="Avatar usuario seleccionado" />
+        <div class="loginAvatarPreviewFallback" id="loginUserAvatarFallback">SIN AVATAR</div>
+      </div>
+      <div class="loginPickTitle">Selecciona usuario</div>
+      <input id="userPick" class="loginPickInput" list="loginUserOptions" placeholder="Buscar usuario..." autocomplete="off"/>
+      <datalist id="loginUserOptions"></datalist>
+      <div id="loginUserSuggest" class="loginPickSuggest hidden"></div>
+
+      <div class="loginField">
+        <span class="loginFieldIcon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" role="img">
+            <path d="M4 7h16v10H4z"></path>
+            <path d="M4 8l8 6 8-6"></path>
+          </svg>
+        </span>
+        <input id="user" class="loginInput" placeholder="Usuario" autocomplete="username"/>
+      </div>
+
+      <div class="loginField">
+        <span class="loginFieldIcon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" role="img">
+            <path d="M5 12h14v8H5z"></path>
+            <path d="M8 12V9a4 4 0 0 1 8 0v3"></path>
+            <circle cx="12" cy="16" r="1.4"></circle>
+          </svg>
+        </span>
+        <input id="pass" class="loginInput" type="password" placeholder="Contrasena" autocomplete="current-password"/>
+      </div>
+
+      <button id="btn" class="loginBtn" type="button">INICIAR SESION</button>
+      <div id="msg" class="loginMsg"></div>
+    </div>
+  </div>
+
+<script>
+const $ = s => document.querySelector(s);
+const APP_BASE_PATH = (() => {
+  const parts = String(location.pathname || "")
+    .split("/")
+    .filter(Boolean);
+  const publicIndex = parts.findIndex((part) => part.toLowerCase() === "public");
+  if (publicIndex > 0) {
+    return `/${parts.slice(0, publicIndex).join("/")}`;
+  }
+  if (parts[0] && parts[0].toLowerCase() === "inventarioprincipal") {
+    return `/${parts[0]}`;
+  }
+  return "";
+})();
+const API_ORIGIN = `${location.origin}${APP_BASE_PATH}`;
+const loginUsers = [];
+const userOptionsMap = new Map();
+
+async function fetchLoginApi(path, init) {
+  return fetch(`${API_ORIGIN}${path}`, init);
+}
+
+
+function focusLoginPassword() {
+  const pick = $("#userPick");
+  const pass = $("#pass");
+  if (pick && document.activeElement === pick && typeof pick.blur === "function") {
+    pick.blur();
+  }
+  if (!pass) return;
+  requestAnimationFrame(() => {
+    pass.focus();
+    if (typeof pass.select === "function") pass.select();
+  });
+}
+
+function useCustomLoginSuggest() {
+  const smallViewport = window.matchMedia?.("(max-width: 980px)")?.matches;
+  const touchPointer = window.matchMedia?.("(pointer: coarse)")?.matches;
+  const touchFallback = "ontouchstart" in window || Number(navigator.maxTouchPoints || 0) > 0;
+  return Boolean(smallViewport && (touchPointer || touchFallback));
+}
+
+function syncLoginPickerMode() {
+  const pick = $("#userPick");
+  if (!pick) return;
+  if (useCustomLoginSuggest()) {
+    pick.removeAttribute("list");
+  } else {
+    pick.setAttribute("list", "loginUserOptions");
+    hideLoginUserSuggest();
+  }
+}
+
+function setLoginAvatar(avatar) {
+  const img = $("#loginUserAvatar");
+  const fallback = $("#loginUserAvatarFallback");
+  if (!img || !fallback) return;
+  if (typeof avatar === "string" && avatar.startsWith("data:image/")) {
+    img.src = avatar;
+    img.classList.remove("hidden");
+    fallback.classList.add("hidden");
+  } else {
+    img.removeAttribute("src");
+    img.classList.add("hidden");
+    fallback.classList.remove("hidden");
+  }
+}
+
+async function loadLoginUsers() {
+  const pick = $("#userPick");
+  const list = $("#loginUserOptions");
+  if (!pick || !list) return;
+  try {
+    const r = await fetchLoginApi(`/api/auth/users`);
+    const rows = await r.json().catch(() => []);
+    if (!r.ok || !Array.isArray(rows)) return;
+
+    userOptionsMap.clear();
+    loginUsers.length = 0;
+    list.innerHTML = rows
+      .map((u) => {
+        const username = String(u.username || "").trim();
+        if (!username) return "";
+        const item = {
+          username,
+          full_name: String(u.full_name || ""),
+          avatar_url: String(u.avatar_url || ""),
+        };
+        userOptionsMap.set(username.toLowerCase(), item);
+        loginUsers.push(item);
+        return `<option value="${username}" label="${u.full_name || username}"></option>`;
+      })
+      .join("");
+  } catch {}
+}
+
+function syncPickedUserToForm() {
+  const pick = $("#userPick");
+  const user = $("#user");
+  if (!pick || !user) return;
+  const typed = String(pick.value || "").trim();
+  const found = userOptionsMap.get(typed.toLowerCase());
+  if (!found) {
+    user.value = typed;
+    setLoginAvatar("");
+    return;
+  }
+  user.value = found.username;
+  pick.value = found.username;
+  setLoginAvatar(found.avatar_url);
+}
+
+function renderLoginUserSuggest(q = "") {
+  const box = $("#loginUserSuggest");
+  if (!box) return;
+  if (!useCustomLoginSuggest()) {
+    box.innerHTML = "";
+    box.classList.add("hidden");
+    return;
+  }
+  const query = String(q || "").trim().toLowerCase();
+  const list = loginUsers
+    .filter((u) => {
+      if (!query) return true;
+      return (
+        u.username.toLowerCase().includes(query) ||
+        u.full_name.toLowerCase().includes(query)
+      );
+    })
+    .slice(0, 20);
+
+  if (!list.length) {
+    box.innerHTML = "";
+    box.classList.add("hidden");
+    return;
+  }
+
+  box.innerHTML = list
+    .map(
+      (u) => `
+      <button type="button" class="loginPickItem" data-user="${u.username}">
+        <span class="loginPickUser">${u.username}</span>
+        <span class="loginPickName">${u.full_name || u.username}</span>
+      </button>
+    `
+    )
+    .join("");
+  box.classList.remove("hidden");
+}
+
+function hideLoginUserSuggest() {
+  const box = $("#loginUserSuggest");
+  if (!box) return;
+  box.classList.add("hidden");
+}
+
+function hasExactLoginUserMatch() {
+  const pick = $("#userPick");
+  const typed = String(pick?.value || "").trim();
+  return Boolean(typed && userOptionsMap.get(typed.toLowerCase()));
+}
+
+function selectLoginUser(username, { focusPassword = false } = {}) {
+  const pick = $("#userPick");
+  const user = $("#user");
+  if (!pick || !user) return;
+  const key = String(username || "").trim();
+  const found = userOptionsMap.get(key.toLowerCase());
+  if (!found) {
+    pick.value = key;
+    user.value = key;
+    setLoginAvatar("");
+    hideLoginUserSuggest();
+    if (focusPassword) focusLoginPassword();
+    return;
+  }
+  pick.value = found.username;
+  user.value = found.username;
+  setLoginAvatar(found.avatar_url);
+  hideLoginUserSuggest();
+  if (focusPassword) {
+    focusLoginPassword();
+  } else if (typeof pick.blur === "function") {
+    pick.blur();
+  }
+}
+
+$("#btn").onclick = async () => {
+  const btn = $("#btn");
+  const msg = $("#msg");
+  msg.textContent = "";
+  msg.className = "loginMsg";
+
+  const username = $("#user").value.trim();
+  const password = $("#pass").value.trim();
+  if (!username || !password) {
+    msg.textContent = "Falta usuario o contrasena";
+    msg.className = "loginMsg bad";
+    return;
+  }
+
+  btn.disabled = true;
+  try {
+    const r = await fetchLoginApi(`/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+
+    const ct = r.headers.get("content-type") || "";
+    const j = ct.includes("application/json") ? await r.json() : { error: "Respuesta invalida del servidor API" };
+
+    if (!r.ok) {
+      msg.textContent = j.error || "No se pudo iniciar sesion";
+      msg.className = "loginMsg bad";
+      return;
+    }
+
+    localStorage.setItem("token", j.token);
+    localStorage.setItem("me", JSON.stringify(j.user));
+    location.href = "app.html";
+  } catch {
+    msg.textContent = "Error de conexion con el servidor";
+    msg.className = "loginMsg bad";
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+$("#pass").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") $("#btn").click();
+});
+$("#userPick").addEventListener("focus", () => {
+  syncLoginPickerMode();
+  if (hasExactLoginUserMatch()) {
+    hideLoginUserSuggest();
+    return;
+  }
+  renderLoginUserSuggest($("#userPick").value || "");
+});
+$("#userPick").addEventListener("change", () => {
+  syncPickedUserToForm();
+  syncLoginPickerMode();
+  if (hasExactLoginUserMatch()) {
+    hideLoginUserSuggest();
+    focusLoginPassword();
+    return;
+  }
+  renderLoginUserSuggest($("#userPick").value || "");
+});
+$("#userPick").addEventListener("input", () => {
+  syncPickedUserToForm();
+  syncLoginPickerMode();
+  if (hasExactLoginUserMatch()) {
+    hideLoginUserSuggest();
+    return;
+  }
+  renderLoginUserSuggest($("#userPick").value || "");
+});
+$("#userPick").addEventListener("blur", () => {
+  setTimeout(hideLoginUserSuggest, 140);
+});
+$("#userPick").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  if (!hasExactLoginUserMatch()) return;
+  e.preventDefault();
+  syncPickedUserToForm();
+  hideLoginUserSuggest();
+  focusLoginPassword();
+});
+$("#loginUserSuggest").addEventListener("pointerdown", (e) => {
+  const btn = e.target?.closest ? e.target.closest(".loginPickItem") : null;
+  if (!btn) return;
+  e.preventDefault();
+  selectLoginUser(btn.dataset.user || "", { focusPassword: true });
+});
+document.addEventListener("pointerdown", (e) => {
+  const pick = $("#userPick");
+  const box = $("#loginUserSuggest");
+  const target = e.target;
+  if (!pick || !box || !target) return;
+  if (pick.contains?.(target) || box.contains?.(target)) return;
+  hideLoginUserSuggest();
+  if (hasExactLoginUserMatch()) {
+    focusLoginPassword();
+  }
+});
+
+setLoginAvatar("");
+syncLoginPickerMode();
+window.addEventListener("resize", syncLoginPickerMode);
+loadLoginUsers();
+</script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js").catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
