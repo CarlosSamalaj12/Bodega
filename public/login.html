@@ -348,12 +348,101 @@ syncLoginPickerMode();
 window.addEventListener("resize", syncLoginPickerMode);
 loadLoginUsers();
 </script>
+  <div class="connIndicator" id="connIndicator">
+    <span class="connDot" id="connDot"></span>
+    <span class="connText" id="connText">En l&iacute;nea</span>
+  </div>
+  <div class="updateBanner hidden" id="updateBanner">
+    <span class="updateText">Nueva versi&oacute;n disponible</span>
+    <button class="updateBtn" id="updateBtn" type="button">Actualizar</button>
+  </div>
 <script>
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("./sw.js").catch(() => {});
+  (function() {
+    if (!("serviceWorker" in navigator)) return;
+    var swReg = null;
+    var waitingSW = null;
+    var updateBanner = document.getElementById("updateBanner");
+    var updateBtn = document.getElementById("updateBtn");
+
+    function showUpdate() {
+      if (updateBanner) updateBanner.classList.remove("hidden");
+    }
+
+    function hideUpdate() {
+      if (updateBanner) updateBanner.classList.add("hidden");
+    }
+
+    if (updateBtn) {
+      updateBtn.addEventListener("click", function () {
+        hideUpdate();
+        if (waitingSW) {
+          waitingSW.postMessage({ type: "SKIP_WAITING" });
+        } else if (swReg && swReg.waiting) {
+          swReg.waiting.postMessage({ type: "SKIP_WAITING" });
+        }
+      });
+    }
+
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      window.location.reload();
     });
-  }
+
+    function onSWStateChange(worker) {
+      if (worker.state === "installed" && navigator.serviceWorker.controller) {
+        showUpdate();
+      }
+    }
+
+    function onUpdateFound() {
+      var installing = swReg.installing;
+      if (!installing) return;
+      waitingSW = installing;
+      installing.addEventListener("statechange", function () {
+        onSWStateChange(installing);
+      });
+      onSWStateChange(installing);
+    }
+
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("./sw.js").then(function (reg) {
+        swReg = reg;
+        waitingSW = reg.waiting;
+        if (reg.waiting) {
+          showUpdate();
+        }
+        reg.addEventListener("updatefound", onUpdateFound);
+      }).catch(function (err) {
+        console.error("SW registration failed:", err);
+      });
+    });
+  })();
+</script>
+<script>
+  (function() {
+    var indicator = document.getElementById("connIndicator");
+    var dot = document.getElementById("connDot");
+    var text = document.getElementById("connText");
+    if (!indicator) return;
+
+    function updateConn(online) {
+      if (online) {
+        indicator.classList.remove("offline");
+        indicator.classList.add("online");
+        if (dot) dot.className = "connDot on";
+        if (text) text.textContent = "En l\u00ednea";
+      } else {
+        indicator.classList.remove("online");
+        indicator.classList.add("offline");
+        if (dot) dot.className = "connDot off";
+        if (text) text.textContent = "Sin conexi\u00f3n";
+      }
+    }
+
+    updateConn(navigator.onLine);
+
+    window.addEventListener("online", function () { updateConn(true); });
+    window.addEventListener("offline", function () { updateConn(false); });
+  })();
 </script>
 </body>
 </html>

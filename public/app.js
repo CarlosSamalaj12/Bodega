@@ -172,7 +172,7 @@ function normalizeAddViewsLayout(){
       card.querySelectorAll(editSelectors).forEach((el)=>el.classList.remove('hidden'));
 
     });
-  }catch{}
+  } catch (e) { console.error('processAddViewSections:', e); }
 }
 
 function applyAddViewButtonLabels(){
@@ -199,7 +199,7 @@ function applyAddViewButtonLabels(){
       if(!el.classList.contains('btn')) el.classList.add('btn','soft','btn-sm');
       if(!(el.textContent||'').trim()) el.textContent=text;
     });
-  }catch{}
+  } catch (e) { console.error('clearCuadreDraftLocal:', e); }
 }
 
 
@@ -771,7 +771,7 @@ function ensureNativeUiClasses(){
         btn.classList.add('btn','soft','btn-sm');
       });
     });
-  }catch{}
+  } catch (e) { console.error('saveCuadreDraftLocal:', e); }
 }
 function applyAddFieldHints(){
   try{
@@ -817,7 +817,7 @@ function applyAddFieldHints(){
         first.textContent=label;
       }
     });
-  }catch{}
+  } catch (e) { console.error('applyAddFieldHints:', e); }
 }
 
 function ensureStaticSelectCatalogs() {
@@ -995,7 +995,7 @@ function ensureStaticSelectCatalogs() {
         sel.value = String(options[0].value);
       }
     });
-  } catch {}
+  } catch (e) { console.error('api_usuarios:', e); }
 }
 const UI_FIELD_LABELS = {
   catNombre: 'Nombre categoria',
@@ -1294,7 +1294,7 @@ function applyUiHelpTooltips(root = document) {
       const helpText = buildControlHelpText(el, labelText, sectionTitle);
       el.setAttribute('title', helpText);
     });
-  } catch {}
+  } catch (e) { console.error('ensurePermCatalogLoaded:', e); }
 }
 const APP_BASE_PATH = (() => {
   const parts = String(location.pathname || "")
@@ -1363,6 +1363,7 @@ let ajSaveInFlight = false;
 let pedSaveInFlight = false;
 let pedNowTimer = null;
 let pedDispatchBatchInFlight = false;
+let pedDispatchRevertInFlight = false;
 const pedDispatchLineInFlight = new Set();
 
 function getDeviceKey() {
@@ -1672,10 +1673,7 @@ function renderMenuUserLabel() {
 
 function renderMenuAvatar() {
   const img = $("#menuAvatarImg");
-  const initial = $("#menuAvatarFallback");
-  if (!img || !initial) return;
-  const userName = me?.full_name ? String(me.full_name).trim() : "Usuario";
-  initial.textContent = userInitial(userName);
+  if (!img) return;
   if (menuAvatarData && menuAvatarData.startsWith("data:image/")) {
     img.src = menuAvatarData;
     img.classList.remove("hidden");
@@ -1964,7 +1962,7 @@ async function loadMyPermissions() {
     myPerms = j.permisos || {};
     permCatalog = Array.isArray(j.catalogo) ? j.catalogo : [];
     myIsAdminRole = Number(j?.is_admin_role || 0) === 1 || j?.is_admin_role === true;
-  } catch {}
+  } catch (e) { console.error('api_usuarios:', e); }
 }
 
 function applyMenuPermissions() {
@@ -3075,6 +3073,7 @@ let repCloseSelectedDate = "";
 let repCloseSelectedWarehouseId = 0;
 let repCloseSelectedSummary = null;
 let repCanCloseDay = false;
+let repCloseDayInFlight = false;
 let ajWarehouseLoaded = false;
 let ajCanAllBodegas = false;
 var repHeadFiltersBound = false;
@@ -3169,7 +3168,7 @@ async function loadBodegasPedido() {
         .join("");
     fromSel.innerHTML = opts;
     bodegasLoaded = true;
-  } catch {}
+  } catch (e) { console.error('api_bodegas:', e); }
 }
 
 async function loadUsuariosPedido() {
@@ -3190,7 +3189,7 @@ async function loadUsuariosPedido() {
       sel.value = String(me.id_user);
       onPedidoUserChange();
     }
-  } catch {}
+  } catch (e) { console.error('api_roles:', e); }
 }
 
 function normalizePedidoUserFilter(value) {
@@ -3287,7 +3286,7 @@ async function loadPedidoStock() {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return;
     if ($("#pedStock")) $("#pedStock").value = j.stock ?? 0;
-  } catch {}
+  } catch (e) { console.error('api_subcategorias:', e); }
 }
 
 if ($("#pedSearchBtn")) {
@@ -3335,7 +3334,7 @@ async function loadProveedores() {
       `<option value="">Seleccione proveedor</option>` +
       rows.map((p) => `<option value="${p.id_proveedor}">${p.nombre_proveedor}</option>`).join("");
     proveedoresLoaded = true;
-  } catch {}
+  } catch (e) { console.error('loadProveedoresEntrada:', e); }
 }
 
 async function loadMotivosEntrada() {
@@ -3361,7 +3360,7 @@ async function loadMotivosEntrada() {
     if (!r.ok) return;
     applyRows(rows);
     motivosLoaded = true;
-  } catch {}
+  } catch (e) { console.error('api_bodegas:', e); }
 }
 
 function normalizeSalidaRuleText(value) {
@@ -3490,7 +3489,7 @@ async function loadBodegasSalida() {
       destinos.map((b) => `<option value="${b.id_bodega}">${b.nombre_bodega}</option>`).join("");
     applyConfiguredDefaultSalidaDestino();
     applyDefaultSalidaDestinoForNilasUser();
-  } catch {}
+  } catch (e) { console.error('api_subcategorias:', e); }
 }
 
 async function loadMotivosSalida() {
@@ -3517,7 +3516,7 @@ async function loadMotivosSalida() {
     }
     if ($("#salTipoMov")) $("#salTipoMov").value = tipo;
     motivosSalidaLoaded = true;
-  } catch {}
+  } catch (e) { console.error('loadMotivosSalida:', e); }
 }
 
 if ($("#salDestino")) {
@@ -3545,7 +3544,7 @@ async function loadBodegaUsuario() {
     if ($("#entBodega")) $("#entBodega").value = bodegaNombre;
     menuWarehouseLabel = bodegaNombre;
     renderMenuUserLabel();
-  } catch {}
+  } catch (e) { console.error('loadBodegaUsuario:', e); }
 }
 
 loadBodegaUsuario();
@@ -3573,7 +3572,7 @@ async function loadBodegaUsuarioSalida() {
     renderMenuUserLabel();
     applyDefaultSalidaDestinoForNilasUser();
     if (isVentasNilasDestinoSelected()) loadMotivosSalida();
-  } catch {}
+  } catch (e) { console.error('loadBodegaUsuarioSalida:', e); }
 }
 
 loadBodegaUsuarioSalida();
@@ -3588,7 +3587,7 @@ async function loadCorrelativoSalidaDocumento() {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return;
     inp.value = Number(j.correlativo || 0) > 0 ? String(j.correlativo) : "";
-  } catch {}
+  } catch (e) { console.error('api_motivos:', e); }
 }
 
 loadCorrelativoSalidaDocumento();
@@ -3635,7 +3634,7 @@ async function loadExistenciasBodegasFilter() {
     }
     subSel.innerHTML = `<option value="">Todas las subcategorias</option>`;
     repExistBodegasLoaded = true;
-  } catch {}
+  } catch (e) { console.error('api_productos:', e); }
 }
 
 async function loadReporteExistenciasSubcategorias() {
@@ -3655,7 +3654,7 @@ async function loadReporteExistenciasSubcategorias() {
     sel.innerHTML =
       `<option value="">Todas las subcategorias</option>` +
       rows.map((s) => `<option value="${s.id_subcategoria}">${s.nombre_subcategoria}</option>`).join("");
-  } catch {}
+  } catch (e) { console.error('api_subcategorias:', e); }
 }
 
 async function loadReporteCuadreWarehouseFilter(force = false) {
@@ -3681,7 +3680,7 @@ async function loadReporteCuadreWarehouseFilter(force = false) {
       sel.disabled = true;
     }
     repCuadreWarehouseLoaded = true;
-  } catch {}
+  } catch (e) { console.error('loadCuadreWarehouseFilter:', e); }
 }
 
 function openStoredCuadrePrint(fecha, idBodega = 0, format = "carta") {
@@ -3863,7 +3862,7 @@ async function loadReporteEntradasCatalogos() {
     }
 
     repEntCatalogosLoaded = true;
-  } catch {}
+  } catch (e) { console.error('loadReporteEntradasCatalogos:', e); }
 }
 
 async function loadReporteEntradasSubcategorias() {
@@ -3883,7 +3882,7 @@ async function loadReporteEntradasSubcategorias() {
     sel.innerHTML =
       `<option value="">Todas las subcategorias</option>` +
       rows.map((s) => `<option value="${s.id_subcategoria}">${s.nombre_subcategoria}</option>`).join("");
-  } catch {}
+  } catch (e) { console.error('loadReporteEntradasSubcategorias:', e); }
 }
 
 async function loadReporteSalidasCatalogos() {
@@ -3956,7 +3955,7 @@ async function loadReporteSalidasCatalogos() {
     }
 
     repSalCatalogosLoaded = true;
-  } catch {}
+  } catch (e) { console.error('loadStockSalidaActual:', e); }
 }
 
 async function loadReporteSalidasSubcategorias() {
@@ -3976,7 +3975,7 @@ async function loadReporteSalidasSubcategorias() {
     sel.innerHTML =
       `<option value="">Todas las subcategorias</option>` +
       rows.map((s) => `<option value="${s.id_subcategoria}">${s.nombre_subcategoria}</option>`).join("");
-  } catch {}
+  } catch (e) { console.error('api_subcategorias:', e); }
 }
 
 async function loadReportePedidosCatalogos() {
@@ -4061,7 +4060,7 @@ async function loadReportePedidosCatalogos() {
     }
 
     repPedCatalogosLoaded = true;
-  } catch {}
+  } catch (e) { console.error('loadReportePedidosCatalogos:', e); }
 }
 
 async function loadReportePedidosSubcategorias() {
@@ -4081,7 +4080,7 @@ async function loadReportePedidosSubcategorias() {
     sel.innerHTML =
       `<option value="">Todas las subcategorias</option>` +
       rows.map((s) => `<option value="${s.id_subcategoria}">${s.nombre_subcategoria}</option>`).join("");
-  } catch {}
+  } catch (e) { console.error('api_subcategorias:', e); }
 }
 
 async function loadStockSalidaActual() {
@@ -4097,7 +4096,7 @@ async function loadStockSalidaActual() {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return;
     if ($("#salStock")) $("#salStock").value = j.stock ?? 0;
-  } catch {}
+  } catch (e) { console.error('loadStockSalidaActual:', e); }
 }
 
 if ($("#salSearchBtn")) {
@@ -4908,7 +4907,7 @@ async function loadSalidaConteoWarehouseFilter(force = false) {
     updateSalidaConteoManualColumnVisibility();
     updateReporteCorteCountAvailability();
     updateReporteCorteManualColumnVisibility();
-  } catch {}
+  } catch (e) { console.error('api_subcategorias:', e); }
 }
 
 function updateSalidaConteoSummary() {
@@ -5193,7 +5192,7 @@ async function loadReporteCorteWarehouseFilter(force = false) {
     repDiaWarehouseLoaded = true;
     updateReporteCorteCountAvailability();
     updateReporteCorteManualColumnVisibility();
-  } catch {}
+  } catch (e) { console.error('updateReporteCorteManual:', e); }
 }
 
 async function loadReporteCorteDiario() {
@@ -5424,6 +5423,10 @@ async function promptSensitiveApproval(actionLabel = "accion sensible") {
 }
 
 async function realizarCierreDiaManual() {
+  if (repCloseDayInFlight) return;
+  repCloseDayInFlight = true;
+  const closeBtn = $("#repDiaClose");
+  if (closeBtn) closeBtn.classList.add("is-loading");
   try {
     await loadCloseDayAccessFlag();
     if (!repCanCloseDay) {
@@ -5446,10 +5449,12 @@ async function realizarCierreDiaManual() {
     }
 
     const ok = await uiConfirm(
-      `Estas seguro de realizar el cierre del dia ${fechaObjetivo}? No podra revertirlo.`,
+      `Estas seguro de realizar el cierre del dia ${fechaObjetivo}?\n\n⚠ Este proceso es IRREVERSIBLE. No podra deshacerse ni revertirse.`,
       "Confirmar cierre de dia"
     );
-    if (!ok) return;
+    if (!ok) {
+      return;
+    }
 
     let payload = { fecha: fechaObjetivo, confirmar: true };
     let r = await fetch("/api/cierre-dia", {
@@ -5488,6 +5493,9 @@ async function realizarCierreDiaManual() {
     loadReporteCorteDiario();
   } catch {
     showEntToast("Error de red al intentar realizar el cierre diario.", "bad");
+  } finally {
+    repCloseDayInFlight = false;
+    if (closeBtn) closeBtn.classList.remove("is-loading");
   }
 }
 
@@ -7308,7 +7316,7 @@ async function loadReporteKardexCatalogos() {
     }
 
     repKarCatalogosLoaded = true;
-  } catch {}
+  } catch (e) { console.error('loadReporteKardexCatalogos:', e); }
 }
 async function loadReporteKardexSubcategorias() {
   const catId = Number($("#repKarCategoria")?.value || 0);
@@ -7327,7 +7335,7 @@ async function loadReporteKardexSubcategorias() {
     sel.innerHTML =
       `<option value="">Todas las subcategorias</option>` +
       rows.map((s) => `<option value="${s.id_subcategoria}">${s.nombre_subcategoria}</option>`).join("");
-  } catch {}
+  } catch (e) { console.error('api_subcategorias:', e); }
 }
 
 function kardexTipoHtml(tipo) {
@@ -8080,6 +8088,8 @@ if ($("#entSave")) {
     const entSaveBtn = $("#entSave");
     if (entSaveBtn) entSaveBtn.disabled = true;
     showSavingProgressToast("entrada");
+    /* Mobile saving indicator */
+    if (entSaveBtn) entSaveBtn.classList.add('is-saving');
     try {
       let r = await fetch("/api/entradas", {
         method: "POST",
@@ -8144,6 +8154,9 @@ if ($("#entSave")) {
       }
       showEntToast("Error de red. Si la carga era grande, verifica en Reporte de Entradas antes de reintentar.", "bad");
     } finally {
+      /* Mobile saving indicator */
+      const entBtn = document.querySelector('#entSave');
+      if (entBtn) entBtn.classList.remove('is-saving');
       entSaveInFlight = false;
       renderEntradas();
     }
@@ -8362,6 +8375,8 @@ if ($("#salSave")) {
     const salSaveBtn = $("#salSave");
     if (salSaveBtn) salSaveBtn.disabled = true;
     showSavingProgressToast("salida");
+    /* Mobile saving indicator */
+    if (salSaveBtn) salSaveBtn.classList.add('is-saving');
     try {
       let r = await fetch("/api/salidas", {
         method: "POST",
@@ -8435,6 +8450,9 @@ if ($("#salSave")) {
       }
       showEntToast("Error de red. Si la carga era grande, verifica en Reporte de Salidas antes de reintentar.", "bad");
     } finally {
+      /* Mobile saving indicator */
+      const salBtn = document.querySelector('#salSave');
+      if (salBtn) salBtn.classList.remove('is-saving');
       salSaveInFlight = false;
       renderSalidas();
     }
@@ -8530,7 +8548,7 @@ async function loadAjusteStockActual() {
     if (!r.ok) return;
     ajStockActual = Number(j.stock || 0);
     updateAjusteStockPreview();
-  } catch {}
+  } catch (e) { console.error('loadAjusteStockActual:', e); }
 }
 
 function updateAjusteUiHints() {
@@ -8639,7 +8657,7 @@ async function loadAjustesMotivos() {
         .map((m) => `<option value="${m.id_motivo}">${m.nombre_motivo || `Motivo #${m.id_motivo}`}</option>`)
         .join("");
     ajustesMotivosLoaded = true;
-  } catch {}
+  } catch (e) { console.error('loadCorrelativoSalidaDocumento:', e); }
 }
 
 async function loadAjustesWarehouseFilter(force = false) {
@@ -8667,7 +8685,7 @@ async function loadAjustesWarehouseFilter(force = false) {
     }
     ajWarehouseLoaded = true;
     await loadAjusteStockActual();
-  } catch {}
+  } catch (e) { console.error('loadAjustesWarehouseFilter:', e); }
 }
 
 if ($("#ajSearchBtn")) {
@@ -8838,7 +8856,10 @@ if ($("#ajSave")) {
     };
     ajSaveInFlight = true;
     const ajSaveBtn = $("#ajSave");
-    if (ajSaveBtn) ajSaveBtn.disabled = true;
+    if (ajSaveBtn) {
+      ajSaveBtn.disabled = true;
+      ajSaveBtn.classList.add('is-saving');
+    }
     showSavingProgressToast("ajuste");
     try {
       let r = await fetch("/api/ajustes", {
@@ -8879,6 +8900,8 @@ if ($("#ajSave")) {
       showEntToast("Error de red.", "bad");
     } finally {
       ajSaveInFlight = false;
+      const ajFinallyBtn = $("#ajSave");
+      if (ajFinallyBtn) ajFinallyBtn.classList.remove('is-saving');
       renderAjustes();
     }
   };
@@ -9426,7 +9449,7 @@ async function loadSubcatCatalogos() {
     if ($("#subCatCategoria")) $("#subCatCategoria").innerHTML = opts;
     if ($("#subCatEditCategoria")) $("#subCatEditCategoria").innerHTML = opts;
     subcatCatalogosLoaded = true;
-  } catch {}
+  } catch (e) { console.error('loadBodegaUsuario:', e); }
 }
 
 async function loadSubcategoriasManage() {
@@ -9900,7 +9923,7 @@ async function loadCatalogosProductos() {
     if ($("#prdCategoria")) $("#prdCategoria").innerHTML = catOpts;
     if ($("#prdEditCategoria")) $("#prdEditCategoria").innerHTML = catOpts;
     prdCatalogosLoaded = true;
-  } catch {}
+  } catch (e) { console.error('loadProductosCatalogos:', e); }
 }
 
 async function loadSubcategoriasProducto(idCategoria, targetId, selected = "") {
@@ -9920,7 +9943,7 @@ async function loadSubcategoriasProducto(idCategoria, targetId, selected = "") {
       `<option value="">Seleccione subcategoria</option>` +
       rows.map((x) => `<option value="${x.id_subcategoria}">${x.nombre_subcategoria}</option>`).join("");
     if (selected) sel.value = String(selected);
-  } catch {}
+  } catch (e) { console.error('loadProductosSubcategorias:', e); }
 }
 
 function productoEstadoTag(active) {
@@ -11364,7 +11387,7 @@ async function loadProductoWarehouseOptions(force = false) {
     renderProductWarehouseChecklist("#prdVisibleWarehouses");
     renderProductWarehouseChecklist("#prdEditVisibleWarehouses");
     syncMyProductWarehouseUI();
-  } catch {}
+  } catch (e) { console.error('api_motivos:', e); }
 }
 
 async function loadProductVisibleWarehouses(idProducto, containerSelector) {
@@ -11952,7 +11975,7 @@ async function loadLimCatalogos() {
     if ($("#limWarehouse")) $("#limWarehouse").innerHTML = bodOpts;
     if ($("#limProduct")) $("#limProduct").innerHTML = prdOpts;
     limCatalogosLoaded = true;
-  } catch {}
+  } catch (e) { console.error('api_proveedores:', e); }
 }
 
 async function loadLimitesList() {
@@ -12159,7 +12182,7 @@ async function loadRegCatalogos() {
       `<option value="">Seleccione subcategoria</option>` +
       rows.map((s) => `<option value="${s.id_subcategoria}">${s.nombre_subcategoria}</option>`).join("");
     regCatalogosLoaded = true;
-  } catch {}
+  } catch (e) { console.error('loadPedidoStock:', e); }
 }
 
 async function loadReglasList() {
@@ -12346,7 +12369,7 @@ async function loadRolesUsuario() {
     if (sel) sel.innerHTML = opts;
     if (editSel) editSel.innerHTML = opts;
     usrRolesLoaded = true;
-  } catch {}
+  } catch (e) { console.error('api_usuarios:', e); }
 }
 
 async function loadBodegasUsuarioForm() {
@@ -12367,7 +12390,7 @@ async function loadBodegasUsuarioForm() {
     if (sel) sel.innerHTML = opts;
     if (editSel) editSel.innerHTML = opts;
     usrBodegasLoaded = true;
-  } catch {}
+  } catch (e) { console.error('loadUsuariosBodegas:', e); }
 }
 
 async function loadUsuariosResetForm() {
@@ -12386,7 +12409,7 @@ async function loadUsuariosResetForm() {
         .map((u) => `<option value="${u.id_user}">${u.full_name}${u.username ? ` (${u.username})` : ""}</option>`)
         .join("");
     usrResetUsersLoaded = true;
-  } catch {}
+  } catch (e) { console.error('loadMyPermissions:', e); }
 }
 
 async function ensurePermCatalogLoaded() {
@@ -12398,7 +12421,7 @@ async function ensurePermCatalogLoaded() {
     const rows = await r.json().catch(() => []);
     if (!r.ok) return;
     permCatalog = Array.isArray(rows) ? rows : [];
-  } catch {}
+  } catch (e) { console.error('ensurePermCatalogLoaded:', e); }
 }
 
 function renderUserPermList(permisosMap) {
@@ -12452,7 +12475,7 @@ async function loadUsuariosPermForm() {
             .join("");
         usrPermUsersLoaded = true;
       }
-    } catch {}
+    } catch (e) { console.error('loadUsuariosList:', e); }
   }
   if ($("#usrPermList") && !$("#usrPermList").innerHTML.trim()) {
     renderUserPermList(permissionDefaultsClient());
@@ -12619,7 +12642,7 @@ async function loadUsuariosWarehouseAccessForm() {
             .join("");
         usrWhAccessUsersLoaded = true;
       }
-    } catch {}
+    } catch (e) { console.error('loadUsersRegisters:', e); }
   }
   if (!sel.dataset.bound) {
     sel.onchange = () => loadSelectedUsuarioWarehouseAccess();
@@ -13325,11 +13348,26 @@ function renderPedidos() {
     )
     .join("");
 
+  /* Stagger entrance animation */
+  box.querySelectorAll(".cartItem").forEach((el, i) => {
+    el.style.animationDelay = i * 0.04 + "s";
+  });
+
   box.querySelectorAll("[data-del]").forEach((b) => {
     b.onclick = () => {
       const idx = Number(b.dataset.del);
-      pedList.splice(idx, 1);
-      renderPedidos();
+      const item = b.closest(".cartItem");
+      if (item) {
+        item.classList.add("removing");
+        item.style.animationDelay = "0s";
+        setTimeout(() => {
+          pedList.splice(idx, 1);
+          renderPedidos();
+        }, 260);
+      } else {
+        pedList.splice(idx, 1);
+        renderPedidos();
+      }
     };
   });
 
@@ -13565,6 +13603,11 @@ if ($("#pedClear")) {
   $("#pedClear").onclick = async () => {
     if (!pedList.length) return;
     if (!(await uiConfirm("Vaciar el carro de pedido?", "Confirmar vaciado"))) return;
+    const items = document.querySelectorAll("#pedList .cartItem");
+    if (items.length) {
+      items.forEach((el) => el.classList.add("removing"));
+      await new Promise((r) => setTimeout(r, 260));
+    }
     pedList.splice(0, pedList.length);
     renderPedidos();
     showEntToast("Carro vaciado correctamente.", "ok");
@@ -13659,6 +13702,14 @@ if ($("#pedSave")) {
     pedSaveInFlight = true;
     const pedSaveBtn = $("#pedSave");
     if (pedSaveBtn) pedSaveBtn.disabled = true;
+    /* Mobile saving indicator */
+    const pedSide = document.querySelector('#view-pedidos .orderSide');
+    if (pedSide) pedSide.classList.add('is-saving');
+    const peekText = document.querySelector('#view-pedidos .cartPeekText');
+    if (peekText) {
+      peekText.dataset.originalText = peekText.textContent;
+      peekText.textContent = 'Guardando pedido...';
+    }
     showSavingProgressToast("pedido");
     try {
       const r = await fetch("/api/orders", {
@@ -13704,6 +13755,13 @@ if ($("#pedSave")) {
       }
       showEntToast("Error de red. Si la carga era grande, verifica en Reporte de Pedidos antes de reintentar.", "bad");
     } finally {
+    /* Mobile saving indicator */
+    if (pedSide) pedSide.classList.remove('is-saving');
+    const peekText = document.querySelector('#view-pedidos .cartPeekText');
+    if (peekText && peekText.dataset.originalText) {
+      peekText.textContent = peekText.dataset.originalText;
+      delete peekText.dataset.originalText;
+    }
       pedSaveInFlight = false;
       renderPedidos();
     }
@@ -13774,7 +13832,24 @@ async function loadPedidosDespachar() {
       tb.innerHTML = `<tr><td colspan="7">Sin pedidos por despachar.</td></tr>`;
       return;
     }
-    tb.innerHTML = sortedList
+
+    /* Client-side search filter */
+    const searchQuery = String(document.querySelector('#pedDispatchSearch')?.value || '').trim().toLowerCase();
+    const filteredList = searchQuery
+      ? sortedList.filter((o) => {
+          const id = String(o.id_pedido ?? o.id_order ?? '');
+          const name = String(o.requester_name || '').toLowerCase();
+          const wh = String(o.requester_warehouse || '').toLowerCase();
+          const status = String(o.estado || o.status || '').toLowerCase();
+          return id.includes(searchQuery) || name.includes(searchQuery) || wh.includes(searchQuery) || status.includes(searchQuery);
+        })
+      : sortedList;
+
+    if (!filteredList.length) {
+      tb.innerHTML = `<tr><td colspan="7">Sin resultados para "${searchQuery}".</td></tr>`;
+      return;
+    }
+    tb.innerHTML = filteredList
       .map(
         (o) => {
           const estado = String(o.estado || o.status || "").toUpperCase();
@@ -13806,7 +13881,7 @@ async function loadPedidosDespachar() {
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v14l-2-1-2 1-2-1-2 1-2-1-2 1z"/><path d="M9 9h6M9 12h6"/></svg>
                 <span>POS 80mm</span>
               </button>
-              <button class="dispatchBtn dispatchBtn-danger" data-revert="${o.id_pedido ?? o.id_order}" title="Revertir">
+              <button class="dispatchBtn dispatchBtn-danger ${estado === "PENDIENTE" ? "disabled" : ""}" data-revert="${o.id_pedido ?? o.id_order}" title="Revertir">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v6h6" /></svg>
                 <span>Revertir</span>
               </button>
@@ -13855,8 +13930,14 @@ async function loadPedidosDespachar() {
     tb.querySelectorAll("[data-revert]").forEach((b) => {
       b.onclick = async () => {
         const id = Number(b.dataset.revert);
-        if (!id) return;
-        if (!(await uiConfirm(`Revertir el despacho del pedido #${id}? (Solo el mismo dia)`, "Confirmar reversion"))) return;
+        if (!id || pedDispatchRevertInFlight) return;
+        pedDispatchRevertInFlight = true;
+        b.classList.add("is-loading");
+        if (!(await uiConfirm(`Revertir el despacho del pedido #${id}? (Solo el mismo dia)\n\n⚠ ADVERTENCIA: Si la bodega destino ya recibio o uso el producto, el stock quedara INCONSISTENTE. Solo revierte si estas seguro.`, "Confirmar reversion"))) {
+          pedDispatchRevertInFlight = false;
+          b.classList.remove("is-loading");
+          return;
+        }
         try {
           let rr = await fetch(`/api/orders/${id}/revert`, {
             method: "POST",
@@ -13888,6 +13969,9 @@ async function loadPedidosDespachar() {
           loadPedidosDespachar();
         } catch {
           showEntToast("Error de red.", "bad");
+        } finally {
+          pedDispatchRevertInFlight = false;
+          if (b) b.classList.remove("is-loading");
         }
       };
     });
@@ -13898,6 +13982,25 @@ async function loadPedidosDespachar() {
 
 if ($("#pedRefresh")) {
   $("#pedRefresh").onclick = loadPedidosDespachar;
+}
+
+if ($("#pedDispatchRefresh")) {
+  $("#pedDispatchRefresh").onclick = loadPedidosDespachar;
+}
+
+if ($("#pedDispatchSearchBtn")) {
+  $("#pedDispatchSearchBtn").onclick = () => {
+    loadPedidosDespachar();
+  };
+}
+
+if ($("#pedDispatchSearch")) {
+  $("#pedDispatchSearch").onkeydown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      loadPedidosDespachar();
+    }
+  };
 }
 
 let dispatchOrderId = null;
@@ -14151,7 +14254,7 @@ async function openDispatchModal(id, opts = {}) {
           }
           return;
         }
-        if (!(await uiConfirm("Revertir esta linea? (Solo el mismo dia)", "Confirmar reversion"))) return;
+        if (!(await uiConfirm("Revertir esta linea? (Solo el mismo dia)\n\n⚠ ADVERTENCIA: Si la bodega destino ya recibio o uso el producto, el stock quedara INCONSISTENTE. Solo revierte si estas seguro.", "Confirmar reversion"))) return;
         try {
           let payload = { id_pedido_detalle: idLine };
           let rr = await fetch(`/api/orders/${dispatchOrderId}/revert-line`, {
@@ -14270,7 +14373,10 @@ if ($("#pedDispatchConfirm")) {
 
     pedDispatchBatchInFlight = true;
     const dispatchBtn = $("#pedDispatchConfirm");
-    if (dispatchBtn) dispatchBtn.disabled = true;
+    if (dispatchBtn) {
+      dispatchBtn.disabled = true;
+      dispatchBtn.classList.add("is-loading");
+    }
     showSavingProgressToast(`despacho de pedido #${orderId}`);
     try {
       const rr = await fetch(`/api/orders/${orderId}/fulfill`, {
@@ -14305,7 +14411,10 @@ if ($("#pedDispatchConfirm")) {
       await uiConfirm("Error de red.", "Error de red");
     } finally {
       pedDispatchBatchInFlight = false;
-      if (dispatchBtn) dispatchBtn.disabled = false;
+      if (dispatchBtn) {
+        dispatchBtn.disabled = false;
+        dispatchBtn.classList.remove("is-loading");
+      }
     }
   };
 }
@@ -14778,7 +14887,7 @@ function saveCuadreDraftLocal() {
       updated_at: new Date().toISOString(),
     };
     localStorage.setItem(cuadreDraftStorageKey(), JSON.stringify(draft));
-  } catch {}
+  } catch (e) { console.error('unknown:', e); }
 }
 
 function loadCuadreDraftLocal() {
@@ -14795,7 +14904,7 @@ function loadCuadreDraftLocal() {
 function clearCuadreDraftLocal() {
   try {
     localStorage.removeItem(cuadreDraftStorageKey());
-  } catch {}
+  } catch (e) { console.error('unknown:', e); }
 }
 
 function applyCuadrePayload(payload = {}) {
@@ -14917,7 +15026,7 @@ async function loadCuadreWarehouseFilter(force = false) {
     }
 
     cuadreWarehouseLoaded = true;
-  } catch {}
+  } catch (e) { console.error('loadCuadreCajaCatalogos:', e); }
 }
 
 async function loadCuadreCaja() {

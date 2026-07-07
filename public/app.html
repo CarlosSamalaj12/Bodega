@@ -24,7 +24,6 @@
     <aside class="menu">
       <div class="menuHeader">
 <div class="menuAvatarWrap">
-<div class="menuInitialBadge" id="menuAvatarFallback">U</div>
 <img class="menuAvatarImg hidden" id="menuAvatarImg" alt="Avatar usuario" />
 </div>
 <div class="brandTitle">Bodega</div>
@@ -642,7 +641,14 @@
 </div>
 <div class="view hidden" id="view-pedidos-despachar">
 <div class="card light">
-<div class="cardTitle">Pedidos x Despachar</div>
+<div class="dispatchHead">
+  <div class="cardTitle">Pedidos x Despachar</div>
+  <div class="dispatchSearch">
+    <input class="in" id="pedDispatchSearch" placeholder="Buscar por ID, solicitante, bodega..." />
+    <button class="btn soft btn-sm" id="pedDispatchSearchBtn" type="button">Buscar</button>
+    <button class="btn soft btn-sm" id="pedDispatchRefresh" type="button">Actualizar</button>
+  </div>
+</div>
 <div class="tableWrap repTableScroll">
 <table class="tbl grid">
 <thead>
@@ -2378,13 +2384,192 @@
   </script>
   <script src="./app.js?v=20260525b">
 </script>
+  <div class="connIndicator" id="connIndicator">
+    <span class="connDot" id="connDot"></span>
+    <span class="connText" id="connText">En l&iacute;nea</span>
+  </div>
+  <div class="updateBanner hidden" id="updateBanner">
+    <span class="updateText">Nueva versi&oacute;n disponible</span>
+    <button class="updateBtn" id="updateBtn" type="button">Actualizar</button>
+  </div>
   <script>
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js").catch(() => {});
+    (function() {
+      if (!("serviceWorker" in navigator)) return;
+      var swReg = null;
+      var waitingSW = null;
+      var updateBanner = document.getElementById("updateBanner");
+      var updateBtn = document.getElementById("updateBtn");
+
+      function showUpdate() {
+        if (updateBanner) updateBanner.classList.remove("hidden");
+      }
+
+      function hideUpdate() {
+        if (updateBanner) updateBanner.classList.add("hidden");
+      }
+
+      if (updateBtn) {
+        updateBtn.addEventListener("click", function () {
+          hideUpdate();
+          if (waitingSW) {
+            waitingSW.postMessage({ type: "SKIP_WAITING" });
+          } else if (swReg && swReg.waiting) {
+            swReg.waiting.postMessage({ type: "SKIP_WAITING" });
+          }
+        });
+      }
+
+      // When a new SW takes over, reload to use the new version
+      navigator.serviceWorker.addEventListener("controllerchange", function () {
+        window.location.reload();
       });
+
+      function onSWStateChange(worker) {
+        if (worker.state === "installed" && navigator.serviceWorker.controller) {
+          showUpdate();
+        }
+      }
+
+      function onUpdateFound() {
+        var installing = swReg.installing;
+        if (!installing) return;
+        waitingSW = installing;
+        installing.addEventListener("statechange", function () {
+          onSWStateChange(installing);
+        });
+        onSWStateChange(installing);
+      }
+
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("./sw.js").then(function (reg) {
+        swReg = reg;
+        waitingSW = reg.waiting;
+        if (reg.waiting) {
+          showUpdate();
+        }
+        reg.addEventListener("updatefound", onUpdateFound);
+      }).catch(function (err) {
+        console.error("SW registration failed:", err);
+      });
+    });
+  })();
+</script>  <script>
+  (function() {
+    var indicator = document.getElementById("connIndicator");
+    var dot = document.getElementById("connDot");
+    var text = document.getElementById("connText");
+    if (!indicator) return;
+
+    function updateConn(online) {
+      if (online) {
+        indicator.classList.remove("offline");
+        indicator.classList.add("online");
+        if (dot) dot.className = "connDot on";
+        if (text) text.textContent = "En l\u00ednea";
+      } else {
+        indicator.classList.remove("online");
+        indicator.classList.add("offline");
+        if (dot) dot.className = "connDot off";
+        if (text) text.textContent = "Sin conexi\u00f3n";
+      }
     }
-  </script>
+
+    updateConn(navigator.onLine);
+
+    window.addEventListener("online", function () { updateConn(true); });
+    window.addEventListener("offline", function () { updateConn(false); });
+  })();
+</script>
+<script>
+  /* Mobile: enhance report filter forms with collapsible toggle */
+  (function() {
+    function enhanceReportFilters() {
+      /* Already enhanced by this script? skip */
+      if (document.querySelector(".view[id^=\"view-r-\"] .repFilterToggle")) return;
+      var views = document.querySelectorAll('.view[id^="view-r-"]');
+      for (var vi = 0; vi < views.length; vi++) {
+        var view = views[vi];
+        var layout = view.querySelector('.uiFormLayout');
+        if (layout) {
+          /* Case 1: views with .uiFormLayout wrapper */
+          var body = document.createElement('div');
+          body.className = 'repFilterBody open';
+          layout.parentNode.replaceChild(body, layout);
+          body.appendChild(layout);
+          makeToggle(body);
+        } else {
+          /* Case 2: views without .uiFormLayout (corte-diario, cuadres-caja, entradas, salidas) */
+          var card = view.querySelector('.card.light');
+          if (!card) continue;
+          var children = card.children;
+          var collecting = false;
+          var nodesToMove = [];
+          for (var ci = 0; ci < children.length; ci++) {
+            var child = children[ci];
+            if (child.classList.contains('cardTitle')) {
+              collecting = true;
+              continue;
+            }
+            if (!collecting) continue;
+            if (child.classList.contains('repTableScroll') || child.classList.contains('cardTitle')) break;
+            var isValid = child.classList.contains('grid4') || child.classList.contains('grid3') || child.classList.contains('addRow');
+            if (!isValid && child.tagName === 'INPUT' && child.type === 'hidden') isValid = true;
+            if (isValid) {
+              nodesToMove.push(child);
+            } else if (nodesToMove.length > 0) {
+              break;
+            }
+          }
+          if (nodesToMove.length > 0) {
+            var wrap = document.createElement('div');
+            wrap.className = 'repFilterBody open';
+            var refNode = nodesToMove[0];
+            refNode.parentNode.insertBefore(wrap, refNode);
+            for (var mi = 0; mi < nodesToMove.length; mi++) {
+              wrap.appendChild(nodesToMove[mi]);
+            }
+            makeToggle(wrap);
+          }
+        }
+      }
+    }
+    function makeToggle(container) {
+      var toggle = document.createElement('button');
+      toggle.className = 'repFilterToggle';
+      toggle.type = 'button';
+      toggle.setAttribute('aria-expanded','true');
+      var toggleSpan = document.createElement('span');
+      toggleSpan.textContent = 'Filtros';
+      var caret = document.createElement('span');
+      caret.className = 'repFilterCaret';
+      caret.textContent = '\u25BC';
+      toggle.appendChild(toggleSpan);
+      toggle.appendChild(caret);
+      container.parentNode.insertBefore(toggle, container);
+      (function(btn, bd) {
+        btn.addEventListener('click', function() {
+          btn.classList.toggle('open');
+          btn.setAttribute('aria-expanded', btn.classList.contains('open') ? 'true' : 'false');
+          bd.classList.toggle('open');
+        });
+      })(toggle, container);
+    }
+    /* Run on load and also when views may be dynamically switched */
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      enhanceReportFilters();
+    } else {
+      document.addEventListener('DOMContentLoaded', enhanceReportFilters);
+    }
+    /* Also run when view sections are shown (observed via mutation) */
+    var targetNode = document.querySelector('.stageBody') || document.body;
+    if (targetNode) {
+      var observer = new MutationObserver(function() {
+        enhanceReportFilters();
+      });
+      observer.observe(targetNode, { childList: true, subtree: true });
+    }
+  })();
+</script>
 </body>
 </html>
 

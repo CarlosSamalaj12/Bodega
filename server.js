@@ -3696,7 +3696,7 @@ app.get("/api/bodegas/:id", auth, async (req, res) => {
             cb.requiere_precio_salida
      FROM bodegas b
      LEFT JOIN configuracion_bodega cb ON cb.id_bodega=b.id_bodega
-     WHERE id_bodega=:id_bodega
+     WHERE b.id_bodega=:id_bodega
      LIMIT 1`,
     { id_bodega }
   );
@@ -7835,6 +7835,29 @@ app.post("/api/orders/:id/revert", auth, requirePermission("action.dispatch", "r
 
     const movIds = [...new Set(links.map((x) => x.id_movimiento))];
 
+    /* Validar que la bodega destino no haya movido los productos */
+    const id_bodega_destino = Number(pe.id_bodega_solicita || 0);
+    if (id_bodega_destino) {
+      const [destRows] = await conn.query(
+        `SELECT COUNT(*) as cnt FROM kardex k
+         WHERE k.id_bodega = ?
+         AND k.delta_cantidad < 0
+         AND k.id_producto IN (
+           SELECT pd.id_producto FROM pedido_detalle pd
+           WHERE pd.id_pedido = ? AND pd.cantidad_surtida > 0
+         )
+         AND k.id_movimiento NOT IN (${movIds.map(() => "?").join(",")})`,
+        [id_bodega_destino, id_pedido, ...movIds]
+      );
+      if (Number(destRows[0]?.cnt || 0) > 0) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: "No se puede revertir: la bodega destino (solicitante) ya realizo movimientos de salida con los productos recibidos. El stock quedaria INCONSISTENTE.",
+          code: "DESTINATION_HAS_MOVEMENTS"
+        });
+      }
+    }
+
     for (const ln of links) {
       await conn.query(
         `UPDATE pedido_detalle
@@ -7968,6 +7991,30 @@ app.post("/api/orders/:id/revert-line", auth, requirePermission("action.dispatch
     if (!links.length) return res.status(400).json({ error: "No hay movimientos reversibles hoy" });
 
     const movIds = [...new Set(links.map((x) => x.id_movimiento))];
+
+    /* Validar que la bodega destino no haya movido los productos (linea individual) */
+    const id_bodega_destino2 = Number(pe.id_bodega_solicita || 0);
+    if (id_bodega_destino2) {
+      const [destRows2] = await conn.query(
+        `SELECT COUNT(*) as cnt FROM kardex k
+         WHERE k.id_bodega = ?
+         AND k.delta_cantidad < 0
+         AND k.id_producto IN (
+           SELECT pd.id_producto FROM pedido_detalle pd
+           WHERE pd.id_pedido_detalle = ?
+         )
+         AND k.id_movimiento NOT IN (${movIds.map(() => "?").join(",")})`,
+        [id_bodega_destino2, id_pedido_detalle, ...movIds]
+      );
+      if (Number(destRows2[0]?.cnt || 0) > 0) {
+        await conn.rollback();
+        return res.status(409).json({
+          error: "No se puede revertir la linea: la bodega destino (solicitante) ya realizo movimientos de salida con este producto. El stock quedaria INCONSISTENTE.",
+          code: "DESTINATION_HAS_MOVEMENTS"
+        });
+      }
+    }
+
     const reverted_qty = links.reduce((a, b) => a + Number(b.cantidad || 0), 0);
 
     await conn.query(

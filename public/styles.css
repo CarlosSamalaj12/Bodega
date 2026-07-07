@@ -734,14 +734,27 @@ body::-webkit-scrollbar-thumb:hover,
   margin-top:4px;
 }
 .brandSub{color:#CBD5E1; font-size:12px; margin-top:4px}
-.menuGroup{margin-top:14px}
+.menuGroup{
+  margin-top:14px;
+  border-radius:12px;
+  overflow:visible;
+  transition: all .2s ease;
+}
+.menuGroup:not(.is-collapsed){
+  background: rgba(56,189,248,.04);
+  border:1px solid rgba(56,189,248,.12);
+  padding:10px 10px 8px;
+  margin-left:-4px;
+  margin-right:-4px;
+}
 .menuTitle{
   text-transform:uppercase;
   letter-spacing:.08em;
-  font-size:12px;
+  font-size:11px;
   font-weight:800;
-  color:#E2E8F0;
+  color:#94A3B8;
   margin-bottom:9px;
+  padding-left:2px;
 }
 .menuGroupToggle{
   width:100%;
@@ -751,18 +764,34 @@ body::-webkit-scrollbar-thumb:hover,
   background: linear-gradient(135deg, rgba(56,189,248,.26), rgba(14,116,144,.22));
   border:1px solid rgba(56,189,248,.45);
   border-radius:10px;
-  padding:10px 12px;
+  padding:12px 14px;
   cursor:pointer;
   box-shadow: inset 0 0 0 1px rgba(15,23,42,.18);
+  transition: all .2s ease;
+  position:relative;
+}
+.menuGroup:not(.is-collapsed) .menuGroupToggle{
+  background: linear-gradient(135deg, rgba(56,189,248,.34), rgba(14,116,144,.28));
+  border-color: rgba(56,189,248,.6);
+  box-shadow: 0 4px 16px rgba(56,189,248,.12), inset 0 0 0 1px rgba(56,189,248,.15);
+  margin-bottom:6px;
 }
 .menuGroupToggle .menuTitle{
   margin:0;
   color:#BAE6FD;
+  font-size:13px;
 }
 .menuGroupCaret{
   color:#BAE6FD;
   font-size:12px;
-  transition: transform .18s ease;
+  transition: transform .25s ease;
+  width:22px;
+  height:22px;
+  border-radius:999px;
+  display:grid;
+  place-items:center;
+  background: rgba(2,6,23,.3);
+  border:1px solid rgba(148,163,184,.2);
 }
 .menuGroupToggle:hover{
   background: linear-gradient(135deg, rgba(34,211,238,.34), rgba(14,165,233,.26));
@@ -770,41 +799,71 @@ body::-webkit-scrollbar-thumb:hover,
 }
 .menuGroupBody{
   margin-top:8px;
+  padding-left:4px;
+  padding-right:4px;
 }
 .menuAccordion.is-collapsed .menuGroupBody{
   display:none;
 }
 .menuAccordion:not(.is-collapsed) .menuGroupCaret{
   transform: rotate(180deg);
+  background: rgba(56,189,248,.2);
+  border-color: rgba(56,189,248,.4);
 }
 
 .menuBtn{
   width:100%;
   text-align:left;
-  border:1px solid rgba(255,255,255,.08);
-  background: rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.06);
+  background: rgba(255,255,255,.03);
   color:#E5E7EB;
-  padding:13px 14px;
+  padding:12px 14px;
   border-radius:10px;
   cursor:pointer;
-  margin-bottom:8px;
-  font-size:16px;
-  font-weight:800;
-  line-height:1.25;
+  margin-bottom:6px;
+  font-size:14px;
+  font-weight:700;
+  line-height:1.3;
   transition: all .15s ease;
+  display:flex;
+  align-items:center;
+  gap:10px;
 }
 
 .menuBtn:hover{
-  background: linear-gradient(135deg, rgba(249,115,22,.20), rgba(34,211,238,.20));
-  border-color: rgba(34,211,238,.55);
+  background: linear-gradient(135deg, rgba(249,115,22,.18), rgba(34,211,238,.18));
+  border-color: rgba(34,211,238,.5);
   transform: translateX(4px);
   box-shadow: 0 6px 18px rgba(15,23,42,.22);
 }
+
+.menuBtn:active{
+  transform: translateX(2px) scale(.98);
+}
+
+.menuBtn.active{
+  background: linear-gradient(135deg, rgba(34,211,238,.22), rgba(14,165,233,.16));
+  border-color: rgba(34,211,238,.6);
+  color:#E0F2FE;
+  box-shadow: inset 0 0 0 1px rgba(34,211,238,.12);
+}
+
 .menuBtn.danger{
   border-color: rgba(248,113,113,.35);
   color:#FCA5A5;
 }
-.menuSpacer{height:10px}
+
+.menuBtn.danger:hover{
+  border-color: rgba(248,113,113,.6);
+  background: rgba(127,29,29,.3);
+}
+
+.menuBtn.danger:active{
+  border-color: rgba(248,113,113,.8);
+  background: rgba(127,29,29,.5);
+}
+
+.menuSpacer{height:14px}
 
 .avatarField{
   display:flex;
@@ -2645,7 +2704,6 @@ body::-webkit-scrollbar-thumb:hover,
   opacity:0;
   pointer-events:none;
   transform: translateY(4px);
-  transition: opacity .16s ease, transform .16s ease;
   z-index:20;
   box-shadow: 0 16px 34px rgba(2,6,23,.55);
 }
@@ -3909,6 +3967,9 @@ button.homeDashCard{
 #confirmModal{
   z-index: 2147483645 !important;
 }
+#confirmText{
+  white-space: pre-line;
+}
 #supervisorModal,#closeDayPinModal{
   z-index: 2147483644 !important;
 }
@@ -5014,3 +5075,1807 @@ button.homeDashCard{
 }
 
 
+
+/* =========================
+   MEJORAS MOVILES - SPA TACTIL
+========================= */
+
+/* Touch targets minimos 44px */
+.app.mobile-nav .menuBtn,
+.app.mobile-nav .btn,
+.app.mobile-nav button:not(.iconBtn):not(.iconBtnSm):not(.homeDashCard),
+.app.mobile-nav select.in,
+.app.mobile-nav .in{
+  min-height:44px !important;
+  font-size:16px !important;
+}
+
+.app.mobile-nav .in,
+.app.mobile-nav select.in{
+  font-size:16px !important;
+  padding:12px 14px !important;
+}
+
+.app.mobile-nav .btn{
+  height:44px !important;
+  min-height:44px !important;
+  padding:10px 16px !important;
+}
+
+.app.mobile-nav .btn-sm{
+  height:38px !important;
+  min-height:38px !important;
+  padding:8px 12px !important;
+}
+
+.app.mobile-nav .iconBtnSm{
+  width:40px !important;
+  height:40px !important;
+}
+
+.app.mobile-nav .iconBtn{
+  width:40px !important;
+  height:40px !important;
+}
+
+/* Pull-to-refresh indicator */
+.pullRefreshIndicator{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  z-index:11020;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  padding:12px;
+  background: linear-gradient(180deg, rgba(15,23,42,.95), rgba(15,23,42,.85));
+  border-bottom:1px solid rgba(56,189,248,.3);
+  color:#7DD3FC;
+  font-size:13px;
+  font-weight:700;
+  transform: translateY(-100%);
+  transition: transform .25s ease;
+  pointer-events:none;
+}
+.pullRefreshIndicator.show{
+  transform: translateY(0);
+}
+.pullRefreshIndicator .prSpinner{
+  width:20px;
+  height:20px;
+  border-radius:50%;
+  border:2px solid rgba(56,189,248,.25);
+  border-top-color:#7DD3FC;
+  animation: prSpin .7s linear infinite;
+}
+@keyframes prSpin{
+  to{transform:rotate(360deg)}
+}
+
+/* Stage en mobile */
+/* Pedidos mobile: cart peek bar siempre visible */
+.app.mobile-nav #view-pedidos .orderWorkspace{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  padding-bottom:64px;
+}
+
+.app.mobile-nav #view-pedidos .orderComposer{
+  order:1;
+}
+
+.app.mobile-nav #view-pedidos .orderSide{
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+  z-index:100;
+  border-radius:18px 18px 0 0;
+  box-shadow:0 -8px 30px rgba(2,6,23,.5);
+  padding-bottom:env(safe-area-inset-bottom,0);
+  background:linear-gradient(180deg, rgba(15,23,42,.98), rgba(2,6,23,.98));
+  border:1px solid rgba(56,189,248,.3);
+  border-bottom:none;
+  transition:max-height .32s cubic-bezier(.32,.72,0,1);
+  max-height:52px;
+  overflow:hidden;
+}
+
+/* Peek bar (siempre visible) */
+.app.mobile-nav #view-pedidos .orderSide .cartPeekBar{
+  display:flex !important;
+  align-items:center;
+  gap:10px;
+  padding:10px 14px;
+  min-height:52px;
+  cursor:pointer;
+  user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  background:linear-gradient(135deg, rgba(56,189,248,.12), rgba(99,102,241,.08));
+  border-bottom:1px solid rgba(56,189,248,.2);
+}
+.app.mobile-nav #view-pedidos .orderSide .cartPeekCount{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:28px;
+  height:28px;
+  border-radius:999px;
+  background:linear-gradient(135deg, #38BDF8, #60A5FA);
+  color:#0B1222;
+  font-size:13px;
+  font-weight:900;
+  line-height:1;
+}
+.app.mobile-nav #view-pedidos .orderSide .cartPeekText{
+  flex:1;
+  font-weight:700;
+  color:#E2E8F0;
+  font-size:14px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.app.mobile-nav #view-pedidos .orderSide .cartPeekArrow{
+  width:24px;
+  height:24px;
+  border-radius:999px;
+  border:1px solid rgba(148,163,184,.35);
+  background:rgba(2,6,23,.5);
+  display:grid;
+  place-items:center;
+  color:#94A3B8;
+  font-size:14px;
+  line-height:1;
+  transition:transform .25s ease;
+}
+.app.mobile-nav #view-pedidos .orderSide.expanded .cartPeekArrow{
+  transform:rotate(180deg);
+}
+
+/* Expandido */
+.app.mobile-nav #view-pedidos .orderSide.expanded{
+  max-height:70dvh;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+.app.mobile-nav #view-pedidos .orderSide.expanded .orderCart{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  border-radius:0;
+  background:transparent;
+  border:none;
+}
+.app.mobile-nav #view-pedidos .orderSide.expanded .cartList{
+  flex:1;
+  overflow-y:auto;
+  min-height:120px;
+  max-height:none !important;
+}
+.app.mobile-nav #view-pedidos .orderSide.expanded .orderActions{
+  padding:10px 14px;
+  border-top:1px solid rgba(148,163,184,.22);
+  background:linear-gradient(180deg, rgba(2,6,23,.18), rgba(2,6,23,0));
+}
+.app.mobile-nav #view-pedidos .orderSide.expanded .orderActions #pedClear,
+.app.mobile-nav #view-pedidos .orderSide.expanded .orderActions #pedRefresh,
+.app.mobile-nav #view-pedidos .orderSide.expanded .orderActions #pedPrintPos{
+  display:inline-flex;
+}
+
+/* Colapsado: ocultar todo menos la barra peek */
+.app.mobile-nav #view-pedidos .orderSide:not(.expanded) .orderCart,
+.app.mobile-nav #view-pedidos .orderSide:not(.expanded) .orderSubmitProgress{
+  display:none !important;
+}
+
+/* Cart item mobile */
+.app.mobile-nav .cartItem{
+  grid-template-columns:1fr;
+  gap:10px;
+  padding:12px;
+}
+.app.mobile-nav .cartRight{
+  align-items:stretch;
+  flex-direction:row;
+  flex-wrap:wrap;
+  justify-content:space-between;
+}
+.app.mobile-nav .qtyRow{
+  width:100%;
+  justify-content:space-between;
+}
+.app.mobile-nav .qtyInput{
+  width:80px;
+}
+.app.mobile-nav .stage{
+  padding-bottom:80px;
+}
+
+.app.mobile-nav .stageTop{
+  flex-direction:column;
+  align-items:flex-start;
+  gap:8px;
+  padding:14px;
+}
+
+.app.mobile-nav .stageTitle{
+  font-size:20px;
+}
+
+.app.mobile-nav .stageSub{
+  font-size:12px;
+}
+
+.app.mobile-nav .stageHeadLogo{
+  max-height:36px;
+}
+
+/* Tablas en mobile: horizontal scroll por defecto */
+.app.mobile-nav .tbl{
+  min-width:600px;
+}
+
+.app.mobile-nav .tableWrap{
+  border-radius:12px;
+  max-width:100%;
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+}
+
+/* Grids en mobile */
+.app.mobile-nav .grid3,
+.app.mobile-nav .grid4{
+  grid-template-columns:1fr !important;
+}
+
+.app.mobile-nav .grid2{
+  grid-template-columns:1fr !important;
+}
+
+/* Cuadre en mobile */
+.app.mobile-nav .cuadreShell{
+  grid-template-columns:1fr;
+}
+
+.app.mobile-nav .cuadreStickyHead{
+  position:static;
+  padding:0;
+  background:transparent;
+  border:none;
+  box-shadow:none;
+}
+
+.app.mobile-nav .cuadreResumeGrid{
+  grid-template-columns:1fr 1fr;
+}
+
+.app.mobile-nav .cuadreMiniGrid{
+  grid-template-columns:1fr;
+}
+
+.app.mobile-nav .cuadrePreviewWrap{
+  position:static;
+}
+
+.app.mobile-nav .cuadreActions{
+  flex-direction:column;
+  align-items:stretch;
+}
+
+.app.mobile-nav .cuadreActions .btn,
+.app.mobile-nav .cuadreActions select{
+  width:100% !important;
+}
+
+/* Modales en mobile */
+.app.mobile-nav .modalCard{
+  width:96vw;
+  max-height:90dvh;
+  border-radius:18px;
+  padding:14px;
+}
+
+.app.mobile-nav .modalCard .tbl{
+  min-width:400px;
+}
+
+/* Botones de accion en mobile */
+.app.mobile-nav .actionRow,
+.app.mobile-nav .addRow{
+  width:100%;
+}
+
+.app.mobile-nav .actionRow .btn,
+.app.mobile-nav .addRow .btn{
+  flex:1 1 100% !important;
+  width:100% !important;
+  justify-content:center;
+}
+
+.app.mobile-nav .orderActions{
+  width:100%;
+}
+
+.app.mobile-nav .orderActions .btn{
+  flex:1 1 45% !important;
+}
+
+/* Home dashboard en mobile */
+.app.mobile-nav .homeDashGrid{
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+
+.app.mobile-nav .homeDashCard{
+  min-height:80px;
+  padding:10px !important;
+}
+
+.app.mobile-nav .homeDashCard .v{
+  font-size:22px;
+}
+
+/* Entradas/salidas en mobile */
+.app.mobile-nav #view-entradas .grid3,
+.app.mobile-nav #view-entradas .grid4,
+.app.mobile-nav #view-salidas .grid3,
+.app.mobile-nav #view-salidas .grid4{
+  grid-template-columns:1fr !important;
+}
+
+}
+
+.app.mobile-nav #view-r-existencias .repHeadFilters{
+  grid-template-columns:1fr 1fr;
+}
+
+.app.mobile-nav #view-r-existencias .repExistLegendCards{
+  grid-template-columns:1fr;
+}
+
+.app.mobile-nav .permBoard{
+  grid-template-columns:1fr;
+}
+
+.app.mobile-nav .adminImportBoard{
+  grid-template-columns:1fr;
+}
+
+/* RepTableScroll en mobile */
+.app.mobile-nav .repTableScroll{
+  max-height:50dvh;
+}
+
+/* Productos warehouse editor en mobile */
+.app.mobile-nav #view-productos .prdWhEditorTools{
+  grid-template-columns:1fr;
+}
+
+.app.mobile-nav #view-productos .prdWhEditorList{
+  grid-template-columns:1fr;
+  max-height:200px;
+}
+
+/* Toast stack en mobile */
+.app.mobile-nav .toastStack{
+  right:10px;
+  top:10px;
+  left:10px;
+}
+
+.app.mobile-nav .toastFloat{
+  min-width:0;
+  max-width:100%;
+  width:100%;
+}
+
+/* Alert bar en mobile */
+.app.mobile-nav .alertBar{
+  width:94vw;
+  min-width:0;
+  top:10px;
+  padding:12px 14px;
+  font-size:13px;
+}
+
+/* Prevent zoom en inputs on iOS */
+.app.mobile-nav input[type="text"],
+.app.mobile-nav input[type="number"],
+.app.mobile-nav input[type="password"],
+.app.mobile-nav select,
+.app.mobile-nav textarea{
+  font-size:16px !important;
+}
+
+/* Safe area padding for modals */
+.app.mobile-nav .modal{
+  padding:
+    calc(16px + env(safe-area-inset-top))
+    8px
+    calc(16px + env(safe-area-inset-bottom))
+    8px;
+}
+
+/* Dispatch modal mobile */
+.app.mobile-nav #pedDispatchModal .modalCard{
+  max-height:95dvh;
+}
+
+.app.mobil
+
+/* =========================
+   MEJORAS VISUALES - VISTAS AGREGAR
+========================= */
+
+/* Encabezados de seccion con iconos */
+#view-categorias .cardTitle::before,
+#view-subcategorias .cardTitle::before,
+#view-motivos-movimiento .cardTitle::before,
+#view-proveedores .cardTitle::before,
+#view-productos .cardTitle::before,
+#view-limites .cardTitle::before,
+#view-reglas-subcategorias .cardTitle::before,
+#view-usuarios .cardTitle::before,
+#view-bodegas .cardTitle::before{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:32px;
+  height:32px;
+  border-radius:10px;
+  margin-right:10px;
+  font-size:16px;
+  vertical-align:middle;
+  background: linear-gradient(135deg, rgba(56,189,248,.18), rgba(99,102,241,.12));
+  border:1px solid rgba(56,189,248,.25);
+}
+#view-categorias .cardTitle::before{content:"\25A3"}
+#view-subcategorias .cardTitle::before{content:"\229E"}
+#view-motivos-movimiento .cardTitle::before{content:"\2605"}
+#view-proveedores .cardTitle::before{content:"\2295"}
+#view-productos .cardTitle::before{content:"\25A1"}
+#view-limites .cardTitle::before{content:"\21C5"}
+#view-reglas-subcategorias .cardTitle::before{content:"\2696"}
+#view-usuarios .cardTitle::before{content:"\25C9"}
+#view-bodegas .cardTitle::before{content:"\2302"}
+
+#view-categorias .cardTitle,
+#view-subcategorias .cardTitle,
+#view-motivos-movimiento .cardTitle,
+#view-proveedores .cardTitle,
+#view-productos .cardTitle,
+#view-limites .cardTitle,
+#view-reglas-subcategorias .cardTitle,
+#view-usuarios .cardTitle,
+#view-bodegas .cardTitle{
+  font-size:20px;
+  padding-bottom:12px;
+  border-bottom:1px solid rgba(148,163,184,.15);
+  margin-bottom:16px;
+  display:flex;
+  align-items:center;
+}
+
+/* Campos de formulario con mejor espaciado */
+#view-categorias .grid4,
+#view-subcategorias .grid4,
+#view-motivos-movimiento .grid4,
+#view-proveedores .grid4,
+#view-productos .grid4,
+#view-limites .grid4,
+#view-reglas-subcategorias .grid4{
+  gap:12px;
+  margin-bottom:12px;
+  padding:14px;
+  border:1px solid rgba(148,163,184,.12);
+  border-radius:14px;
+  background: rgba(2,6,23,.2);
+}
+
+/* Etiquetas mas visibles */
+#view-categorias .lbl,
+#view-subcategorias .lbl,
+#view-motivos-movimiento .lbl,
+#view-proveedores .lbl,
+#view-productos .lbl,
+#view-limites .lbl,
+#view-reglas-subcategorias .lbl,
+#view-usuarios .lbl,
+#view-bodegas .lbl{
+  font-size:12px;
+  color:#93C5FD;
+  letter-spacing:.03em;
+  margin-bottom:4px;
+}
+
+/* Botones de accion agrupados */
+#view-categorias .addRow,
+#view-subcategorias .addRow,
+#view-motivos-movimiento .addRow,
+#view-proveedores .addRow,
+#view-productos .addRow,
+#view-limites .addRow,
+#view-reglas-subcategorias .addRow,
+#view-usuarios .addRow{
+  padding:12px 14px;
+  margin-bottom:14px;
+  border:1px solid rgba(148,163,184,.1);
+  border-radius:12px;
+  background: rgba(56,189,248,.03);
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:center;
+}
+
+#view-categorias .addRow .btn,
+#view-subcategorias .addRow .btn,
+#view-motivos-movimiento .addRow .btn,
+#view-proveedores .addRow .btn,
+#view-productos .addRow .btn,
+#view-limites .addRow .btn,
+#view-reglas-subcategorias .addRow .btn{
+  min-height:38px;
+  font-size:13px;
+}
+
+/* Tablas con mejor presentacion */
+#view-categorias .tbl.grid,
+#view-subcategorias .tbl.grid,
+#view-motivos-movimiento .tbl.grid,
+#view-proveedores .tbl.grid,
+#view-productos .tbl.grid,
+#view-limites .tbl.grid,
+#view-reglas-subcategorias .tbl.grid,
+#view-usuarios .tbl.grid,
+#view-bodegas .tbl.grid{
+  border:1px solid rgba(148,163,184,.12);
+  border-radius:12px;
+  overflow:hidden;
+}
+
+#view-categorias .tbl.grid thead th,
+#view-subcategorias .tbl.grid thead th,
+#view-motivos-movimiento .tbl.grid thead th,
+#view-proveedores .tbl.grid thead th,
+#view-productos .tbl.grid thead th,
+#view-limites .tbl.grid thead th,
+#view-reglas-subcategorias .tbl.grid thead th,
+#view-usuarios .tbl.grid thead th,
+#view-bodegas .tbl.grid thead th{
+  padding:12px 10px;
+  font-size:11px;
+  letter-spacing:.05em;
+}
+
+#view-categorias .tbl.grid tbody td,
+#view-subcategorias .tbl.grid tbody td,
+#view-motivos-movimiento .tbl.grid tbody td,
+#view-proveedores .tbl.grid tbody td,
+#view-productos .tbl.grid tbody td,
+#view-limites .tbl.grid tbody td,
+#view-reglas-subcategorias .tbl.grid tbody td,
+#view-usuarios .tbl.grid tbody td,
+#view-bodegas .tbl.grid tbody td{
+  padding:10px;
+  vertical-align:middle;
+}
+
+/* Seccion de edicion con tarjeta */
+#view-categorias [id$="EditId"],
+#view-subcategorias [id$="EditId"],
+#view-motivos-movimiento [id$="EditId"],
+#view-proveedores [id$="EditId"],
+#view-productos #prdEditId{
+  display:none !important;
+}
+
+/* Grupo de edicion visible */
+#view-categorias [id$="EditNombre"],
+#view-categorias [id$="EditActivo"],
+#view-categorias #catEditSave,
+#view-subcategorias [id$="EditNombre"],
+#view-subcategorias [id$="EditActivo"],
+#view-subcategorias [id$="EditSave"],
+#view-motivos-movimiento [id$="EditNombre"],
+#view-motivos-movimiento [id$="EditActivo"],
+#view-motivos-movimiento [id$="EditSave"],
+#view-proveedores [id$="EditNombre"],
+#view-proveedores [id$="EditActivo"],
+#view-proveedores [id$="EditSave"],
+#view-productos #prdEditNombre,
+#view-productos #prdEditSku,
+#view-productos #prdEditMedida,
+#view-productos #prdEditActivo,
+#view-productos #prdEditCategoria,
+#view-productos #prdEditSubcategoria,
+#view-productos #prdEditVisibleWarehouses,
+#view-productos #prdEditSave{
+  margin-top:10px;
+}
+
+/* Agrupar inputs de edicion */
+#view-categorias [id$="EditNombre"],
+#view-categorias [id$="EditActivo"],
+#view-subcategorias [id$="EditNombre"],
+#view-subcategorias [id$="EditActivo"],
+#view-motivos-movimiento [id$="EditNombre"],
+#view-motivos-movimiento [id$="EditActivo"],
+#view-proveedores [id$="EditNombre"],
+#view-proveedores [id$="EditActivo"]{
+  border:1px solid rgba(56,189,248,.2) !important;
+  border-radius:12px !important;
+  background: rgba(2,6,23,.5) !important;
+  margin-bottom:6px;
+}
+
+/* Usuarios - mejor organizacion */
+#view-usuarios .card.light > *{
+  margin-bottom:14px;
+}
+
+#view-usuarios .addRow:first-of-type{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  align-items:end;
+}
+
+#view-usuarios .addRow:first-of-type > *{
+  flex:1 1 auto;
+  min-width:150px;
+}
+
+/* En mobile, apilar campos */
+@media (max-width: 980px){
+  #view-categorias .grid4,
+  #view-subcategorias .grid4,
+  #view-motivos-movimiento .grid4,
+  #view-proveedores .grid4,
+  #view-productos .grid4{
+    grid-template-columns:1fr;
+    padding:12px;
+  }
+  
+  #view-categorias .addRow,
+  #view-subcategorias .addRow,
+  #view-motivos-movimiento .addRow,
+  #view-proveedores .addRow{
+    flex-direction:column;
+    align-items:stretch;
+  }
+  
+  #view-categorias .addRow .btn,
+  #view-subcategorias .addRow .btn,
+  #view-motivos-movimiento .addRow .btn,
+  #view-proveedores .addRow .btn{
+    width:100%;
+  }
+  
+  #view-usuarios .addRow:first-of-type{
+    flex-direction:column;
+    align-items:stretch;
+  }
+  
+  #view-usuarios .addRow:first-of-type > *{
+    min-width:0;
+  }
+}
+
+/* Animacion sutil al cambiar de seccion */
+.view:not(.hidden){
+  animation: viewFadeIn .2s ease both;
+}
+@keyframes viewFadeIn{
+  from{opacity:.6; transform:translateY(6px)}
+  to{opacity:1; transform:translateY(0)}
+}
+
+/* Board de Agregar en el menu */
+.menuGroup[data-menu-group="agregar"] .menuGroupToggle .menuTitle::before,
+.menuGroup[data-menu-group="movimientos"] .menuGroupToggle .menuTitle::before,
+.menuGroup[data-menu-group="reportes"] .menuGroupToggle .menuTitle::before,
+.menuGroup .menuTitle:not(.menuGroupToggle .menuTitle)::before{
+  display:none;
+}
+
+/* Iconos de grupo en el toggle */
+.menuGroup[data-menu-group="movimientos"] .menuGroupToggle .menuTitle::before{
+  content:"\21C4";
+  display:inline;
+  margin-right:6px;
+}
+.menuGroup[data-menu-group="agregar"] .menuGroupToggle .menuTitle::before{
+  content:"\002B";
+  display:inline;
+  margin-right:6px;
+}
+.menuGroup[data-menu-group="reportes"] .menuGroupToggle .menuTitle::before{
+  content:"\25C7";
+  display:inline;
+  margin-right:6px;
+}
+
+/* Iconos en items del menu */
+
+/* Iconos en items del menu - minimalistas */
+.menuBtn[data-section="home"]::before{content:"\2302"; font-size:15px}
+.menuBtn[data-section="entradas"]::before{content:"\2193"; font-size:15px}
+.menuBtn[data-section="salidas"]::before{content:"\2191"; font-size:15px}
+.menuBtn[data-section="ajustes"]::before{content:"\2299"; font-size:15px}
+.menuBtn[data-section="pedidos"]::before{content:"\270E"; font-size:15px}
+.menuBtn[data-section="pedidos-despachar"]::before{content:"\25B6"; font-size:15px}
+.menuBtn[data-section="cuadre-caja"]::before{content:"\0024"; font-size:15px}
+.menuBtn[data-section="categorias"]::before{content:"\25A3"; font-size:15px}
+.menuBtn[data-section="subcategorias"]::before{content:"\229E"; font-size:15px}
+.menuBtn[data-section="motivos-movimiento"]::before{content:"\2605"; font-size:15px}
+.menuBtn[data-section="proveedores"]::before{content:"\2295"; font-size:15px}
+.menuBtn[data-section="productos"]::before{content:"\25A1"; font-size:15px}
+.menuBtn[data-section="limites"]::before{content:"\21C5"; font-size:15px}
+.menuBtn[data-section="reglas-subcategorias"]::before{content:"\2696"; font-size:15px}
+.menuBtn[data-section="usuarios"]::before{content:"\25C9"; font-size:15px}
+.menuBtn[data-section="bodegas"]::before{content:"\2302"; font-size:15px}
+.menuBtn[data-section^="r-"]::before{content:"\25C7"; font-size:15px}
+.menuBtn#logout::before{content:"\2715"; font-size:15px}
+
+/* En mobile los iconos se ven mas pequeños */
+@media (max-width: 980px){
+  .menuBtn::before{font-size:14px}
+  .menuBtn{padding:12px; font-size:14px; gap:8px}
+}
+
+/* =========================
+   MEJORAS PEDIDOS DESKTOP
+========================= */
+
+/* Panel de datos del pedido - borde azul */
+#view-pedidos .orderPanel:first-child{
+  border-color: rgba(56,189,248,.25);
+  background: linear-gradient(180deg, rgba(15,23,42,.6), rgba(2,6,23,.35));
+}
+
+/* Iconos en titulos de panel */
+#view-pedidos .orderPanel .panelTitle{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:15px;
+  padding-bottom:8px;
+  border-bottom:1px solid rgba(148,163,184,.12);
+  margin-bottom:12px;
+}
+
+#view-pedidos .orderPanel .panelTitle::before{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:28px;
+  height:28px;
+  border-radius:8px;
+  font-size:14px;
+  background: rgba(56,189,248,.15);
+  border:1px solid rgba(56,189,248,.25);
+  color:#7DD3FC;
+}
+
+#view-pedidos .orderPanel:first-child .panelTitle::before{
+  content:"\2139";
+}
+
+#view-pedidos .orderPanel:nth-child(2) .panelTitle::before{
+  content:"\002B";
+}
+
+/* Panel de agregar producto */
+#view-pedidos .orderPanel:nth-child(2){
+  border-color: rgba(34,197,94,.25);
+  background: linear-gradient(180deg, rgba(15,23,42,.6), rgba(2,6,23,.35));
+  margin-top:14px;
+}
+
+#view-pedidos .orderPanel:nth-child(2) .panelTitle::before{
+  background: rgba(34,197,94,.15);
+  border-color: rgba(34,197,94,.25);
+  color:#86EFAC;
+}
+
+/* Campos del formulario mas claros */
+#view-pedidos .orderPanel .grid3,
+#view-pedidos .orderPanel .grid4{
+  gap:10px;
+}
+
+#view-pedidos .orderPanel .lbl{
+  font-size:11px;
+  color:#93C5FD;
+  letter-spacing:.03em;
+  margin-bottom:3px;
+  display:flex;
+  align-items:center;
+  gap:4px;
+}
+
+/* Boton Agregar mas visible */
+#view-pedidos .orderPanel #pedAdd{
+  background: linear-gradient(135deg, #22C55E, #34D399) !important;
+  border-color: rgba(34,197,94,.55) !important;
+  color:#052E16 !important;
+  min-height:38px;
+  min-width:140px;
+  font-weight:800;
+  letter-spacing:.02em;
+}
+
+#view-pedidos .orderPanel #pedAdd:hover{
+  transform:translateY(-1px);
+  box-shadow:0 8px 20px rgba(34,197,94,.25);
+}
+
+/* Carrito (lado derecho) */
+#view-pedidos .orderCart{
+  background: linear-gradient(180deg, rgba(15,23,42,.7), rgba(2,6,23,.45)) !important;
+  border-color: rgba(56,189,248,.2) !important;
+  box-shadow: 0 8px 24px rgba(2,6,23,.28);
+}
+
+#view-pedidos .orderCart .panelTitle{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:15px;
+  padding-bottom:10px;
+  border-bottom:1px solid rgba(148,163,184,.12);
+}
+
+#view-pedidos .orderCart .panelTitle::before{
+  content:"\25A1";
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:28px;
+  height:28px;
+  border-radius:8px;
+  font-size:14px;
+  background: rgba(99,102,241,.15);
+  border:1px solid rgba(99,102,241,.25);
+  color:#A5B4FC;
+}
+
+/* Cart items mejor espaciado */
+#view-pedidos .cartItem{
+  background: linear-gradient(135deg, rgba(2,6,23,.8), rgba(15,23,42,.6)) !important;
+  border-color: rgba(148,163,184,.18) !important;
+  padding:12px !important;
+  transition: all .2s ease;
+}
+
+#view-pedidos .cartItem:hover{
+  border-color: rgba(56,189,248,.35) !important;
+  box-shadow:0 8px 20px rgba(2,6,23,.35);
+}
+
+/* Notas generales */
+#view-pedidos .orderCart .ta{
+  min-height:60px;
+  margin-top:4px;
+  font-size:13px;
+}
+
+#view-pedidos .orderCart label[for="pedNotes"],
+#view-pedidos .orderCart .lbl{
+  font-size:11px;
+  color:#93C5FD;
+  letter-spacing:.03em;
+  display:flex;
+  align-items:center;
+  gap:4px;
+}
+
+#view-pedidos .orderCart label[for="pedNotes"]::before,
+#view-pedidos .orderCart .lbl:has(+ textarea)::before{
+  content:"\270E";
+  font-size:12px;
+}
+
+/* Botones de accion del carrito */
+#view-pedidos .orderActions{
+  gap:10px !important;
+  padding-top:12px !important;
+  margin-top:4px !important;
+}
+
+#view-pedidos .orderActions .btn{
+  min-width:100px !important;
+  min-height:38px;
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:.02em;
+  border-radius:10px;
+}
+
+#view-pedidos #pedClear{
+  background: rgba(127,29,29,.4) !important;
+  border-color: rgba(239,68,68,.35) !important;
+  color:#FCA5A5 !important;
+}
+
+#view-pedidos #pedClear:hover{
+  background: rgba(127,29,29,.6) !important;
+  border-color: rgba(239,68,68,.55) !important;
+}
+
+#view-pedidos #pedSave{
+  background: linear-gradient(135deg, #38BDF8, #60A5FA) !important;
+  color:#041321 !important;
+  border-color: rgba(96,165,250,.6) !important;
+  min-width:150px !important;
+}
+
+#view-pedidos #pedSave:hover{
+  transform:translateY(-1px);
+  box-shadow:0 8px 20px rgba(56,189,248,.3);
+}
+
+/* Progress bar mas visible */
+#view-pedidos .orderSubmitProgress{
+  background: linear-gradient(135deg, rgba(14,165,233,.2), rgba(37,99,235,.15)) !important;
+  border-color: rgba(56,189,248,.4) !important;
+  border-radius:14px;
+}
+
+/* Campo stock con indicador */
+#view-pedidos #pedStock{
+  background: rgba(2,6,23,.5) !important;
+  color:#86EFAC !important;
+  font-weight:800;
+}
+
+/* Select de usuario mas ancho */
+#view-pedidos #pedUser{
+  min-width:200px;
+}
+
+/* Responsive desktop medio */
+@media (max-width: 1280px){
+  #view-pedidos .orderWorkspace{
+    grid-template-columns:1fr !important;
+  }
+  
+  #view-pedidos .orderSide{
+    position:static !important;
+    max-height:none !important;
+    overflow:visible !important;
+  }
+  
+  #view-pedidos .orderCart{
+    max-height:none !important;
+  }
+  
+  #view-pedidos .orderCart .cartList{
+    max-height: min(50dvh, 400px) !important;
+    overflow:auto !important;
+  }
+}
+
+/* Ajuste para pantallas altas */
+@media (min-height: 1000px){
+  #view-pedidos .orderSide{
+    max-height: calc(100dvh - 160px) !important;
+  }
+  
+  #view-pedidos .orderCart .cartList{
+    max-height: calc(100dvh - 480px) !important;
+  }
+}
+
+/* Contador de productos mas visible */
+#view-pedidos #pedCount{
+  background: linear-gradient(135deg, rgba(56,189,248,.2), rgba(99,102,241,.15));
+  border-color: rgba(56,189,248,.4);
+  color:#E0F2FE;
+  font-size:13px;
+  padding:6px 14px;
+}
+
+/* Encabezado del pedido */
+#view-pedidos .orderHeader .cardTitle{
+  font-size:20px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+#view-pedidos .orderHeader .cardTitle::before{
+  content:"\1F4DD";
+  font-size:18px;
+}
+
+/* =========================
+   CART ANIMATIONS
+========================= */
+
+@keyframes cartItemIn {
+  from {
+    opacity: 0;
+    transform: translateX(24px) scale(.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes cartItemOut {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    max-height: 120px;
+    margin-bottom: 10px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    border-width: 1px;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(40px) scale(.93);
+    max-height: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-width: 0;
+    overflow: hidden;
+  }
+}
+
+#view-pedidos .cartItem {
+  animation: cartItemIn .35s ease backwards;
+}
+
+#view-pedidos .cartItem.removing {
+  animation: cartItemOut .25s ease both;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+#view-pedidos .cartItem.removing * {
+  pointer-events: none !important;
+}
+
+/* =========================
+   PEDIDOS MOBILE - TEXTBOXES ALINEADOS
+========================= */
+
+.app.mobile-nav #view-pedidos .orderPanel{
+  padding:12px;
+}
+
+/* Todos los inputs/selects del pedido en mobile con el mismo alto */
+.app.mobile-nav #view-pedidos .in,
+.app.mobile-nav #view-pedidos select.in{
+  min-height:44px;
+  height:44px;
+  font-size:16px;
+  padding:8px 12px;
+  width:100%;
+  box-sizing:border-box;
+}
+
+/* searchWrap: input + boton alineados */
+.app.mobile-nav #view-pedidos .searchWrap{
+  display:flex;
+  flex-direction:row;
+  align-items:stretch;
+  gap:8px;
+  width:100%;
+}
+
+.app.mobile-nav #view-pedidos .searchWrap .in{
+  flex:1;
+  min-width:0;
+}
+
+.app.mobile-nav #view-pedidos .searchWrap .btn{
+  flex:0 0 auto;
+  min-width:80px;
+  height:44px;
+  min-height:44px;
+  margin:0;
+  padding:8px 12px;
+  font-size:14px;
+  white-space:nowrap;
+}
+
+/* Boton Agregar en mobile: ancho completo */
+.app.mobile-nav #view-pedidos .addRow{
+  flex-direction:column;
+  align-items:stretch;
+}
+
+.app.mobile-nav #view-pedidos .addRow .btn{
+  width:100%;
+  min-width:0;
+  min-height:44px;
+  justify-content:center;
+}
+
+/* Labels con mejor espaciado */
+.app.mobile-nav #view-pedidos .lbl{
+  font-size:12px;
+  margin-bottom:4px;
+  margin-top:10px;
+}
+
+.app.mobile-nav #view-pedidos .lbl:first-child{
+  margin-top:0;
+}
+
+/* Campos deshabilitados */
+.app.mobile-nav #view-pedidos .in:disabled,
+.app.mobile-nav #view-pedidos select.in:disabled{
+  font-size:14px;
+  opacity:.8;
+}
+
+/* Fecha/hora: mantener el mismo alto */
+.app.mobile-nav #view-pedidos input[type="date"].in,
+.app.mobile-nav #view-pedidos input[type="time"].in{
+  min-height:44px;
+  height:44px;
+}
+
+/* Multi-select de usuario */
+.app.mobile-nav #pedUser{
+  min-height:44px;
+  height:44px;
+}
+
+/* Espaciado entre paneles */
+.app.mobile-nav #view-pedidos .orderPanel + .orderPanel{
+  margin-top:12px;
+}
+
+/* Notas generales */
+.app.mobile-nav #view-pedidos .ta{
+  min-height:60px;
+  font-size:16px;
+}
+
+/* =========================
+   PEDIDOS MOBILE - ESPACIADO GENERAL
+========================= */
+
+/* Order Header en mobile: mas compacto */
+.app.mobile-nav #view-pedidos .orderHeader{
+  flex-direction:column;
+  align-items:stretch;
+  gap:8px;
+  margin-bottom:4px;
+}
+
+.app.mobile-nav #view-pedidos .orderHeader .cardTitle{
+  font-size:18px;
+  margin-bottom:2px;
+}
+
+.app.mobile-nav #view-pedidos .orderHeader .orderMeta{
+  align-self:flex-start;
+}
+
+.app.mobile-nav #view-pedidos .orderSub{
+  font-size:12px;
+  margin-top:2px;
+  color:#94A3B8;
+  line-height:1.35;
+}
+
+/* Card mas compacto en mobile */
+.app.mobile-nav #view-pedidos .card.light.orderWrap{
+  padding:12px;
+  gap:10px;
+}
+
+/* Panel spacing mejorado */
+.app.mobile-nav #view-pedidos .orderPanel{
+  padding:12px;
+  border-radius:14px;
+  margin-bottom:0;
+}
+
+/* Override inline style del segundo panel */
+.app.mobile-nav #view-pedidos .orderPanel[style*="margin-top"]{
+  margin-top:12px !important;
+}
+
+/* Ultimo panel sin margen extra */
+.app.mobile-nav #view-pedidos .orderPanel:last-child{
+  margin-bottom:0;
+}
+
+/* Espaciado entre grid items */
+.app.mobile-nav #view-pedidos .grid3,
+.app.mobile-nav #view-pedidos .grid4{
+  gap:8px;
+}
+
+/* Panel titles en mobile */
+.app.mobile-nav #view-pedidos .panelTitle{
+  font-size:14px;
+  padding-bottom:6px;
+  margin-bottom:10px;
+}
+
+/* Botonera del carrito expandido mas compacta */
+.app.mobile-nav #view-pedidos .orderSide.expanded .orderActions{
+  display:flex;
+  flex-direction:row;
+  flex-wrap:wrap;
+  gap:6px;
+  padding:8px 12px;
+}
+
+.app.mobile-nav #view-pedidos .orderSide.expanded .orderActions .btn{
+  flex:1 1 calc(50% - 6px) !important;
+  min-width:0;
+  min-height:40px;
+  font-size:12px;
+  padding:8px 8px;
+  justify-content:center;
+}
+
+/* Cart items en mobile: mas compactos */
+.app.mobile-nav #view-pedidos .cartList{
+  gap:8px;
+  padding:8px 0;
+}
+
+/* Notas generales mas compacto */
+.app.mobile-nav #view-pedidos .orderCart .ta{
+  min-height:50px;
+  margin:4px 0;
+}
+
+/* Boton guardar mas destacado en mobile */
+.app.mobile-nav #view-pedidos #pedSave{
+  min-height:44px;
+  font-weight:800;
+}
+
+/* =========================
+   PEDIDOS MOBILE - INDICADOR DE GUARDADO
+========================= */
+
+/* Pulse animation para el contador cuando esta guardando */
+@keyframes savingPulse {
+  0%, 100% { transform:scale(1); box-shadow:0 0 0 0 rgba(234,179,8,.5); }
+  50% { transform:scale(1.1); box-shadow:0 0 0 6px rgba(234,179,8,0); }
+}
+
+/* Peek bar en estado de guardado */
+.app.mobile-nav #view-pedidos .orderSide.is-saving .cartPeekBar{
+  background:linear-gradient(135deg, rgba(234,179,8,.15), rgba(234,179,8,.08)) !important;
+  border-bottom-color:rgba(234,179,8,.4) !important;
+}
+
+.app.mobile-nav #view-pedidos .orderSide.is-saving .cartPeekCount{
+  animation:savingPulse .8s ease infinite;
+  background:linear-gradient(135deg, #EAB308, #F59E0B) !important;
+}
+
+.app.mobile-nav #view-pedidos .orderSide.is-saving .cartPeekText{
+  color:#FDE68A !important;
+}
+
+.app.mobile-nav #view-pedidos .orderSide.is-saving .cartPeekArrow{
+  border-color:rgba(234,179,8,.5) !important;
+  color:#FDE68A !important;
+}
+
+
+
+/* =========================
+   ENTRADAS/SALIDAS MOBILE - INDICADOR DE GUARDADO
+========================= */
+
+@keyframes savingPulseBtn {
+  0%, 100% { transform:scale(1); box-shadow:0 0 0 0 rgba(52,211,153,.5); }
+  50% { transform:scale(1.04); box-shadow:0 0 0 8px rgba(52,211,153,0); }
+}
+
+.app.mobile-nav #entSave.is-saving,
+.app.mobile-nav #salSave.is-saving{
+  animation:savingPulseBtn .7s ease infinite !important;
+  pointer-events:none !important;
+  opacity:1 !important;
+}
+
+.app.mobile-nav #entSave.is-saving::after,
+.app.mobile-nav #salSave.is-saving::after{
+  content:"";
+  display:inline-block;
+  width:16px;
+  height:16px;
+  margin-left:8px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,.3);
+  border-top-color:#fff;
+  animation:pedSaveSpin .8s linear infinite;
+  vertical-align:-2px;
+}
+
+  width:16px;
+  height:16px;
+  margin-left:8px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,.3);
+  border-top-color:#fff;
+  animation:pedSaveSpin .8s linear infinite;
+  vertical-align:-2px;
+}
+
+/* =========================
+   PEDIDOS x DESPACHAR - BUSCADOR Y BOTONES MEJORADOS
+========================= */
+
+/* Encabezado con buscador */
+.dispatchHead{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:14px;
+  flex-wrap:wrap;
+}
+
+.dispatchHead .cardTitle{
+  margin-bottom:0;
+  white-space:nowrap;
+}
+
+.dispatchSearch{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex:1 1 400px;
+  max-width:520px;
+}
+
+.dispatchSearch .in{
+  flex:1;
+  min-width:160px;
+  min-height:36px;
+  font-size:13px;
+}
+
+.dispatchSearch .btn{
+  flex:0 0 auto;
+  white-space:nowrap;
+}
+
+/* Botones de accion - horizontal en desktop */
+#view-pedidos-despachar .dispatchActions{
+  display:flex;
+  flex-direction:row;
+  flex-wrap:wrap;
+  gap:4px;
+  max-width:280px;
+}
+
+#view-pedidos-despachar .dispatchBtn{
+  flex:0 1 auto;
+  min-width:0;
+  padding:6px 8px;
+  font-size:11px;
+  min-height:30px;
+  border-radius:8px;
+  gap:4px;
+}
+
+#view-pedidos-despachar .dispatchBtn svg{
+  width:12px;
+  height:12px;
+}
+
+#view-pedidos-despachar .dispatchBtn span{
+  display:none;
+}
+
+#view-pedidos-despachar .dispatchBtn.dispatchBtn-ok span,
+#view-pedidos-despachar .dispatchBtn.dispatchBtn-danger span{
+  display:inline;
+}
+
+/* Botones mas compactos para que quepan */
+#view-pedidos-despachar .dispatchBtn-ok{order:1}
+#view-pedidos-despachar .dispatchBtn-neutral{order:2}
+#view-pedidos-despachar .dispatchBtn-pdf{order:3}
+#view-pedidos-despachar .dispatchBtn-pos{order:4}
+#view-pedidos-despachar .dispatchBtn-danger{order:5}
+
+/* Estados de pedido */
+#view-pedidos-despachar .tbl td:nth-child(4){
+  min-width:120px;
+}
+
+/* Mobile */
+.app.mobile-nav #view-pedidos-despachar .dispatchHead{
+  flex-direction:column;
+  align-items:stretch;
+}
+
+.app.mobile-nav #view-pedidos-despachar .dispatchSearch{
+  max-width:none;
+  flex-wrap:wrap;
+}
+
+.app.mobile-nav #view-pedidos-despachar .dispatchSearch .in{
+  min-width:0;
+  width:100%;
+}
+
+.app.mobile-nav #view-pedidos-despachar .dispatchSearch .btn{
+  flex:1;
+}
+
+.app.mobile-nav #view-pedidos-despachar .dispatchActions{
+  flex-direction:column;
+  max-width:none;
+  gap:4px;
+}
+
+.app.mobile-nav #view-pedidos-despachar .dispatchBtn{
+  width:100%;
+  padding:8px 10px;
+  font-size:12px;
+  min-height:36px;
+}
+
+.app.mobile-nav #view-pedidos-despachar .dispatchBtn span{
+  display:inline;
+}
+
+
+/* =========================
+   AJUSTES MOBILE - INDICADOR DE GUARDADO Y LAYOUT
+========================= */
+
+/* Mobile grids a 1 columna */
+.app.mobile-nav #view-ajustes .grid4{
+  grid-template-columns:1fr !important;
+}
+
+.app.mobile-nav #view-ajustes .ajFlowCard{
+  padding:10px 12px;
+  margin:4px 0 8px;
+}
+
+.app.mobile-nav #view-ajustes .ajFlowTitle{
+  font-size:13px;
+}
+
+.app.mobile-nav #view-ajustes .ajFlowDesc{
+  font-size:11px;
+}
+
+.app.mobile-nav #view-ajustes .ajMiniHelp{
+  padding:8px 10px;
+  margin-bottom:8px;
+}
+
+.app.mobile-nav #view-ajustes .ajMiniHelpTitle{
+  font-size:11px;
+}
+
+.app.mobile-nav #view-ajustes .ajMiniHelpStep{
+  font-size:11px;
+}
+
+.app.mobile-nav #view-ajustes .ajResume{
+  font-size:12px;
+  padding:8px 10px;
+}
+
+.app.mobile-nav #view-ajustes #ajSave.is-saving{
+  animation:savingPulseBtn .7s ease infinite !important;
+  pointer-events:none !important;
+  opacity:1 !important;
+}
+
+.app.mobile-nav #view-ajustes #ajSave.is-saving::after{
+  content:"";
+  display:inline-block;
+  width:16px;
+  height:16px;
+  margin-left:8px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,.3);
+  border-top-color:#fff;
+  animation:pedSaveSpin .8s linear infinite;
+  vertical-align:-2px;
+}
+
+
+/* Revert button loading spinner */
+.dispatchBtn.is-loading{
+  pointer-events:none !important;
+  opacity:.8 !important;
+  position:relative;
+  padding-right:32px !important;
+}
+
+.dispatchBtn.is-loading::after{
+  content:"";
+  position:absolute;
+  right:10px;
+  top:50%;
+  width:14px;
+  height:14px;
+  margin-top:-7px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,.25);
+  border-top-color:currentColor;
+  animation:pedSaveSpin .7s linear infinite;
+}
+
+
+/* Loading spinner for .btn buttons (e.g. Confirmar despacho) */
+.btn.is-loading{
+  pointer-events:none !important;
+  opacity:.8 !important;
+  position:relative;
+  padding-right:38px !important;
+}
+
+.btn.is-loading::after{
+  content:"";
+  position:absolute;
+  right:14px;
+  top:50%;
+  width:14px;
+  height:14px;
+  margin-top:-7px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,.25);
+  border-top-color:currentColor;
+  animation:pedSaveSpin .7s linear infinite;
+}
+
+/* Update banner for SW update notification */
+.updateBanner{
+  position:fixed;
+  left:50%;
+  bottom:24px;
+  transform: translateX(-50%) translateY(0);
+  min-width:300px;
+  max-width:480px;
+  width:auto;
+  padding:12px 18px;
+  border-radius:16px;
+  font-size:14px;
+  font-weight:800;
+  letter-spacing:.01em;
+  box-shadow: 0 20px 50px rgba(2,6,23,.55);
+  z-index:2147483647 !important;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  background: linear-gradient(135deg, rgba(56,189,248,.95), rgba(37,99,235,.85));
+  color:#0B1222;
+  border:1px solid rgba(125,211,252,.65);
+  animation: updateBannerIn .3s ease both;
+}
+.updateBanner.hidden{display:none}
+.updateText{
+  flex:1;
+  font-size:13px;
+  line-height:1.3;
+}
+.updateBtn{
+  flex:0 0 auto;
+  border:1px solid rgba(255,255,255,.35);
+  background: rgba(2,6,23,.25);
+  color:#fff;
+  border-radius:10px;
+  padding:8px 14px;
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer;
+  white-space:nowrap;
+  transition: background .15s ease, transform .12s ease;
+}
+.updateBtn:hover{
+  background: rgba(2,6,23,.4);
+  transform: translateY(-1px);
+}
+@keyframes updateBannerIn{
+  from{opacity:0; transform: translateX(-50%) translateY(16px);}
+  to{opacity:1; transform: translateX(-50%) translateY(0);}
+}
+
+/* Connectivity indicator */
+.connIndicator{
+  position:fixed;
+  right:16px;
+  bottom:16px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 14px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:.02em;
+  box-shadow: 0 10px 24px rgba(2,6,23,.4);
+  z-index:2147483646 !important;
+  pointer-events:none;
+  user-select:none;
+}
+.connIndicator.online{
+  background: rgba(22,163,74,.92);
+  color:#DCFCE7;
+  border:1px solid rgba(74,222,128,.5);
+}
+.connIndicator.offline{
+  background: rgba(220,38,38,.92);
+  color:#FEE2E2;
+  border:1px solid rgba(252,129,129,.5);
+}
+.connDot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  flex:0 0 auto;
+}
+.connDot.on{
+  background:#86EFAC;
+  box-shadow: 0 0 8px rgba(134,239,172,.6);
+}
+.connDot.off{
+  background:#FCA5A5;
+  box-shadow: 0 0 8px rgba(252,165,165,.6);
+}
+.connText{
+  line-height:1;
+}
+
+/* ─── Mobile: Report filter collapsible ────────────────────────── */
+@media (max-width: 768px){
+  .app.mobile-nav .uiFormLayout{
+    padding:0;
+    border:none;
+    background:transparent;
+  }
+  .app.mobile-nav .uiFormLayout .grid3,
+  .app.mobile-nav .uiFormLayout .grid4{
+    grid-template-columns:1fr;
+    gap:8px;
+  }
+  .app.mobile-nav .uiFormLayout .in,
+  .app.mobile-nav .uiFormLayout select.in{
+    min-height:40px;
+    height:40px;
+    font-size:14px;
+  }
+  .app.mobile-nav .uiFormLayout .actionRow{
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .app.mobile-nav .uiFormLayout .actionRow .btn{
+    width:100% !important;
+    justify-content:center;
+  }
+
+  /* Filter collapse toggle (generated by JS) */
+  .app.mobile-nav .repFilterToggle{
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:10px 12px;
+    border:1px solid rgba(56,189,248,.35);
+    border-radius:12px;
+    background:linear-gradient(135deg, rgba(56,189,248,.12), rgba(14,116,144,.10));
+    color:#BAE6FD;
+    font-size:13px;
+    font-weight:800;
+    cursor:pointer;
+    margin-bottom:10px;
+    transition:background .15s ease;
+  }
+  .app.mobile-nav .repFilterToggle:hover{
+    background:linear-gradient(135deg, rgba(56,189,248,.20), rgba(14,116,144,.16));
+  }
+  .app.mobile-nav .repFilterToggle .repFilterCaret{
+    font-size:12px;
+    transition:transform .2s ease;
+    width:22px;
+    height:22px;
+    border-radius:999px;
+    display:grid;
+    place-items:center;
+    background:rgba(2,6,23,.3);
+    border:1px solid rgba(148,163,184,.2);
+  }
+  .app.mobile-nav .repFilterToggle.open .repFilterCaret{
+    transform:rotate(180deg);
+  }
+  .app.mobile-nav .repFilterBody{
+    max-height:0;
+    overflow:hidden;
+    opacity:0;
+    transition:max-height .28s ease, opacity .22s ease, margin .22s ease;
+    margin-bottom:0;
+  }
+  .app.mobile-nav .repFilterBody.open{
+    max-height:1200px;
+    opacity:1;
+    margin-bottom:10px;
+  }
+
+  /* Report tables on mobile */
+  .app.mobile-nav .repTableScroll{
+    max-height:calc(100dvh - 260px);
+    border-radius:10px;
+  }
+  .app.mobile-nav .repTableScroll .tbl{
+    min-width:560px;
+  }
+  .app.mobile-nav .repTableScroll .tbl th,
+  .app.mobile-nav .repTableScroll .tbl td{
+    padding:8px 6px;
+    font-size:12px;
+    white-space:nowrap;
+  }
+
+  /* Report summary cards */
+  .app.mobile-nav #repDiaMeta,
+  .app.mobile-nav #repDiaResume,
+  .app.mobile-nav #repEntResume,
+  .app.mobile-nav #repSalResume,
+  .app.mobile-nav #repPedResume,
+  .app.mobile-nav #repKarResume,
+  .app.mobile-nav #repExistResume,
+  .app.mobile-nav #repAudMeta,
+  .app.mobile-nav #repTrendResume{
+    font-size:12px;
+    padding:8px 10px;
+  }
+
+  /* Tendencia charts stack on mobile */
+  .app.mobile-nav .repTrendCharts{
+    grid-template-columns:1fr;
+  }
+
+  /* Auditoria alerts section */
+  .app.mobile-nav #repAlertResume{
+    margin-top:8px;
+  }
+  .app.mobile-nav #repAlertList{
+    font-size:12px;
+  }
+
+  /* Corte diario special buttons */
+  .app.mobile-nav #repDiaHistory,
+  .app.mobile-nav #repDiaClose,
+  .app.mobile-nav #repDiaPdf{
+    width:100%;
+    min-width:0;
+  }
+
+  /* Reporte cuadres */
+  .app.mobile-nav .repCuadreActions{
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .app.mobile-nav .repCuadreActions .btn{
+    width:100%;
+  }
+}
