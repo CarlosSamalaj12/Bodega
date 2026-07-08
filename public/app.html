@@ -564,47 +564,60 @@
 <div class="orderHeader">
   <div>
     <div class="cardTitle">Realizar pedidos</div>
-    <div class="orderSub">Formulario y busqueda a la izquierda, carrito/lista a la derecha.</div>
+    <div class="orderSub desktop-only">Formulario y busqueda a la izquierda, carrito/lista a la derecha.</div>
   </div>
-  <div class="orderMeta"><div class="pill" id="pedCount">0 lineas</div></div>
-</div>
+  <div class="orderMeta"><div class="pill" id="pedCount">0 productos</div></div>
 
 <div class="orderWorkspace">
   <div class="orderComposer">
-    <div class="orderPanel">
-      <div class="panelTitle">Datos del pedido</div>
-      <div class="grid3">
-        <div><label class="lbl">Desde bodega (despacha)</label><select class="in" id="pedFromWarehouse"></select></div>
-        <div><label class="lbl">Fecha</label><input class="in" id="pedFecha" type="date"/></div>
-        <div><label class="lbl">Hora</label><input class="in" id="pedHora" type="time" readonly /></div>
-      </div>
-      <input type="hidden" id="pedRequesterType" value="USUARIO" />
-
-      <div class="grid3">
-        <div>
-          <label class="lbl">Usuario solicitante</label>
-          <div class="searchWrap"><input class="in" id="pedUserSearch" /><button class="btn soft btn-sm" id="pedUserSearchBtn" type="button">Buscar</button></div>
-          <select class="in" id="pedUser"></select>
+    <div class="pedStep" id="pedStepData">
+      <div class="orderPanel">
+        <div class="panelTitle">Datos del pedido</div>
+        <div class="grid3">
+          <div><label class="lbl">Desde bodega (despacha)</label><select class="in" id="pedFromWarehouse"></select></div>
+          <div><label class="lbl">Fecha</label><input class="in" id="pedFecha" type="date"/></div>
+          <div><label class="lbl">Hora</label><input class="in" id="pedHora" type="time" readonly /></div>
         </div>
-        <div><label class="lbl">PIN usuario</label><input class="in" id="pedUserPin" type="password" /></div>
-        <div><label class="lbl">Bodega del usuario</label><input class="in" id="pedRequesterWarehouseName" disabled /></div>
+        <input type="hidden" id="pedRequesterType" value="USUARIO" />
+
+        <div class="grid3">
+          <div>
+            <label class="lbl">Usuario solicitante</label>
+            <div class="searchWrap"><input class="in" id="pedUserSearch" /><button class="btn soft btn-sm" id="pedUserSearchBtn" type="button">Buscar</button></div>
+            <select class="in" id="pedUser"></select>
+          </div>
+          <div><label class="lbl">PIN usuario</label><input class="in" id="pedUserPin" type="password" /></div>
+          <div><label class="lbl">Bodega del usuario</label><input class="in" id="pedRequesterWarehouseName" disabled /></div>
+        </div>
+        <input type="hidden" id="pedRequesterWarehouseId" />
+        <div class="pedStepNav mobile-only">
+          <button class="btn ok pedStepNext" id="pedStepToProducts" type="button">Continuar <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:18px;height:18px;"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+        </div>
       </div>
-      <input type="hidden" id="pedRequesterWarehouseId" />
     </div>
 
-    <div class="orderPanel" style="margin-top:14px;">
-      <div class="panelTitle">Agregar producto</div>
-      <div class="grid4">
-        <div>
-          <label class="lbl">Producto</label>
-          <div class="searchWrap"><input class="in" id="pedProducto" /><button class="btn soft btn-sm" id="pedSearchBtn" type="button">Buscar</button></div>
+    <div class="pedStep" id="pedStepProducts">
+      <div class="orderPanel" style="margin-top:0;">
+        <div class="pedStepBack mobile-only" id="pedStepBackBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:18px;height:18px;"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          <span>Datos del pedido</span>
         </div>
-        <div><label class="lbl">Stock</label><input class="in" id="pedStock" disabled /></div>
-        <div><label class="lbl">Cantidad</label><input class="in" id="pedCantidad" type="number" min="0" step="1" /></div>
-        <div><label class="lbl">Nota linea</label><input class="in" id="pedLineaNota" /></div>
+        <div class="panelTitle" style="margin-top:8px;">Agregar producto</div>
+        <div class="grid4">
+          <div>
+            <label class="lbl">Producto</label>
+            <div class="searchWrap"><input class="in" id="pedProducto" /><button class="btn soft btn-sm" id="pedSearchBtn" type="button">Buscar</button></div>
+          </div>
+          <div><label class="lbl">Stock</label><input class="in" id="pedStock" disabled /></div>
+          <div><label class="lbl">Cantidad</label><input class="in" id="pedCantidad" type="number" min="0" step="1" /></div>
+          <div><label class="lbl">Nota linea</label><input class="in" id="pedLineaNota" /></div>
+        </div>
+        <div class="addRow" style="justify-content:flex-end; margin-top:8px;">
+          <button class="btn soft" id="pedAdd" type="button">Agregar</button>
+        </div>
       </div>
-      <div class="addRow" style="justify-content:flex-end; margin-top:8px;"><button class="btn soft" id="pedAdd" type="button">Agregar</button></div>
     </div>
+
   </div>
 
   <div class="orderSide">
@@ -638,6 +651,51 @@
   </div>
 </div>
 </div>
+
+<!-- Floating Cart FAB (mobile only) -->
+<button class="pedCartFab mobile-only" id="pedCartFab" type="button" aria-label="Ver carrito">
+  <span class="pedCartFabBadge" id="pedCartFabBadge">0</span>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+    <line x1="3" y1="6" x2="21" y2="6"/>
+    <path d="M16 10a4 4 0 01-8 0"/>
+  </svg>
+</button>
+
+<!-- Cart Drawer Overlay (mobile only) -->
+<div class="pedCartOverlay mobile-only" id="pedCartOverlay"></div>
+<div class="pedCartDrawer mobile-only" id="pedCartDrawer" aria-modal="true" role="dialog" aria-label="Mi lista de pedido">
+  <div class="pedCartDrawerHead">
+    <div class="pedCartDrawerTitle">
+      <span>Mi lista</span>
+      <span class="pedCartDrawerBadge" id="pedCartDrawerBadge">0</span>
+    </div>
+    <button class="pedCartDrawerClose" id="pedCartDrawerClose" type="button" aria-label="Cerrar carrito">&times;</button>
+  </div>
+  <div class="pedCartDrawerBody">
+    <div class="cartList" id="pedListDrawer"></div>
+    <label class="lbl" style="margin-top:12px;">Notas generales</label>
+    <textarea class="ta" id="pedNotesDrawer" rows="3"></textarea>
+  </div>
+  <div class="pedCartDrawerFoot">
+    <div class="orderSubmitProgress hidden" id="pedSubmitProgressDrawer" aria-live="polite">
+      <div class="orderSubmitProgressHead">
+        <span class="orderSubmitProgressTitle">Enviando pedido...</span>
+        <span class="orderSubmitProgressPct" id="pedSubmitProgressPctDrawer">0%</span>
+      </div>
+      <div class="orderSubmitProgressBar">
+        <div class="orderSubmitProgressFill" id="pedSubmitProgressFillDrawer"></div>
+      </div>
+    </div>
+    <div class="pedCartDrawerActions">
+      <button class="btn soft pedCartIconBtn" id="pedClearDrawer" type="button" title="Limpiar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>
+      <button class="btn soft pedCartIconBtn" id="pedRefreshDrawer" type="button" title="Actualizar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg></button>
+      <button class="btn soft pedCartIconBtn" id="pedPrintPosDrawer" type="button" title="Imprimir POS"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><path d="M6 14h12v8H6z"/></svg></button>
+      <button class="btn ok pedCartIconBtn" id="pedSaveDrawer" type="button" title="Guardar pedido"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></button>
+    </div>
+  </div>
+</div>
+
 </div>
 <div class="view hidden" id="view-pedidos-despachar">
 <div class="card light">

@@ -1,4 +1,4 @@
-﻿:root{
+:root{
   --font-main: "ITC Avant Garde Gothic", "Avant Garde", "Century Gothic", "URW Gothic L", "Futura", "Trebuchet MS", sans-serif;
   --bg0:#070A12; --bg1:#0B1024;
   --card: rgba(255,255,255,.06);
@@ -2780,6 +2780,7 @@ body::-webkit-scrollbar-thumb:hover,
   display:grid;
   grid-template-columns: repeat(4, minmax(170px, 1fr));
   gap:10px;
+  overflow:hidden;
 }
 .homeDashCard{
   border:1px solid rgba(148,163,184,.32);
@@ -2790,6 +2791,7 @@ body::-webkit-scrollbar-thumb:hover,
   text-align:left;
   cursor:pointer;
   transition: transform .14s ease, box-shadow .2s ease, border-color .2s ease;
+  overflow:hidden;
 }
 .homeDashCard:hover{
   transform: translateY(-2px);
@@ -2810,6 +2812,8 @@ body::-webkit-scrollbar-thumb:hover,
   font-size:26px;
   font-weight:900;
   line-height:1.1;
+  overflow-wrap:break-word;
+  word-break:break-word;
 }
 .homeDashCard .v.sm{
   font-size:16px;
@@ -2836,7 +2840,9 @@ body::-webkit-scrollbar-thumb:hover,
   .homeDashGrid{grid-template-columns: repeat(2, minmax(150px, 1fr));}
 }
 @media (max-width: 620px){
-  .homeDashGrid{grid-template-columns: 1fr;}
+  .homeDashGrid{grid-template-columns: repeat(2, 1fr);}
+  .homeDashCard .v{font-size:20px;}
+  .homeDashCard .v.sm{font-size:14px;}
 }
 .searchBlock{
   background: rgba(15,23,42,.5);
@@ -5186,7 +5192,7 @@ button.homeDashCard{
 
 /* Peek bar (siempre visible) */
 .app.mobile-nav #view-pedidos .orderSide .cartPeekBar{
-  display:flex !important;
+  display:none !important;
   align-items:center;
   gap:10px;
   padding:10px 14px;
@@ -5419,7 +5425,7 @@ button.homeDashCard{
 }
 
 .app.mobile-nav .homeDashCard .v{
-  font-size:22px;
+  font-size:20px;
 }
 
 /* Entradas/salidas en mobile */
@@ -5428,7 +5434,6 @@ button.homeDashCard{
 .app.mobile-nav #view-salidas .grid3,
 .app.mobile-nav #view-salidas .grid4{
   grid-template-columns:1fr !important;
-}
 
 }
 
@@ -6877,5 +6882,663 @@ button.homeDashCard{
   }
   .app.mobile-nav .repCuadreActions .btn{
     width:100%;
+  }
+}
+
+/* Utility responsive classes */
+.mobile-only {
+  display: none !important;
+}
+
+@media (max-width: 980px) {
+  .mobile-only {
+    display: flex !important;
+  }
+  .desktop-only {
+    display: none !important;
+  }
+
+  /* Tabs style in pedidos screen */
+  #view-pedidos .orderTabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+    padding-bottom: 8px;
+    width: 100%;
+  }
+
+  #view-pedidos .orderTab {
+    flex: 1;
+    background: rgba(15, 23, 42, 0.45);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    color: #94A3B8;
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    text-align: center;
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  #view-pedidos .orderTab:hover, #view-pedidos .orderTab:focus {
+    background: rgba(15, 23, 42, 0.6);
+    border-color: rgba(148, 163, 184, 0.35);
+    color: #F1F5F9;
+  }
+
+  #view-pedidos .orderTab.active {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.22), rgba(99, 102, 241, 0.18));
+    border-color: rgba(56, 189, 248, 0.6);
+    color: #38BDF8;
+    box-shadow: 0 4px 16px rgba(56, 189, 248, 0.18);
+  }
+
+  /* Old tab toggles removed - FAB+drawer used instead */
+
+  /* Override fixed mobile sheet styling for orderSide */
+  .app.mobile-nav #view-pedidos .orderSide {
+    position: static !important;
+    max-height: none !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    margin-top: 14px !important;
+    width: 100% !important;
+  }
+
+  /* Hide the old bottom peek bar */
+  .app.mobile-nav #view-pedidos .orderSide .cartPeekBar {
+    display: none !important;
+  }
+
+  /* Re-enable orderCart to lay out as card in the tab */
+  .app.mobile-nav #view-pedidos .orderSide .orderCart {
+    display: grid !important;
+    background: rgba(2, 6, 23, 0.45) !important;
+    border: 1px solid rgba(148, 163, 184, 0.2) !important;
+    border-radius: 16px !important;
+    padding: 14px !important;
+    height: auto !important;
+    grid-template-rows: auto auto auto !important;
+  }
+
+  .app.mobile-nav #view-pedidos .orderSide .orderCart .cartList {
+    max-height: 400px !important;
+    overflow-y: auto !important;
+    margin-bottom: 12px;
+  }
+
+  /* Ensure actions show normally inside tab */
+  .app.mobile-nav #view-pedidos .orderSide .orderActions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding: 10px 0 0 0 !important;
+    background: transparent !important;
+    border-top: 1px solid rgba(148, 163, 184, 0.2) !important;
+  }
+
+  .app.mobile-nav #view-pedidos .orderSide .orderActions button {
+    display: inline-flex !important;
+    width: calc(50% - 4px) !important;
+    min-height: 44px !important;
+  }
+
+  .app.mobile-nav #view-pedidos .orderSide .orderActions #pedSave {
+    width: 100% !important;
+    order: -1; /* Place save button first */
+  }
+
+  /* Solo mostrar la pestaña activa - ocultar la inactiva */
+  #view-pedidos .orderTabs .orderTab:not(.active) {
+    display: none !important;
+  }
+
+  /* Pestaña activa ocupa todo el ancho cuando está sola */
+  #view-pedidos .orderTabs .orderTab.active {
+    flex: 1;
+    pointer-events: none;   /* No clickable — la navegación es por los botones dentro de cada panel */
+    cursor: default;
+    font-size: 15px;
+  }
+}
+
+/* Ocultar encabezado (título + logo) en móvil cuando se está en la sección pedidos */
+@media (max-width: 980px) {
+  body.hide-stage-header .stageTop {
+    display: none !important;
+  }
+
+  /* Ajustar padding-top del stage cuando el encabezado está oculto */
+  body.hide-stage-header .app.mobile-nav .stage {
+    padding-top: 16px !important;
+  }
+
+  /* Ajustar padding del rail hamburger para que no tape el contenido */
+  body.hide-stage-header #view-pedidos {
+    padding-top: 60px;
+  }
+}
+
+/* =============================================
+   FIX: Hamburger icon centered in rail (mobile)
+   ============================================= */
+@media (max-width: 980px) {
+  .app.mobile-nav .rail {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+  }
+  .app.mobile-nav .rail::after {
+    position: static !important;
+    transform: none !important;
+    right: auto !important;
+    top: auto !important;
+    width: 28px;
+    height: 28px;
+    font-size: 20px !important;
+    font-weight: 900;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #E2E8F0 !important;
+  }
+}
+
+/* =============================================
+   FLOATING CART FAB + DRAWER (mobile pedidos)
+   ============================================= */
+
+/* FAB button */
+.pedCartFab {
+  position: fixed;
+  bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  right: 20px;
+  z-index: 9000;
+  width: 62px;
+  height: 62px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, #38BDF8, #6366F1);
+  color: #0B1222;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 28px rgba(56, 189, 248, 0.45), 0 2px 8px rgba(2, 6, 23, 0.4);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.pedCartFab svg {
+  width: 26px;
+  height: 26px;
+  stroke: #0B1222;
+}
+
+.pedCartFab:hover, .pedCartFab:focus-visible {
+  transform: scale(1.08);
+  box-shadow: 0 12px 36px rgba(56, 189, 248, 0.55), 0 2px 8px rgba(2, 6, 23, 0.4);
+}
+
+.pedCartFab:active {
+  transform: scale(0.94);
+}
+
+/* FAB badge */
+.pedCartFabBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #F43F5E, #E11D48);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 22px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(244, 63, 94, 0.5);
+  border: 2px solid #0B1222;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pedCartFab.has-items .pedCartFabBadge {
+  transform: scale(1.15);
+}
+
+/* FAB shake animation when item added */
+@keyframes fabBounce {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.18) rotate(-8deg); }
+  60%  { transform: scale(1.08) rotate(5deg); }
+  100% { transform: scale(1); }
+}
+.pedCartFab.bounce {
+  animation: fabBounce 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Overlay backdrop */
+.pedCartOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9100;
+  background: rgba(2, 6, 23, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.pedCartOverlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Drawer */
+.pedCartDrawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(380px, 82vw);
+  z-index: 9200;
+  border-radius: 18px 0 0 18px;
+  background: linear-gradient(180deg, rgba(8, 14, 30, 0.99) 0%, rgba(15, 23, 42, 0.98) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-right: none;
+  box-shadow: -16px 0 60px rgba(2, 6, 23, 0.65), -2px 0 8px rgba(56, 189, 248, 0.15);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pedCartDrawer.open {
+  transform: translateX(0);
+}
+
+/* Drag handle */
+.pedCartDrawerHandle {
+  display: none;
+}
+
+/* Drawer header */
+.pedCartDrawerHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 10px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  flex-shrink: 0;
+}
+.pedCartDrawerTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #F1F5F9;
+}
+.pedCartDrawerTitle svg {
+  width: 22px;
+  height: 22px;
+  stroke: #38BDF8;
+}
+.pedCartDrawerBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #38BDF8, #6366F1);
+  color: #0B1222;
+  font-size: 12px;
+  font-weight: 900;
+}
+.pedCartDrawerClose {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.7);
+  color: #94A3B8;
+  font-size: 20px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.pedCartDrawerClose:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #FCA5A5;
+}
+
+/* Drawer body */
+.pedCartDrawerBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 18px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(56, 189, 248, 0.3) transparent;
+}
+.pedCartDrawerBody::-webkit-scrollbar { width: 4px; }
+.pedCartDrawerBody::-webkit-scrollbar-track { background: transparent; }
+.pedCartDrawerBody::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.3); border-radius: 4px; }
+
+/* Drawer footer */
+.pedCartDrawerFoot {
+  flex-shrink: 0;
+  padding: 8px 14px 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  background: linear-gradient(0deg, rgba(8, 14, 30, 0.95), transparent);
+}
+.pedCartDrawerActions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+.pedCartDrawerActions .btn {
+  min-height: 44px;
+  height: 44px;
+  padding: 0;
+  font-size: 0;
+  justify-content: center;
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-radius: 12px;
+  width: 100%;
+}
+.pedCartDrawerActions #pedSaveDrawer {
+  min-height: 44px;
+  height: 44px;
+  font-size: 0;
+  font-weight: 800;
+  background: linear-gradient(135deg, #38BDF8, #60A5FA) !important;
+  color: #041321 !important;
+  border-color: rgba(96, 165, 250, 0.6) !important;
+  box-shadow: 0 4px 20px rgba(56, 189, 248, 0.3);
+}
+.pedCartDrawerActions #pedClearDrawer {
+  background: rgba(127, 29, 29, 0.35) !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+  color: #FCA5A5 !important;
+}
+/* Drawer icon button SVG styles */
+.pedCartIconBtn svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+  margin: 0 auto;
+}
+.pedCartIconBtn {
+  position: relative;
+}
+
+/* Tooltip on hover */
+.pedCartIconBtn:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(2, 6, 23, 0.92);
+  color: #F8FAFC;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+.pedCartIconBtn:hover::before {
+  content: "";
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: rgba(2, 6, 23, 0.92);
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Empty cart state in drawer */
+.pedCartDrawerBody .note {
+  text-align: center;
+  color: #64748B;
+  padding: 40px 20px;
+  font-size: 15px;
+}
+.pedCartDrawerBody .note::before {
+  content: "🛒";
+  display: block;
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+/* Hide the desktop orderSide on mobile (handled by drawer) */
+@media (max-width: 980px) {
+  #view-pedidos .orderSide {
+    display: none !important;
+  }
+
+  /* Keep pedCartFab visible only inside view-pedidos section */
+  body:not(.section-pedidos) .pedCartFab,
+  body:not(.section-pedidos) .pedCartOverlay,
+  body:not(.section-pedidos) .pedCartDrawer {
+    display: none !important;
+  }
+
+  /* Ensure workspace is single column */
+  #view-pedidos .orderWorkspace {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+/* =========================================
+   BOTON VER CARRITO (mobile pedidos)
+   ========================================= */
+.pedGoToCartBtn {
+  display: none !important;
+}
+
+@media (max-width: 980px) {
+  #view-pedidos .pedGoToCartBtn {
+    display: inline-flex !important;
+    background: linear-gradient(135deg, #6366F1, #818CF8) !important;
+    border: 1px solid rgba(129, 140, 248, 0.55) !important;
+    color: #E0E7FF !important;
+    font-weight: 800;
+    min-height: 44px;
+    flex: 1 !important;
+  }
+  #view-pedidos .pedGoToCartBtn:active {
+    transform: scale(0.96);
+  }
+  /* On mobile, make the Add row use full width buttons */
+  #view-pedidos .orderPanel .addRow .btn {
+    flex: 1 !important;
+    min-width: 0;
+  }
+}
+
+/* ============================================
+   RESUMEN DEL PEDIDO — CARD MOBILE
+   ============================================ */
+@media (max-width: 980px) {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 16px;
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(2, 6, 23, 0.7));
+    box-shadow: 0 8px 24px rgba(2, 6, 23, 0.35);
+    position: relative;
+    overflow: hidden;
+  }
+
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(320px 80px at 60% 0%, rgba(56, 189, 248, 0.12), transparent 70%);
+    pointer-events: none;
+  }
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    position: relative;
+    z-index: 1;
+  }
+
+    font-size: 15px;
+    font-weight: 800;
+    color: #F1F5F9;
+    letter-spacing: 0.01em;
+  }
+
+    font-size: 13px;
+    color: #94A3B8;
+    font-weight: 600;
+    position: relative;
+    z-index: 1;
+    min-height: 20px;
+  }
+
+    width: 100%;
+    min-height: 52px;
+    border: none;
+    border-radius: 14px;
+    padding: 14px 18px;
+    cursor: pointer;
+    font-weight: 900;
+    font-size: 16px;
+    letter-spacing: 0.02em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: linear-gradient(135deg, #38BDF8, #6366F1);
+    color: #0B1222;
+    box-shadow: 0 6px 20px rgba(56, 189, 248, 0.35);
+    transition: transform 0.15s ease, box-shadow 0.2s ease;
+    position: relative;
+    z-index: 1;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+
+    transform: scale(0.97);
+    box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25);
+  }
+
+    background: linear-gradient(135deg, #22D3EE, #38BDF8);
+  }
+
+  /* Empty state: hide or dim */
+    opacity: 0.5;
+    pointer-events: none;
+  } (disabled - button always clickable) */
+
+    color: #64748B;
+  }
+
+  /* Adjust FAB position to sit above the review card */
+    bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+
+/* ============================================
+   STEP FLOW PEDIDOS (mobile only)
+   ============================================ */
+.pedStep {
+  display: block;
+}
+.pedStepNav {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+.pedStepNext {
+  min-height: 48px;
+  padding: 10px 20px;
+  font-size: 15px;
+  font-weight: 900;
+  border-radius: 14px;
+  gap: 8px;
+}
+.pedStepBack {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #94A3B8;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 6px 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.pedStepBack:hover {
+  color: #E2E8F0;
+}
+.pedStepBack svg {
+  stroke: #94A3B8;
+}
+.pedStepBack:hover svg {
+  stroke: #E2E8F0;
+}
+
+@media (max-width: 980px) {
+  /* Step data visible by default, products hidden */
+  #view-pedidos .pedStep#pedStepProducts {
+    display: none;
+  }
+  /* When step-products class is added, swap visibility */
+  #view-pedidos.step-products .pedStep#pedStepData {
+    display: none;
+  }
+  #view-pedidos.step-products .pedStep#pedStepProducts {
+    display: block;
+  }
+  /* FAB only visible in step products */
+  #view-pedidos:not(.step-products) .pedCartFab,
+  #view-pedidos:not(.step-products) .pedCartOverlay,
+  #view-pedidos:not(.step-products) .pedCartDrawer {
+    display: none !important;
   }
 }

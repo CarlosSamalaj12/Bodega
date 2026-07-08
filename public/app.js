@@ -1462,15 +1462,7 @@ function clearDateInputValue(el) {
 }
 
 function isMobileAdaptiveView() {
-  const smallViewport = window.matchMedia?.("(max-width: 980px)")?.matches;
-  const tabletViewport = window.matchMedia?.("(max-width: 1366px)")?.matches;
-  const noHover = window.matchMedia?.("(hover: none)")?.matches;
-  const touchPointer = window.matchMedia?.("(pointer: coarse)")?.matches;
-  const touchFallback = "ontouchstart" in window || Number(navigator.maxTouchPoints || 0) > 0;
-  const touchLike = Boolean(touchPointer || touchFallback);
-  const narrowTouch = smallViewport && touchLike;
-  const tabletTouchNoHover = tabletViewport && touchLike && noHover;
-  return Boolean(narrowTouch || tabletTouchNoHover);
+  return window.innerWidth <= 980 || window.matchMedia?.("(max-width: 980px)")?.matches;
 }
 
 function closeMobileNav() {
@@ -2337,6 +2329,8 @@ function bindHomeDashEvents() {
 
 async function initHomeDashboard() {
   if (!$("#view-home")) return;
+  document.body.classList.add("hide-stage-header");
+  document.body.classList.remove("section-pedidos");
   bindHomeDashEvents();
   await Promise.allSettled([loadHomeDashSummary(), loadHomeDashDetail(homeDashKind)]);
 }
@@ -2369,6 +2363,14 @@ document.querySelectorAll(".menuBtn[data-section]").forEach((b) => {
       setTimeout(() => view.classList.remove("animate"), 400);
     }
     currentSection = key;
+    if (currentSection === "pedidos" || currentSection === "home") {
+      document.body.classList.add("hide-stage-header");
+      if (currentSection === "pedidos") document.body.classList.add("section-pedidos");
+      else document.body.classList.remove("section-pedidos");
+    } else {
+      document.body.classList.remove("hide-stage-header");
+      document.body.classList.remove("section-pedidos");
+    }
     expandMenuGroupForSection(currentSection);
     if (currentSection === "entradas") {
       setFechaHoraActual();
@@ -2395,6 +2397,7 @@ document.querySelectorAll(".menuBtn[data-section]").forEach((b) => {
       setFechaHoraActual();
       loadBodegasPedido();
       loadUsuariosPedido();
+      resetPedidoTab();
     }
     if (currentSection === "pedidos-despachar") {
       loadPedidosDespachar();
@@ -13302,8 +13305,12 @@ if ($("#usrEditSave")) {
 renderEntradas();
 
 function updatePedidoCount() {
-  if ($("#pedCount")) $("#pedCount").textContent = `${pedList.length} productos`;
+  const countStr = pedList.length + " productos";
+  if (document.querySelector("#pedCount")) document.querySelector("#pedCount").textContent = countStr;
+  if (typeof updateFabBadge === "function") updateFabBadge();
+  
 }
+
 
 function renderPedidos() {
   const box = $("#pedList");
@@ -13611,6 +13618,7 @@ if ($("#pedClear")) {
     pedList.splice(0, pedList.length);
     renderPedidos();
     showEntToast("Carro vaciado correctamente.", "ok");
+    resetPedidoTab();
   };
 }
 
@@ -13619,6 +13627,118 @@ if ($("#pedPrintPos")) {
     openPedidoPosPreviewFromCart();
   };
 }
+
+// =============================================
+// FLOATING CART FAB + DRAWER (mobile pedidos)
+// =============================================
+const pedCartFab     = $("#pedCartFab");
+const pedCartOverlay = $("#pedCartOverlay");
+const pedCartDrawer  = $("#pedCartDrawer");
+const pedCartDrawerClose = $("#pedCartDrawerClose");
+
+function openPedCartDrawer() {
+  if (!pedCartDrawer) return;
+  syncDrawerList();
+  pedCartDrawer.classList.add("open");
+  if (pedCartOverlay) pedCartOverlay.classList.add("open");
+  document.body.classList.add("cart-drawer-open");
+}
+
+function closePedCartDrawer() {
+  if (!pedCartDrawer) return;
+  pedCartDrawer.classList.remove("open");
+  if (pedCartOverlay) pedCartOverlay.classList.remove("open");
+  document.body.classList.remove("cart-drawer-open");
+}
+
+function syncDrawerList() {
+  // Mirror the main pedList into the drawer list
+  const drawerList = $("#pedListDrawer");
+  const mainList   = $("#pedList");
+  if (drawerList && mainList) drawerList.innerHTML = mainList.innerHTML;
+  // Sync notes
+  const drawerNotes = $("#pedNotesDrawer");
+  const mainNotes   = $("#pedNotes");
+  if (drawerNotes && mainNotes) drawerNotes.value = mainNotes.value;
+  // Sync drawer badge
+  const drawerBadge = $("#pedCartDrawerBadge");
+  if (drawerBadge) drawerBadge.textContent = pedList.length;
+}
+
+// Update FAB count badge
+function updateFabBadge() {
+  const fab = $("#pedCartFab");
+  const badge = $("#pedCartFabBadge");
+  if (!fab || !badge) return;
+  badge.textContent = pedList.length;
+  fab.classList.toggle("has-items", pedList.length > 0);
+  // Bounce animation on add
+  if (pedList.length > 0) {
+    fab.classList.remove("bounce");
+    void fab.offsetWidth; // reflow
+    fab.classList.add("bounce");
+    fab.addEventListener("animationend", () => fab.classList.remove("bounce"), { once: true });
+  }
+}
+
+if (pedCartFab)          pedCartFab.onclick = openPedCartDrawer;
+if (pedCartOverlay)      pedCartOverlay.onclick = closePedCartDrawer;
+if (pedCartDrawerClose)  pedCartDrawerClose.onclick = closePedCartDrawer;
+
+if ($("#pedRefreshDrawer")) $("#pedRefreshDrawer").onclick = () => { loadBodegasPedido(); loadUsuariosPedido(); };
+
+// =============================================
+// STEP FLOW PEDIDOS (mobile) - navigation
+// =============================================
+if ($("#pedStepToProducts")) {
+  $("#pedStepToProducts").onclick = () => {
+    const view = document.getElementById("view-pedidos");
+    if (view) view.classList.add("step-products");
+  };
+}
+if ($("#pedStepBackBtn")) {
+  $("#pedStepBackBtn").onclick = () => {
+    const view = document.getElementById("view-pedidos");
+    if (view) view.classList.remove("step-products");
+  };
+}
+
+
+// Escape key closes drawer
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closePedCartDrawer();
+});
+
+// Drawer action buttons mirror main buttons
+if ($("#pedClearDrawer")) {
+  $("#pedClearDrawer").onclick = async () => {
+    const mainClear = $("#pedClear");
+    if (mainClear) { mainClear.click(); closePedCartDrawer(); }
+  };
+}
+if ($("#pedPrintPosDrawer")) {
+  $("#pedPrintPosDrawer").onclick = () => { openPedidoPosPreviewFromCart(); };
+}
+if ($("#pedSaveDrawer")) {
+  $("#pedSaveDrawer").onclick = async () => {
+    const mainSave = $("#pedSave");
+    if (mainSave) { mainSave.click(); closePedCartDrawer(); }
+  };
+}
+// Sync notes from drawer back to main on input
+if ($("#pedNotesDrawer")) {
+  $("#pedNotesDrawer").addEventListener("input", () => {
+    const main = $("#pedNotes");
+    if (main) main.value = $("#pedNotesDrawer").value;
+  });
+}
+
+function resetPedidoTab() {
+  closePedCartDrawer();
+  const pv = document.getElementById(iew-pedidos);
+  if (pv) pv.classList.remove(step-products);
+}
+
 
 if ($("#pedSave")) {
   const detectPedidoGuardadoReciente = async ({
@@ -13736,6 +13856,7 @@ if ($("#pedSave")) {
       if ($("#pedProducto")) $("#pedProducto").dataset.id = "";
       if ($("#pedUserPin")) $("#pedUserPin").value = "";
       showEntToast(`Pedido guardado #${j.id_order}`, "ok");
+      resetPedidoTab();
     } catch {
       const hit = await detectPedidoGuardadoReciente({
         requester_user_id,
@@ -13751,6 +13872,7 @@ if ($("#pedSave")) {
         if ($("#pedProducto")) $("#pedProducto").dataset.id = "";
         if ($("#pedUserPin")) $("#pedUserPin").value = "";
         showEntToast(`Pedido guardado #${hit.id_pedido}. La respuesta tardo y se perdio la conexion.`, "ok");
+        resetPedidoTab();
         return;
       }
       showEntToast("Error de red. Si la carga era grande, verifica en Reporte de Pedidos antes de reintentar.", "bad");
