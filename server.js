@@ -4708,9 +4708,13 @@ app.get("/api/reportes/corte-diario", auth, async (req, res) => {
             COALESCE(SUM(CASE WHEN k.creado_en < CURDATE() THEN k.delta_cantidad ELSE 0 END), 0) AS existencia_ayer,
             COALESCE(SUM(CASE WHEN k.creado_en >= CURDATE() AND k.delta_cantidad > 0 THEN k.delta_cantidad ELSE 0 END), 0) AS entradas_hoy,
             COALESCE(SUM(CASE WHEN k.creado_en >= CURDATE() AND k.delta_cantidad < 0 THEN ABS(k.delta_cantidad) ELSE 0 END), 0) AS salidas_hoy,
-            COALESCE(SUM(CASE WHEN k.creado_en <= NOW() THEN k.delta_cantidad ELSE 0 END), 0) AS existencia_actual
+            COALESCE(SUM(k.delta_cantidad), 0) AS existencia_actual
      FROM productos p
-     LEFT JOIN kardex k
+     LEFT JOIN (
+       SELECT k.*
+       FROM kardex k
+       JOIN movimiento_encabezado me ON me.id_movimiento=k.id_movimiento AND me.estado<>'ANULADO'
+     ) k
        ON k.id_producto=p.id_producto
       AND k.id_bodega=:id_bodega
      WHERE p.activo=1
@@ -5272,9 +5276,13 @@ app.get("/api/print/corte-diario", auth, async (req, res) => {
             COALESCE(SUM(CASE WHEN k.creado_en < CURDATE() THEN k.delta_cantidad ELSE 0 END), 0) AS existencia_ayer,
             COALESCE(SUM(CASE WHEN k.creado_en >= CURDATE() AND k.delta_cantidad > 0 THEN k.delta_cantidad ELSE 0 END), 0) AS entradas_hoy,
             COALESCE(SUM(CASE WHEN k.creado_en >= CURDATE() AND k.delta_cantidad < 0 THEN ABS(k.delta_cantidad) ELSE 0 END), 0) AS salidas_hoy,
-            COALESCE(SUM(CASE WHEN k.creado_en <= NOW() THEN k.delta_cantidad ELSE 0 END), 0) AS existencia_actual
+            COALESCE(SUM(k.delta_cantidad), 0) AS existencia_actual
      FROM productos p
-     LEFT JOIN kardex k
+     LEFT JOIN (
+       SELECT k.*
+       FROM kardex k
+       JOIN movimiento_encabezado me ON me.id_movimiento=k.id_movimiento AND me.estado<>'ANULADO'
+     ) k
        ON k.id_producto=p.id_producto
       AND k.id_bodega=:id_bodega
      WHERE p.activo=1
