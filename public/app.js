@@ -253,7 +253,7 @@ function createAdminCollapseSection(title, bodyClass = '') {
   sec.setAttribute('data-admin-collapse', '1');
   sec.innerHTML =
     '<button class="repCollapseToggle" data-admin-collapse-toggle type="button" aria-expanded="true">'
-      + '<div class="repCollapseMeta"><div class="cardTitle">' + title + '</div></div>'
+      + '<div class="repCollapseMeta"><div class="sectionTitle">' + title + '</div></div>'
       + '<span class="repCollapseIcon" aria-hidden="true">&#9662;</span>'
     + '</button>'
     + '<div class="repCollapseBody"><div class="repCollapseBodyInner ' + bodyClass + '"></div></div>';
@@ -344,7 +344,7 @@ function openAdminCollapseSection(viewId, title) {
   const view = document.getElementById(viewId);
   if (!view) return;
   const section = Array.from(view.querySelectorAll('[data-admin-collapse]')).find((sec) => {
-    const txt = sec.querySelector('.cardTitle, .panelTitle')?.textContent?.trim();
+    const txt = sec.querySelector('.sectionTitle, .cardTitle, .panelTitle')?.textContent?.trim();
     return txt === title;
   });
   syncAdminCollapseState(section, true);
@@ -393,7 +393,7 @@ function enhanceSingleImportSection(section) {
   const body = section.querySelector('.repCollapseBodyInner');
   if (!body || body.dataset.importEnhanced === '1') return;
 
-  const title = section.querySelector('.cardTitle, .panelTitle')?.textContent?.trim() || '';
+  const title = section.querySelector('.sectionTitle, .cardTitle, .panelTitle')?.textContent?.trim() || '';
   if (!/^importar/i.test(title)) return;
 
   const card = section.closest('.card.light');
@@ -716,9 +716,18 @@ function safeRebuildAddViewSections() {
   try {
     rebuildAddViewSections();
     applyUiHelpTooltips(document);
+    enhanceAdminImportSections();
   } catch (e) {
     console.error('Error en rebuildAddViewSections:', e);
   }
+  // Clean up empty wrappers left after elements moved into collapse sections
+  const addViews = ['view-categorias','view-subcategorias','view-motivos-movimiento','view-proveedores','view-productos','view-limites','view-reglas-subcategorias','view-usuarios','view-bodegas'];
+  addViews.forEach((viewId) => {
+    const view = document.getElementById(viewId);
+    const card = view?.querySelector('.card.light');
+    if (!card) return;
+    card.querySelectorAll('.grid4,.grid3,.grid2,.addRow').forEach((el) => { if (!el.children.length && !el.innerHTML.trim()) el.remove(); });
+  });
 }
 
 function ensureNativeUiClasses(){
@@ -781,6 +790,11 @@ function applyAddFieldHints(){
       motNombre:'Nombre motivo',
       provNombre:'Nombre proveedor',provTelefono:'Telefono',provDireccion:'Direccion',
       prdNombre:'Nombre producto',prdSku:'SKU',prdSearch:'Buscar producto...',prdStockImportObs:'Observacion importacion',
+      prdQuickCatNombre:'Nombre categoria',prdQuickSubcatNombre:'Nombre subcategoria',prdQuickSubcatCategoria:'Categoria',
+n  prdQuickCatNombre:'Nombre categoria',
+  prdQuickSubcatNombre:'Nombre subcategoria',
+  prdQuickSubcatCategoria:'Categoria',
+
       limMin:'Minimo',limMax:'Maximo',
       regMaxDays:'Dias maximos',regAlertDays:'Dias alerta',
       usrUsername:'Usuario',usrFullName:'Nombre completo',usrPassword:'Contrasena',usrOrderPin:'PIN pedidos',
@@ -1149,7 +1163,7 @@ function ensureUiFieldLabel(el) {
   if (el.classList?.contains('hidden') || el.closest('.hidden')) return;
 
   if (/(Data)$/i.test(el.id) || el.id === 'usrEditId' || el.id === 'bodEditId' || el.id === 'regEditSubcatId') return;
-  if (el.closest('table') || el.closest('.tableWrap') || el.closest('.searchWrap')) return;
+  if (el.closest('table') || el.closest('.tableWrap') || el.closest('.searchWrap') || el.closest('.quickCreateRow')) return;
   if (el.closest('.uiField')) return;
   const prev = el.previousElementSibling;
   if (prev && prev.classList && prev.classList.contains('lbl')) return;
@@ -1214,7 +1228,7 @@ const UI_HELP_HINTS = {
 function getClosestHelpSectionTitle(el) {
   const sec = el?.closest?.('[data-admin-collapse], [data-bod-collapse], .userSection');
   if (!sec) return '';
-  const titleEl = sec.querySelector('.cardTitle, .panelTitle');
+  const titleEl = sec.querySelector('.sectionTitle, .cardTitle, .panelTitle');
   return String(titleEl?.textContent || '').trim();
 }
 
@@ -1776,6 +1790,10 @@ setTimeout(() => {
   initHomeDashboard().catch(() => {});
 }, 0);
 
+setTimeout(() => {
+  initQuickCreateProducto();
+}, 50);
+
 let pedidosSocket = null;
 let pedidosRealtimeTimer = null;
 
@@ -1847,6 +1865,34 @@ const titles = {
   "r-corte-diario": "Reporte Corte Diario",
   "r-cuadres-caja": "Reporte Cuadres de Caja",
   "r-auditoria-sensibles": "Auditoria de Acciones Sensibles",
+};
+
+const stageSubtitles = {
+  home: "Selecciona una seccion del menu lateral",
+  categorias: "Registra y administra categorias de productos",
+  subcategorias: "Registra y administra subcategorias",
+  "motivos-movimiento": "Define motivos para movimientos de inventario",
+  proveedores: "Registra y administra proveedores",
+  productos: "Catalogo de productos y busqueda",
+  limites: "Configura limites minimos y maximos por bodega",
+  "reglas-subcategorias": "Reglas de vigencia por subcategoria",
+  usuarios: "Gestion de usuarios y permisos",
+  bodegas: "Configuracion de bodegas",
+  entradas: "Registro de entradas de productos",
+  salidas: "Registro de salidas de productos",
+  ajustes: "Ajustes de inventario",
+  pedidos: "Solicitudes de producto a bodega",
+  "pedidos-despachar": "Despacho de pedidos pendientes",
+  "cuadre-caja": "Control de cuadre y cierre de caja",
+  "r-entradas": "Reporte de entradas por periodo",
+  "r-salidas": "Reporte de salidas por periodo",
+  "r-pedidos": "Reporte de pedidos solicitados",
+  "r-tendencia-producto": "Analisis de tendencia por producto",
+  "r-transferencias": "Kardex y transferencias",
+  "r-existencias": "Existencias actuales por bodega",
+  "r-corte-diario": "Resumen de movimientos diarios",
+  "r-cuadres-caja": "Historial de cuadres de caja",
+  "r-auditoria-sensibles": "Log de acciones sensibles",
 };
 
 let currentSection = "home";
@@ -2355,6 +2401,7 @@ document.querySelectorAll(".menuBtn[data-section]").forEach((b) => {
       if (!(await uiConfirm("Tienes productos en el carro. Salir sin guardar el pedido?", "Salir sin guardar"))) return;
     }
     if ($("#stageTitle")) $("#stageTitle").textContent = titles[key] || "Seccion";
+    if ($("#stageSub")) $("#stageSub").textContent = stageSubtitles[key] || "";
     document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
     const view = $("#view-" + key);
     if (view) {
@@ -15422,3 +15469,134 @@ initCuadreCajaDraft();
 
 
 
+
+/* Quick-create category/subcategory from product creation */
+function initQuickCreateProducto() {
+  const catBtn = document.getElementById('prdQuickCatBtn');
+  const catPanel = document.getElementById('prdQuickCatPanel');
+  const catNombre = document.getElementById('prdQuickCatNombre');
+  const catCancel = document.getElementById('prdQuickCatCancel');
+  const catSave = document.getElementById('prdQuickCatSave');
+
+  if (catBtn && catPanel) {
+    catBtn.addEventListener('click', () => {
+      catPanel.classList.toggle('hidden');
+      if (!catPanel.classList.contains('hidden')) {
+        if (catNombre) catNombre.focus();
+      }
+    });
+    if (catCancel) {
+      catCancel.addEventListener('click', () => {
+        catPanel.classList.add('hidden');
+        if (catNombre) catNombre.value = '';
+      });
+    }
+    if (catSave) {
+      catSave.addEventListener('click', async () => {
+        const name = (catNombre?.value || '').trim();
+        if (!name) {
+          showEntToast('El nombre de la categoria es obligatorio.', 'bad');
+          if (catNombre) catNombre.focus();
+          return;
+        }
+        try {
+          const r = await fetch('/api/categorias', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+            body: JSON.stringify({ nombre_categoria: name, activo: 1 }),
+          });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) {
+            showEntToast(j.error || 'Error guardando categoria.', 'bad');
+            return;
+          }
+          showEntToast('Categoria creada #' + (j.id || j.id_categoria || ''), 'ok');
+          if (catNombre) catNombre.value = '';
+          catPanel.classList.add('hidden');
+          const selectCat = document.getElementById('prdCategoria');
+          if (selectCat) {
+            const r2 = await fetch('/api/categorias?all=1', {
+              headers: { Authorization: 'Bearer ' + token },
+            });
+            const cats = await r2.json().catch(() => []);
+            if (r2.ok && Array.isArray(cats)) {
+              const newId = j.id || j.id_categoria || '';
+              selectCat.innerHTML = '<option value="">Seleccione categoria</option>' +
+                cats.map((x) => '<option value="' + x.id_categoria + '">' + x.nombre_categoria + '</option>').join('');
+              if (newId) selectCat.value = String(newId);
+              selectCat.dispatchEvent(new Event('change'));
+            }
+          }
+        } catch (e) {
+          showEntToast('Error de red.', 'bad');
+        }
+      });
+    }
+  }
+
+  const subcatBtn = document.getElementById('prdQuickSubcatBtn');
+  const subcatPanel = document.getElementById('prdQuickSubcatPanel');
+  const subcatCat = document.getElementById('prdQuickSubcatCategoria');
+  const subcatNombre = document.getElementById('prdQuickSubcatNombre');
+  const subcatCancel = document.getElementById('prdQuickSubcatCancel');
+  const subcatSave = document.getElementById('prdQuickSubcatSave');
+
+  if (subcatBtn && subcatPanel) {
+    subcatBtn.addEventListener('click', async () => {
+      subcatPanel.classList.toggle('hidden');
+      if (!subcatPanel.classList.contains('hidden')) {
+        if (subcatCat) {
+          const mainCat = document.getElementById('prdCategoria');
+          if (mainCat) {
+            subcatCat.innerHTML = mainCat.innerHTML;
+            if (mainCat.value) subcatCat.value = mainCat.value;
+          }
+        }
+        if (subcatNombre) subcatNombre.focus();
+      }
+    });
+    if (subcatCancel) {
+      subcatCancel.addEventListener('click', () => {
+        subcatPanel.classList.add('hidden');
+        if (subcatNombre) subcatNombre.value = '';
+      });
+    }
+    if (subcatSave) {
+      subcatSave.addEventListener('click', async () => {
+        const idCat = subcatCat?.value || '';
+        const name = (subcatNombre?.value || '').trim();
+        if (!idCat) {
+          showEntToast('Selecciona una categoria.', 'bad');
+          if (subcatCat) subcatCat.focus();
+          return;
+        }
+        if (!name) {
+          showEntToast('El nombre de la subcategoria es obligatorio.', 'bad');
+          if (subcatNombre) subcatNombre.focus();
+          return;
+        }
+        try {
+          const r = await fetch('/api/subcategorias', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+            body: JSON.stringify({ id_categoria: idCat, nombre_subcategoria: name, activo: 1 }),
+          });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) {
+            showEntToast(j.error || 'Error guardando subcategoria.', 'bad');
+            return;
+          }
+          showEntToast('Subcategoria creada #' + (j.id || j.id_subcategoria || ''), 'ok');
+          if (subcatNombre) subcatNombre.value = '';
+          subcatPanel.classList.add('hidden');
+          const mainCat = document.getElementById('prdCategoria');
+          if (mainCat && mainCat.value) {
+            await loadSubcategoriasProducto(mainCat.value, '#prdSubcategoria', String(j.id || j.id_subcategoria || ''));
+          }
+        } catch (e) {
+          showEntToast('Error de red.', 'bad');
+        }
+      });
+    }
+  }
+}

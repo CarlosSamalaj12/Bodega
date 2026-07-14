@@ -697,6 +697,7 @@
 </div>
 
 </div>
+</div>
 <div class="view hidden" id="view-pedidos-despachar">
 <div class="card light">
 <div class="dispatchHead">
@@ -921,7 +922,6 @@
 </div>
         <div class="view hidden" id="view-categorias">
 <div class="card light">
-<div class="cardTitle">Categorias</div>
 <div class="grid4">
 <div>
 <label class="lbl">Nombre</label>
@@ -979,7 +979,6 @@
 </div>
         <div class="view hidden" id="view-subcategorias">
 <div class="card light">
-<div class="cardTitle">Subcategorias</div>
 <div class="grid4">
 <div>
 <label class="lbl">Nombre</label>
@@ -1113,9 +1112,6 @@
 </div>
         <div class="view hidden" id="view-productos">
 <div class="card light">
-<div class="cardTitle">Productos</div>
-<div class="note prdFlowHint">Flujo recomendado: 1) Captura manual para crear producto, 2) Listado productos para buscar, 3) Editar producto para actualizar.</div>
-
 <div class="grid4">
   <div><label class="lbl">Nombre producto</label><input class="in" id="prdNombre" /></div>
   <div><label class="lbl">SKU</label><input class="in" id="prdSku" /></div>
@@ -1124,9 +1120,13 @@
 </div>
 
 <div class="grid4">
-  <div><label class="lbl">Categoria</label><select class="in" id="prdCategoria"></select></div>
-  <div><label class="lbl">Subcategoria</label><select class="in" id="prdSubcategoria"></select></div>
-  <div style="grid-column: span 2;"><label class="lbl">Bodegas visibles (activar/desactivar por bodega)</label><div class="warehouseCheckList" id="prdVisibleWarehouses"></div><label class="warehouseCheckItem" id="prdMyWarehouseToggleWrap"><input type="checkbox" id="prdVisibleInMyWarehouse" checked /><span>Habilitado en mi bodega</span></label><div class="note" id="prdMyWarehouseHint">Puedes habilitar o inhabilitar el producto en tu bodega desde la lista.</div></div>
+  <div class="prdQuickCreateCell"><label class="lbl">Categoria</label><div class="quickCreateRow"><select class="in" id="prdCategoria"></select><button class="btn iconBtnSm quickCreateBtn" id="prdQuickCatBtn" type="button" title="Crear nueva categoria">+</button></div><div class="quickCreatePanel hidden" id="prdQuickCatPanel"><input class="in" id="prdQuickCatNombre" placeholder="Nombre de la categoria" /><div class="quickCreateActions"><button class="btn soft btn-sm" id="prdQuickCatCancel" type="button">Cancelar</button><button class="btn ok btn-sm" id="prdQuickCatSave" type="button">Crear</button></div></div></div>
+  <div class="prdQuickCreateCell"><label class="lbl">Subcategoria</label><div class="quickCreateRow"><select class="in" id="prdSubcategoria"></select><button class="btn iconBtnSm quickCreateBtn" id="prdQuickSubcatBtn" type="button" title="Crear nueva subcategoria">+</button></div><div class="quickCreatePanel hidden" id="prdQuickSubcatPanel"><div class="quickCreateSubcatCat"><select class="in" id="prdQuickSubcatCategoria"></select></div><input class="in" id="prdQuickSubcatNombre" placeholder="Nombre de la subcategoria" /><div class="quickCreateActions"><button class="btn soft btn-sm" id="prdQuickSubcatCancel" type="button">Cancelar</button><button class="btn ok btn-sm" id="prdQuickSubcatSave" type="button">Crear</button></div></div></div><div style="grid-column: 1 / -1;">
+    <label class="lbl">Bodegas visibles — selecciona donde estara disponible este producto</label>
+    <div class="warehouseCheckList" id="prdVisibleWarehouses"></div>
+    <label class="warehouseCheckItem" id="prdMyWarehouseToggleWrap"><input type="checkbox" id="prdVisibleInMyWarehouse" checked /><span>Habilitado en mi bodega</span></label>
+    <div class="note" id="prdMyWarehouseHint">Puedes habilitar o inhabilitar el producto en tu bodega desde la lista.</div>
+  </div>
 </div>
 
 <div class="grid4 importGrid">

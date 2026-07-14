@@ -3643,6 +3643,71 @@ button.homeDashCard{
 }
 
 
+n/* Quick-create inline panels */.quickCreateRow{
+  display:flex;
+  gap:6px;
+  align-items:stretch;
+}
+.quickCreateRow select.in{
+  flex:1;
+  min-width:0;
+}
+.quickCreateBtn{
+  flex-shrink:0;
+  width:36px;
+  min-width:36px;
+  height:44px;
+  min-height:44px;
+  padding:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:18px;
+  font-weight:700;
+  border-radius:8px;
+  background:linear-gradient(135deg,rgba(56,189,248,.18),rgba(14,165,233,.12));
+  border:1px solid rgba(56,189,248,.35);
+  color:#7DD3FC;
+  cursor:pointer;
+  transition:all .15s ease;
+}
+.quickCreateBtn:hover{
+  background:linear-gradient(135deg,rgba(56,189,248,.32),rgba(14,165,233,.24));
+  border-color:rgba(56,189,248,.65);
+  color:#BAE6FD;
+  transform:scale(1.05);
+}
+.quickCreateBtn:active{
+  transform:scale(.95);
+}
+.quickCreatePanel{
+  margin-top:8px;
+  padding:10px 12px;
+  background:rgba(15,23,42,.55);
+  border:1px solid rgba(56,189,248,.25);
+  border-radius:10px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  animation:quickCreateFadeIn .2s ease;
+}
+@keyframes quickCreateFadeIn{
+  from{opacity:0;transform:translateY(-6px);}
+  to{opacity:1;transform:translateY(0);}
+}
+.quickCreatePanel .uiField{
+  margin:0;
+}
+.quickCreateActions{
+  display:flex;
+  gap:8px;
+  justify-content:flex-end;
+  margin-top:2px;
+}
+.quickCreateSubcatCat{
+  margin-bottom:-4px;
+}
+
 /* Productos: checklist y scroll visual */
 #view-productos .warehouseCheckList{
   max-height: 116px;
@@ -3662,6 +3727,7 @@ button.homeDashCard{
 }
 #view-productos .prdWarehouseField{
   grid-column:1 / -1;
+  align-self: start;
 }
 #view-productos .prdWhPicker{
   border:1px solid rgba(96,165,250,.24);
@@ -3728,7 +3794,7 @@ button.homeDashCard{
 #view-productos .prdWhEditorList{
   margin-top:10px;
   display:grid;
-  grid-template-columns:repeat(2, minmax(0, 1fr));
+  grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));
   gap:8px;
   max-height:360px;
   overflow-x:hidden;
@@ -3746,7 +3812,18 @@ button.homeDashCard{
 #view-productos .prdWhSwitchRow{
   display:flex;
   align-items:center;
-  gap:12px;
+  gap:10px;
+  width:100%;
+}
+#view-productos .prdWhSwitchRow .prdWhName{
+  flex:1;
+  min-width:0;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  font-size:13px;
+  font-weight:600;
+  color:#E2E8F0;
 }
 #view-productos .prdWhName{
   min-width:0;
@@ -3862,6 +3939,7 @@ button.homeDashCard{
 .adminSectionBody > table,
 .adminSectionBody > .repTableScroll{
   grid-column:1 / -1;
+  align-self: start;
 }
 
 /* Styled scrollbars for admin panels */
@@ -3937,6 +4015,7 @@ button.homeDashCard{
 #view-bodegas [data-bod-collapse] .adminSectionBody > .tableWrap,
 #view-bodegas [data-bod-collapse] .adminSectionBody > table{
   grid-column:1 / -1;
+  align-self: start;
 }
 
 #view-usuarios .avatarPreviewImg,
@@ -4242,6 +4321,7 @@ button.homeDashCard{
 /* Import UX cards */
 .adminImportBoard{
   grid-column:1 / -1;
+  align-self: start;
   display:grid;
   grid-template-columns: minmax(300px, 1.15fr) minmax(260px, 1fr);
   gap:12px;
@@ -4368,6 +4448,7 @@ button.homeDashCard{
 }
 #view-productos .prdListSection .tableWrap{
   grid-column:1 / -1;
+  align-self: start;
   margin-top:4px;
 }
 
@@ -4378,10 +4459,12 @@ button.homeDashCard{
   }
   #view-productos .prdListSection .searchWrap{
     grid-column:1 / -1;
+  align-self: start;
     grid-template-columns:1fr;
   }
   #view-productos .prdListSection #prdRefresh{
     grid-column:1 / -1;
+  align-self: start;
   }
   #view-productos .prdWhPicker .prdWhEditorTools [data-prd-wh-search]{
     min-width:0;
@@ -4442,12 +4525,22 @@ button.homeDashCard{
 .addViewCard .adminSectionBody,
 #view-bodegas [data-bod-collapse] .adminSectionBody,
 #view-usuarios .userSection .adminSectionBody{
+  align-items: end;
   gap:14px;
 }
+/* Button height match inputs */
+.addViewCard .adminSectionBody > .btn,
+.addViewCard .adminSectionBody > button[id]{
+  min-height:44px;
+  height:44px;
+  margin-top:0;
+}
+
 .addViewCard .addSectionHint,
 #view-bodegas .addSectionHint,
 #view-usuarios .addSectionHint{
   grid-column:1 / -1;
+  align-self: start;
   margin:0;
   padding:8px 10px;
   border-radius:10px;
@@ -4468,6 +4561,7 @@ button.homeDashCard{
 #view-bodegas [data-bod-collapse] .adminSectionBody > .addRow,
 #view-usuarios .userSection .adminSectionBody > .addRow{
   grid-column:1 / -1;
+  align-self: start;
   padding-top:10px;
   border-top:1px dashed rgba(148,163,184,.28);
 }
@@ -4482,6 +4576,7 @@ button.homeDashCard{
 /* Productos - Editar producto UX layout */
 #view-productos #prdEditVisibleWarehouses{
   grid-column:1 / -1;
+  align-self: start;
   width:100%;
 }
 #view-productos #prdEditVisibleWarehouses .prdWhEditor{
@@ -4507,6 +4602,7 @@ button.homeDashCard{
 }
 #view-productos #prdEditSave{
   grid-column:1 / -1;
+  align-self: start;
   justify-self:start;
   min-width:220px;
   margin-top:6px;
@@ -4679,6 +4775,7 @@ button.homeDashCard{
 }
 #view-bodegas .warehouseEditSummary{
   grid-column:1 / -1;
+  align-self: start;
   padding:12px 14px;
   border-radius:14px;
   border:1px dashed rgba(148,163,184,.24);
@@ -5566,6 +5663,46 @@ button.homeDashCard{
   margin-bottom:16px;
   display:flex;
   align-items:center;
+}
+
+/* Section title inside collapse sections — no icon, no extra border/padding */
+.repCollapseSection .sectionTitle,
+.userSection .sectionTitle{
+  font-weight:700;
+  font-size:15px;
+  color:#E2E8F0;
+}
+.repCollapseSection .sectionTitle::before,
+.userSection .sectionTitle::before{
+  display:none;
+}
+
+/* Neutralize cardTitle ::before inside collapse — use view-specific to beat the ::before icons */
+#view-categorias .repCollapseSection .cardTitle::before,
+#view-subcategorias .repCollapseSection .cardTitle::before,
+#view-motivos-movimiento .repCollapseSection .cardTitle::before,
+#view-proveedores .repCollapseSection .cardTitle::before,
+#view-productos .repCollapseSection .cardTitle::before,
+#view-limites .repCollapseSection .cardTitle::before,
+#view-reglas-subcategorias .repCollapseSection .cardTitle::before,
+#view-usuarios .userSection .cardTitle::before,
+#view-bodegas .repCollapseSection .cardTitle::before{
+  display:none;
+}
+
+/* Hint inside collapse sections — plain text, not a field */
+.repCollapseSection .addSectionHint{
+  background:transparent;
+  border:none;
+  border-radius:0;
+  padding:0 0 6px 0;
+  font-size:12px;
+  color:#B9C8DF;
+}
+
+/* Collapsed section height — tighter */
+.repCollapseSection.is-collapsed{
+  padding:6px 12px;
 }
 
 /* Campos de formulario con mejor espaciado */
