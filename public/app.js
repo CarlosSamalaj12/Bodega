@@ -791,9 +791,6 @@ function applyAddFieldHints(){
       provNombre:'Nombre proveedor',provTelefono:'Telefono',provDireccion:'Direccion',
       prdNombre:'Nombre producto',prdSku:'SKU',prdSearch:'Buscar producto...',prdStockImportObs:'Observacion importacion',
       prdQuickCatNombre:'Nombre categoria',prdQuickSubcatNombre:'Nombre subcategoria',prdQuickSubcatCategoria:'Categoria',
-n  prdQuickCatNombre:'Nombre categoria',
-  prdQuickSubcatNombre:'Nombre subcategoria',
-  prdQuickSubcatCategoria:'Categoria',
 
       limMin:'Minimo',limMax:'Maximo',
       regMaxDays:'Dias maximos',regAlertDays:'Dias alerta',

@@ -2437,10 +2437,10 @@
 </script>
   <script>
     (function ensureCompatIds(){
-      try{var xhr=new XMLHttpRequest();xhr.open('GET','./app.js?v=20260525b',false);xhr.send(null);if(xhr.status<200||xhr.status>=300)return;var js=String(xhr.responseText||'');var rx=/#([A-Za-z][A-Za-z0-9_-]*)/g;var seen=Object.create(null);var m;var host=document.createElement('div');host.style.display='none';host.id='compatAutoIds';while((m=rx.exec(js))){var id=m[1];if(seen[id])continue;seen[id]=true;if(document.getElementById(id))continue;var el=document.createElement('div');el.id=id;host.appendChild(el);}if(host.childNodes.length)document.body.appendChild(host);}catch(e){}
+      try{var xhr=new XMLHttpRequest();xhr.open('GET','./app.js?v=20260525c',false);xhr.send(null);if(xhr.status<200||xhr.status>=300)return;var js=String(xhr.responseText||'');var rx=/#([A-Za-z][A-Za-z0-9_-]*)/g;var seen=Object.create(null);var m;var host=document.createElement('div');host.style.display='none';host.id='compatAutoIds';while((m=rx.exec(js))){var id=m[1];if(seen[id])continue;seen[id]=true;if(document.getElementById(id))continue;var el=document.createElement('div');el.id=id;host.appendChild(el);}if(host.childNodes.length)document.body.appendChild(host);}catch(e){}
     })();
   </script>
-  <script src="./app.js?v=20260525b">
+  <script src="./app.js?v=20260525c">
 </script>
   <div class="connIndicator" id="connIndicator">
     <span class="connDot" id="connDot"></span>
