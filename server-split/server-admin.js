@@ -1,7 +1,9 @@
 // server-admin.js  |  Admin routes (modular)
-import { app, pool, auth, resolveStockScope, requirePermission, isAvatarTableMissingError, getUserPermissionsMap, canManageUserPermissions, userHasPermission, PERM_CATALOG, opsMetrics, normalizeDeviceKey, getSharedDeviceKeys, isValidOrderPin, isValidSupervisorPin, findOrderPinCollision } from '../server-shared.js';
+import { pool, auth, resolveStockScope, requirePermission, isAvatarTableMissingError, getUserPermissionsMap, canManageUserPermissions, userHasPermission, PERM_CATALOG, opsMetrics, normalizeDeviceKey, getSharedDeviceKeys, isValidOrderPin, isValidSupervisorPin, findOrderPinCollision, bcrypt, signToken, getUserWarehouseAccessIds, normalizeWarehouseIdList } from '../server-shared.js';
+import { Router } from 'express';
+const router = Router();
 // -------------------------------------------------------
-app.get("/api/print/order/:id/pos80", auth, async (req, res) => {
+router.get("/api/print/order/:id/pos80", auth, async (req, res) => {
   const id_pedido = Number(req.params.id);
   const actorWarehouse = Number(req.user?.id_warehouse || 0);
   const stockScope = await resolveStockScope(req.user);
@@ -233,7 +235,7 @@ app.get("/api/print/order/:id/pos80", auth, async (req, res) => {
 /* =========================
    ROLES (LISTA)
 ========================= */
-app.get("/api/roles", auth, async (req, res) => {
+router.get("/api/roles", auth, async (req, res) => {
   const [rows] = await pool.query(
     `SELECT id_rol AS id_role, nombre_rol AS role_name
      FROM roles
@@ -246,7 +248,7 @@ app.get("/api/roles", auth, async (req, res) => {
 /* =========================
    USUARIOS (CREAR)
 ========================= */
-app.post("/api/usuarios", auth, async (req, res) => {
+router.post("/api/usuarios", auth, async (req, res) => {
   try {
     const {
       username,
@@ -341,7 +343,7 @@ app.post("/api/usuarios", auth, async (req, res) => {
 /* =========================
    BODEGAS (EDITAR)
 ========================= */
-app.patch("/api/bodegas/:id", auth, async (req, res) => {
+router.patch("/api/bodegas/:id", auth, async (req, res) => {
   const id_bodega = Number(req.params.id || 0);
   const {
     nombre_bodega,
@@ -428,7 +430,7 @@ app.patch("/api/bodegas/:id", auth, async (req, res) => {
 /* =========================
    USUARIOS (RESET PASSWORD)
 ========================= */
-app.post("/api/usuarios/:id/reset-password", auth, async (req, res) => {
+router.post("/api/usuarios/:id/reset-password", auth, async (req, res) => {
   try {
     const id_user = Number(req.params.id || 0);
     const pass = String(req.body?.password || "");
@@ -450,7 +452,7 @@ app.post("/api/usuarios/:id/reset-password", auth, async (req, res) => {
   }
 });
 
-app.post("/api/usuarios/:id/reset-order-pin", auth, requirePermission("action.manage_permissions", "restablecer PIN de pedidos"), async (req, res) => {
+router.post("/api/usuarios/:id/reset-order-pin", auth, requirePermission("action.manage_permissions", "restablecer PIN de pedidos"), async (req, res) => {
   try {
     const id_user = Number(req.params.id || 0);
     const pin = String(req.body?.pin || "").trim();
@@ -487,7 +489,7 @@ app.post("/api/usuarios/:id/reset-order-pin", auth, requirePermission("action.ma
 /* =========================
    USUARIOS (EDITAR)
 ========================= */
-app.patch("/api/usuarios/:id", auth, async (req, res) => {
+router.patch("/api/usuarios/:id", auth, async (req, res) => {
   try {
     const id_user = Number(req.params.id || 0);
     const username = String(req.body?.username || "").trim();
@@ -561,7 +563,7 @@ app.patch("/api/usuarios/:id", auth, async (req, res) => {
 /* =========================
    USUARIOS (DESACTIVAR)
 ========================= */
-app.post("/api/usuarios/:id/deactivate", auth, async (req, res) => {
+router.post("/api/usuarios/:id/deactivate", auth, async (req, res) => {
   try {
     const id_user = Number(req.params.id || 0);
     if (!id_user) return res.status(400).json({ error: "Falta usuario" });
@@ -590,7 +592,7 @@ app.post("/api/usuarios/:id/deactivate", auth, async (req, res) => {
 /* =========================
    USUARIOS (LISTA)
 ========================= */
-app.get("/api/usuarios", auth, async (req, res) => {
+router.get("/api/usuarios", auth, async (req, res) => {
   const all = String(req.query.all || "") === "1";
   let rows = [];
   try {
@@ -651,11 +653,11 @@ app.get("/api/usuarios", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.get("/api/permisos/catalogo", auth, async (req, res) => {
+router.get("/api/permisos/catalogo", auth, async (req, res) => {
   res.json(PERM_CATALOG);
 });
 
-app.get("/api/me/permisos", auth, async (req, res) => {
+router.get("/api/me/permisos", auth, async (req, res) => {
   try {
     const id_usuario = Number(req.user?.id_user || 0);
     if (!id_usuario) return res.status(400).json({ error: "Usuario invalido" });
@@ -671,7 +673,7 @@ app.get("/api/me/permisos", auth, async (req, res) => {
   }
 });
 
-app.get("/api/usuarios/:id/permisos", auth, async (req, res) => {
+router.get("/api/usuarios/:id/permisos", auth, async (req, res) => {
   try {
     const requester = Number(req.user?.id_user || 0);
     if (!requester) return res.status(401).json({ error: "Usuario invalido" });
@@ -687,7 +689,7 @@ app.get("/api/usuarios/:id/permisos", auth, async (req, res) => {
   }
 });
 
-app.get("/api/usuarios/:id/bodegas-acceso", auth, async (req, res) => {
+router.get("/api/usuarios/:id/bodegas-acceso", auth, async (req, res) => {
   try {
     await ensureUserWarehouseAccessTable();
     const requester = Number(req.user?.id_user || 0);
@@ -716,7 +718,7 @@ app.get("/api/usuarios/:id/bodegas-acceso", auth, async (req, res) => {
   }
 });
 
-app.put("/api/usuarios/:id/bodegas-acceso", auth, async (req, res) => {
+router.put("/api/usuarios/:id/bodegas-acceso", auth, async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await ensureUserWarehouseAccessTable();
@@ -784,7 +786,7 @@ app.put("/api/usuarios/:id/bodegas-acceso", auth, async (req, res) => {
   }
 });
 
-app.put("/api/usuarios/:id/permisos", auth, async (req, res) => {
+router.put("/api/usuarios/:id/permisos", auth, async (req, res) => {
   const conn = await pool.getConnection();
   try {
     const requester = Number(req.user?.id_user || 0);
@@ -832,7 +834,7 @@ app.put("/api/usuarios/:id/permisos", auth, async (req, res) => {
   }
 });
 
-app.get("/api/ops/metrics", auth, requirePermission("action.manage_permissions", "ver metricas operativas"), async (req, res) => {
+router.get("/api/ops/metrics", auth, requirePermission("action.manage_permissions", "ver metricas operativas"), async (req, res) => {
   try {
     const alerts = buildOperationalAlerts();
     const avgApiLatency =
@@ -869,7 +871,7 @@ app.get("/api/ops/metrics", auth, requirePermission("action.manage_permissions",
   }
 });
 
-app.get("/api/ops/backup/status", auth, requirePermission("action.manage_permissions", "ver estado de backups"), async (req, res) => {
+router.get("/api/ops/backup/status", auth, requirePermission("action.manage_permissions", "ver estado de backups"), async (req, res) => {
   try {
     const [[lastBackup]] = await pool.query(
       `SELECT id_backup, backup_date, trigger_type, status, file_path, bytes_written, creado_en, finalizado_en, error_message
@@ -896,7 +898,7 @@ app.get("/api/ops/backup/status", auth, requirePermission("action.manage_permiss
   }
 });
 
-app.post("/api/ops/backup/run", auth, requirePermission("action.manage_permissions", "ejecutar backup"), async (req, res) => {
+router.post("/api/ops/backup/run", auth, requirePermission("action.manage_permissions", "ejecutar backup"), async (req, res) => {
   try {
     const createdBy = Number(req.user?.id_user || 0) || null;
     const r = await createLogicalBackup({ trigger: "MANUAL", createdBy });
@@ -907,7 +909,7 @@ app.post("/api/ops/backup/run", auth, requirePermission("action.manage_permissio
   }
 });
 
-app.post("/api/ops/backup/recovery-test", auth, requirePermission("action.manage_permissions", "ejecutar prueba de recovery"), async (req, res) => {
+router.post("/api/ops/backup/recovery-test", auth, requirePermission("action.manage_permissions", "ejecutar prueba de recovery"), async (req, res) => {
   try {
     const createdBy = Number(req.user?.id_user || 0) || null;
     const r = await runRecoveryDryTest({ trigger: "MANUAL", createdBy });
@@ -918,7 +920,7 @@ app.post("/api/ops/backup/recovery-test", auth, requirePermission("action.manage
   }
 });
 
-app.get("/api/health", async (req, res) => {
+router.get("/api/health", async (req, res) => {
   try {
     const t0 = Date.now();
     await pool.query("SELECT 1");
@@ -935,3 +937,5 @@ app.get("/api/health", async (req, res) => {
 });
 
 
+
+export default router;

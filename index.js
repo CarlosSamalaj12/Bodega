@@ -18,17 +18,27 @@ import {
   createLogicalBackup, maybeRunMonthlyRecoveryTest, prewarmDashboardCache,
 } from './server-shared.js';
 
-// 2) Auto‑register route modules (each imports `app` from shared
-//    and defines its routes at module‑load time).
-import './server-split/server-auth.js';
-import './server-split/server-catalog.js';
-import './server-split/server-warehouse.js';
-import './server-split/server-cierre.js';
-import './server-split/server-cierre-dia.js';
-import './server-split/server-dashboard.js';
-import './server-split/server-reportes.js';
-import './server-split/server-orders.js';
-import './server-split/server-admin.js';
+// 2) Import Express Routers from each route module
+import authRouter from './server-split/server-auth.js';
+import catalogRouter from './server-split/server-catalog.js';
+import warehouseRouter from './server-split/server-warehouse.js';
+import cierreRouter from './server-split/server-cierre.js';
+import cierreDiaRouter from './server-split/server-cierre-dia.js';
+import dashboardRouter from './server-split/server-dashboard.js';
+import reportesRouter from './server-split/server-reportes.js';
+import ordersRouter from './server-split/server-orders.js';
+import adminRouter from './server-split/server-admin.js';
+
+// 3) Mount all routers on the Express app
+app.use(authRouter);
+app.use(catalogRouter);
+app.use(warehouseRouter);
+app.use(cierreRouter);
+app.use(cierreDiaRouter);
+app.use(dashboardRouter);
+app.use(reportesRouter);
+app.use(ordersRouter);
+app.use(adminRouter);
 
 // 3) Start the server
 httpServer.listen(PORT, HOST, () => {

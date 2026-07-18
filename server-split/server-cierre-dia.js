@@ -1,7 +1,9 @@
 // server-cierre-dia.js  |  Cierre dia routes (modular)
-import { app, pool, auth, resolveStockScope, getScopedWarehouseFilter, buildTokenizedLikeFilter, getWarehouseLogoDataUri } from '../server-shared.js';
+import { pool, auth, resolveStockScope, getScopedWarehouseFilter, buildTokenizedLikeFilter, getWarehouseLogoDataUri } from '../server-shared.js';
+import { Router } from 'express';
+const router = Router();
 // -------------------------------------------------------
-app.get("/api/print/corte-diario", auth, async (req, res) => {
+router.get("/api/print/corte-diario", auth, async (req, res) => {
   const scope = await resolveStockScope(req.user);
   if (!scope.id_bodega) return res.status(400).send("Usuario sin bodega");
   if (!scope.can_view_existencias) return res.status(403).send("Sin permiso");
@@ -247,3 +249,5 @@ app.get("/api/print/corte-diario", auth, async (req, res) => {
   res.send(html);
 });
 
+
+export default router;

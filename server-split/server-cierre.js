@@ -1,7 +1,9 @@
 // server-cierre.js  |  Cierre routes (modular)
-import { app, pool, auth, requirePermission, enforceDailyCloseBeforeMutations, verifySensitiveApproval, toSensitiveApprovalPayload, writeSensitiveActionAudit, resolveStockScope, softDelete, getScopedWarehouseFilter } from '../server-shared.js';
+import { pool, auth, requirePermission, enforceDailyCloseBeforeMutations, verifySensitiveApproval, toSensitiveApprovalPayload, writeSensitiveActionAudit, resolveStockScope, softDelete, getScopedWarehouseFilter, beginIdempotentRequest, isProductVisibleInWarehouse, pickLotsFEFO, getLastUnitCost, buildNamedInClause, normalizeWarehouseIdList } from '../server-shared.js';
+import { Router } from 'express';
+const router = Router();
 // -------------------------------------------------------
-app.post("/api/salidas/conteo-final", auth, requirePermission("action.create_update", "registrar salidas por conteo final"), enforceDailyCloseBeforeMutations, async (req, res) => {
+router.post("/api/salidas/conteo-final", auth, requirePermission("action.create_update", "registrar salidas por conteo final"), enforceDailyCloseBeforeMutations, async (req, res) => {
   const { id_bodega: id_bodega_input = null, observaciones = null, lines = [] } = req.body || {};
   if (!Array.isArray(lines) || !lines.length) {
     return res.status(400).json({ error: "Sin lineas para procesar" });
@@ -210,7 +212,7 @@ app.post("/api/salidas/conteo-final", auth, requirePermission("action.create_upd
 /* =========================
    BODEGAS (CREAR)
 ========================= */
-app.post("/api/bodegas", auth, async (req, res) => {
+router.post("/api/bodegas", auth, async (req, res) => {
   const {
     nombre_bodega,
     tipo_bodega,
@@ -272,14 +274,14 @@ app.post("/api/bodegas", auth, async (req, res) => {
   }
 });
 
-app.post("/api/categories", auth, async (req, res) => {
+router.post("/api/categories", auth, async (req, res) => {
   const { category_name } = req.body || {};
   if (!category_name) return res.status(400).json({ error: "Falta nombre" });
   await pool.query("INSERT INTO categories(category_name, active) VALUES(:category_name, 1)", { category_name });
   res.json({ ok: true });
 });
 
-app.put("/api/categories/:id", auth, async (req, res) => {
+router.put("/api/categories/:id", auth, async (req, res) => {
   const id = Number(req.params.id);
   const { category_name, active } = req.body || {};
   await pool.query(
@@ -289,7 +291,7 @@ app.put("/api/categories/:id", auth, async (req, res) => {
   res.json({ ok: true });
 });
 
-app.delete("/api/categories/:id", auth, async (req, res) => {
+router.delete("/api/categories/:id", auth, async (req, res) => {
   await softDelete("categories", "id_category", Number(req.params.id));
   res.json({ ok: true });
 });
@@ -297,7 +299,7 @@ app.delete("/api/categories/:id", auth, async (req, res) => {
 /* =========================
    STOCK (solo con stock + no vencido opcional)
 ========================= */
-app.get("/api/stock", auth, async (req, res) => {
+router.get("/api/stock", auth, async (req, res) => {
   const id_warehouse = Number(req.query.warehouse || req.user.id_warehouse || 0);
   const onlyWithStock = String(req.query.onlyWithStock || "1") === "1";
   const includeLots = String(req.query.includeLots || "1") === "1";
@@ -343,7 +345,7 @@ app.get("/api/stock", auth, async (req, res) => {
 /* =========================
    REPORTE EXISTENCIAS + ALERTAS
 ========================= */
-app.get("/api/reportes/existencias", auth, async (req, res) => {
+router.get("/api/reportes/existencias", auth, async (req, res) => {
   const scope = await resolveStockScope(req.user);
   if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
   if (!scope.can_view_existencias) return res.json([]);
@@ -479,7 +481,7 @@ app.get("/api/reportes/existencias", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.get("/api/reportes/existencias/alertas", auth, async (req, res) => {
+router.get("/api/reportes/existencias/alertas", auth, async (req, res) => {
   const scope = await resolveStockScope(req.user);
   if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
   if (!scope.can_view_existencias) return res.json([]);
@@ -563,7 +565,7 @@ app.get("/api/reportes/existencias/alertas", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.get("/api/reportes/corte-diario", auth, async (req, res) => {
+router.get("/api/reportes/corte-diario", auth, async (req, res) => {
   const scope = await resolveStockScope(req.user);
   if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
   if (!scope.can_view_existencias) {
@@ -699,7 +701,7 @@ async function resolveCuadreScope(user) {
   };
 }
 
-app.get("/api/cuadre-caja/context", auth, requirePermission("section.view.cuadre-caja", "ver modulo cuadre de caja"), async (req, res) => {
+router.get("/api/cuadre-caja/context", auth, requirePermission("section.view.cuadre-caja", "ver modulo cuadre de caja"), async (req, res) => {
   try {
     const scope = await resolveCuadreScope(req.user);
     return res.json({
@@ -713,7 +715,7 @@ app.get("/api/cuadre-caja/context", auth, requirePermission("section.view.cuadre
   }
 });
 
-app.get("/api/reportes/cuadre-caja", auth, requirePermission("section.view.cuadre-caja", "ver reporte de cuadres de caja"), async (req, res) => {
+router.get("/api/reportes/cuadre-caja", auth, requirePermission("section.view.cuadre-caja", "ver reporte de cuadres de caja"), async (req, res) => {
   try {
     const scope = await resolveCuadreScope(req.user);
     const fechaRaw = String(req.query.fecha || "").trim();
@@ -776,7 +778,7 @@ app.get("/api/reportes/cuadre-caja", auth, requirePermission("section.view.cuadr
   }
 });
 
-app.get("/api/cuadre-caja", auth, requirePermission("section.view.cuadre-caja", "ver modulo cuadre de caja"), async (req, res) => {
+router.get("/api/cuadre-caja", auth, requirePermission("section.view.cuadre-caja", "ver modulo cuadre de caja"), async (req, res) => {
   try {
     const scope = await resolveCuadreScope(req.user);
 
@@ -860,7 +862,7 @@ app.get("/api/cuadre-caja", auth, requirePermission("section.view.cuadre-caja", 
   }
 });
 
-app.post(
+router.post(
   "/api/cuadre-caja",
   auth,
   requirePermission("section.view.cuadre-caja", "usar modulo cuadre de caja"),
@@ -931,7 +933,7 @@ app.post(
     }
   }
 );
-app.all("/api/print/cuadre-caja", auth, requirePermission("section.view.cuadre-caja", "imprimir cuadre de caja"), async (req, res) => {
+router.all("/api/print/cuadre-caja", auth, requirePermission("section.view.cuadre-caja", "imprimir cuadre de caja"), async (req, res) => {
   try {
     const scope = await resolveCuadreScope(req.user);
     const fechaSource = req.method === "POST" ? (req.body?.fecha || req.query.fecha) : req.query.fecha;
@@ -1145,3 +1147,5 @@ app.all("/api/print/cuadre-caja", auth, requirePermission("section.view.cuadre-c
     return res.status(500).send(String(e.message || e));
   }
 });
+
+export default router;

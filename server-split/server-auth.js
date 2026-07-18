@@ -1,7 +1,9 @@
 // server-auth.js  |  Auth routes (modular)
-import { app, pool, auth, bcrypt, signToken, normalizeDeviceKey, getSharedDeviceKeys, isAvatarTableMissingError, getUserWarehouseAccessIds } from '../server-shared.js';
+import { pool, auth, bcrypt, signToken, normalizeDeviceKey, getSharedDeviceKeys, isAvatarTableMissingError, getUserWarehouseAccessIds } from '../server-shared.js';
+import { Router } from 'express';
+const router = Router();
 // -------------------------------------------------------
-app.post("/api/auth/login", async (req, res) => {
+router.post("/api/auth/login", async (req, res) => {
   try {
     const { username, password } = req.body || {};
     if (!username || !password) return res.status(400).json({ error: "Falta usuario o contrasena" });
@@ -69,7 +71,7 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-app.get("/api/auth/users", async (req, res) => {
+router.get("/api/auth/users", async (req, res) => {
   try {
     let rows = [];
     try {
@@ -105,7 +107,7 @@ app.get("/api/auth/users", async (req, res) => {
   }
 });
 
-app.get("/api/session-policy", auth, async (req, res) => {
+router.get("/api/session-policy", auth, async (req, res) => {
   try {
     const headerKey = normalizeDeviceKey(req.headers["x-device-key"]);
     const sharedKeys = getSharedDeviceKeys();
@@ -146,6 +148,8 @@ async function listActive(table, nameField) {
 async function softDelete(table, idField, id) {
   await pool.query(`UPDATE ${table} SET active=0 WHERE ${idField}=:id`, { id });
 }
+
+export default router;
 
 /* =========================
    LOCAL HELPERS

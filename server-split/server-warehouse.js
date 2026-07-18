@@ -1,7 +1,9 @@
 // server-warehouse.js  |  Bodegas, entradas, ajustes (modular)
-import { app, pool, auth, requirePermission, enforceDailyCloseBeforeMutations, verifySensitiveApproval, toSensitiveApprovalPayload, writeSensitiveActionAudit, resolveStockScope, normalizeLogoData, getWarehouseCustomLogoRow, getWarehouseLogoDataUri, getWarehouseAppLogoDataUri, getWarehousePrintLogoDataUri } from '../server-shared.js';
+import { pool, auth, requirePermission, enforceDailyCloseBeforeMutations, verifySensitiveApproval, toSensitiveApprovalPayload, writeSensitiveActionAudit, resolveStockScope, normalizeLogoData, getWarehouseCustomLogoRow, getWarehouseLogoDataUri, getWarehouseAppLogoDataUri, getWarehousePrintLogoDataUri, beginIdempotentRequest, ensureWarehouseLogoTable, getPrintLogoDataUri, isProductVisibleInWarehouse, pickLotsFEFO, getLastUnitCost } from '../server-shared.js';
+import { Router } from 'express';
+const router = Router();
 // -------------------------------------------------------
-app.get("/api/bodegas", auth, async (req, res) => {
+router.get("/api/bodegas", auth, async (req, res) => {
   const all = String(req.query.all || "") === "1";
   const [rows] = await pool.query(
     `SELECT b.id_bodega,
@@ -26,7 +28,7 @@ app.get("/api/bodegas", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.get("/api/bodegas/:id", auth, async (req, res) => {
+router.get("/api/bodegas/:id", auth, async (req, res) => {
   const id_bodega = Number(req.params.id);
   if (!id_bodega) return res.status(400).json({ error: "Falta bodega" });
   const [rows] = await pool.query(
@@ -45,7 +47,7 @@ app.get("/api/bodegas/:id", auth, async (req, res) => {
   res.json(rows[0]);
 });
 
-app.get("/api/bodegas/:id/logo", auth, async (req, res) => {
+router.get("/api/bodegas/:id/logo", auth, async (req, res) => {
   try {
     const id_bodega = Number(req.params.id || 0);
     if (!id_bodega) return res.status(400).json({ error: "Bodega invalida" });
@@ -63,7 +65,7 @@ app.get("/api/bodegas/:id/logo", auth, async (req, res) => {
   }
 });
 
-app.put("/api/bodegas/:id/logo", auth, requirePermission("action.create_update", "actualizar logo de bodega"), async (req, res) => {
+router.put("/api/bodegas/:id/logo", auth, requirePermission("action.create_update", "actualizar logo de bodega"), async (req, res) => {
   try {
     const id_bodega = Number(req.params.id || 0);
     if (!id_bodega) return res.status(400).json({ error: "Bodega invalida" });
@@ -106,7 +108,7 @@ app.put("/api/bodegas/:id/logo", auth, requirePermission("action.create_update",
 /* =========================
    ENTRADAS -> MOVIMIENTOS + KARDEX
 ========================= */
-app.post("/api/entradas", auth, requirePermission("action.create_update", "registrar entradas"), enforceDailyCloseBeforeMutations, async (req, res) => {
+router.post("/api/entradas", auth, requirePermission("action.create_update", "registrar entradas"), enforceDailyCloseBeforeMutations, async (req, res) => {
   const {
     id_motivo,
     id_proveedor = null,
@@ -234,7 +236,7 @@ app.post("/api/entradas", auth, requirePermission("action.create_update", "regis
   }
 });
 
-app.get("/api/entradas/existe-documento", auth, async (req, res) => {
+router.get("/api/entradas/existe-documento", auth, async (req, res) => {
   try {
     const no_documento = String(req.query.no_documento || "").trim();
     if (!no_documento) return res.status(400).json({ error: "Falta no_documento" });
@@ -261,7 +263,7 @@ app.get("/api/entradas/existe-documento", auth, async (req, res) => {
   }
 });
 
-app.post("/api/ajustes", auth, requirePermission("action.create_update", "registrar ajustes"), enforceDailyCloseBeforeMutations, async (req, res) => {
+router.post("/api/ajustes", auth, requirePermission("action.create_update", "registrar ajustes"), enforceDailyCloseBeforeMutations, async (req, res) => {
   const { direccion = "", id_motivo, observaciones = null, lines = [], id_bodega: id_bodega_input = null } = req.body || {};
   const dir = String(direccion || "").trim().toUpperCase();
   if (!["ENTRADA", "SALIDA"].includes(dir)) return res.status(400).json({ error: "Direccion invalida: ENTRADA o SALIDA" });
@@ -446,3 +448,5 @@ app.post("/api/ajustes", auth, requirePermission("action.create_update", "regist
   }
 });
 
+
+export default router;

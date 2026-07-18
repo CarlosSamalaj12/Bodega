@@ -1,7 +1,9 @@
 // server-dashboard.js  |  Dashboard routes (modular)
-import { app, pool, auth, requirePermission, resolveStockScope, ymd, getScopedWarehouseFilter, buildNamedInClause, verifySensitiveApproval, toSensitiveApprovalPayload, writeSensitiveActionAudit, createDailyCloseForDate, dmy } from '../server-shared.js';
+import { pool, auth, requirePermission, resolveStockScope, ymd, getScopedWarehouseFilter, buildNamedInClause, verifySensitiveApproval, toSensitiveApprovalPayload, writeSensitiveActionAudit, createDailyCloseForDate, dmy } from '../server-shared.js';
+import { Router } from 'express';
+const router = Router();
 // -------------------------------------------------------
-app.get("/api/cierre-dia/estado", auth, async (req, res) => {
+router.get("/api/cierre-dia/estado", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
     if (!scope.is_bodeguero) {
@@ -67,7 +69,7 @@ app.get("/api/cierre-dia/estado", auth, async (req, res) => {
   }
 });
 
-app.post("/api/cierre-dia", auth, requirePermission("action.create_update", "realizar cierre de dia"), async (req, res) => {
+router.post("/api/cierre-dia", auth, requirePermission("action.create_update", "realizar cierre de dia"), async (req, res) => {
   const id_bodega = Number(req.user?.id_warehouse || 0);
   const id_usuario = Number(req.user?.id_user || 0);
   if (!id_bodega || !id_usuario) return res.status(400).json({ error: "Usuario sin bodega" });
@@ -174,7 +176,7 @@ app.post("/api/cierre-dia", auth, requirePermission("action.create_update", "rea
   }
 });
 
-app.get("/api/cierre-dia", auth, async (req, res) => {
+router.get("/api/cierre-dia", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
     if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
@@ -262,7 +264,7 @@ app.get("/api/cierre-dia", auth, async (req, res) => {
   }
 });
 
-app.get("/api/cierre-dia/:fecha", auth, async (req, res) => {
+router.get("/api/cierre-dia/:fecha", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
     if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
@@ -314,3 +316,5 @@ app.get("/api/cierre-dia/:fecha", auth, async (req, res) => {
   }
 });
 
+
+export default router;

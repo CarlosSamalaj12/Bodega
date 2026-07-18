@@ -1,7 +1,9 @@
 // server-orders.js  |  Orders routes (modular)
-import { app, pool, auth, requirePermission, enforceDailyCloseBeforeMutations, requireSensitiveApproval, resolveStockScope, verifySensitiveApproval, toSensitiveApprovalPayload, writeSensitiveActionAudit } from '../server-shared.js';
+import { pool, auth, requirePermission, enforceDailyCloseBeforeMutations, requireSensitiveApproval, resolveStockScope, verifySensitiveApproval, toSensitiveApprovalPayload, writeSensitiveActionAudit, beginIdempotentRequest, isValidOrderPin, findOrderPinCollision, bcrypt, trackPinFailure, isProductVisibleInWarehouse, emitPedidoChanged, getScopedWarehouseFilter, buildNamedInClause, normalizeWarehouseIdList, getPreferredWarehousePrintLogoDataUri, buildWarehouseFooterHtml, pickLotsFEFO, getLastUnitCost } from '../server-shared.js';
+import { Router } from 'express';
+const router = Router();
 // -------------------------------------------------------
-app.post("/api/orders", auth, requirePermission("action.create_update", "crear pedidos"), enforceDailyCloseBeforeMutations, async (req, res) => {
+router.post("/api/orders", auth, requirePermission("action.create_update", "crear pedidos"), enforceDailyCloseBeforeMutations, async (req, res) => {
   const { requested_from_warehouse_id, notes, lines } = req.body || {};
   const requester_user_id = Number(req.body?.requester_user_id || 0);
   const requester_pin = String(req.body?.requester_pin || "").trim();
@@ -117,7 +119,7 @@ app.post("/api/orders", auth, requirePermission("action.create_update", "crear p
   }
 });
 
-app.get("/api/pedidos/correlativo-actual", auth, async (req, res) => {
+router.get("/api/pedidos/correlativo-actual", auth, async (req, res) => {
   try {
     const [[r]] = await pool.query(
       `SELECT COALESCE(MAX(id_pedido), 0) AS correlativo
@@ -129,7 +131,7 @@ app.get("/api/pedidos/correlativo-actual", auth, async (req, res) => {
   }
 });
 
-app.get("/api/orders", auth, async (req, res) => {
+router.get("/api/orders", auth, async (req, res) => {
   const status = req.query.status ? String(req.query.status) : null;
   const scopeParam = req.query.scope ? String(req.query.scope) : null;
   const whParam = Number(req.query.warehouse || 0);
@@ -181,7 +183,7 @@ app.get("/api/orders", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.get("/api/orders/:id/details", auth, async (req, res) => {
+router.get("/api/orders/:id/details", auth, async (req, res) => {
   const id_pedido = Number(req.params.id);
   if (!Number.isFinite(id_pedido) || id_pedido <= 0) {
     return res.status(400).json({ error: "Pedido invalido" });
@@ -324,61 +326,13 @@ async function recomputePedidoEstado(conn, id_pedido, opts = {}) {
   return { estado, justificacion_despacho: head?.justificacion_despacho || null };
 }
 
-async function pickLotsFEFO(conn, id_bodega, id_producto, qtyNeeded, opts = {}) {
-  const allowExpired = opts.allowExpired !== false;
-  const whereVenc = allowExpired ? "" : "AND (fecha_vencimiento IS NULL OR fecha_vencimiento >= CURDATE())";
-  const [lots] = await conn.query(
-    `
-    SELECT lote, fecha_vencimiento, stock
-    FROM v_stock_disponible
-    WHERE id_bodega=:id_bodega
-      AND id_producto=:id_producto
-      ${whereVenc}
-    ORDER BY (fecha_vencimiento IS NULL), fecha_vencimiento ASC
-    `,
-    { id_bodega, id_producto }
-  );
-  const picks = [];
-  let remaining = Number(qtyNeeded);
-  for (const l of lots) {
-    if (remaining <= 0) break;
-    const take = Math.min(remaining, Number(l.stock));
-    picks.push({ lote: l.lote, fecha_vencimiento: l.fecha_vencimiento, qty: take });
-    remaining -= take;
-  }
-
-  if (!picks.length && allowExpired) {
-    const [[r]] = await conn.query(
-      `SELECT stock FROM v_stock_resumen WHERE id_bodega=:id_bodega AND id_producto=:id_producto LIMIT 1`,
-      { id_bodega, id_producto }
-    );
-    const stock = Number(r?.stock || 0);
-    if (stock > 0) {
-      const take = Math.min(stock, Number(qtyNeeded));
-      return { picks: [{ lote: null, fecha_vencimiento: null, qty: take }], remaining: Number(qtyNeeded) - take };
-    }
-  }
-
-  return { picks, remaining };
-}
-
-
-async function getLastUnitCost(conn, id_bodega, id_producto, lote) {
-  const [rows] = await conn.query(
-    `SELECT costo_unitario
-     FROM kardex
-     WHERE id_bodega=:id_bodega AND id_producto=:id_producto AND lote=:lote AND delta_cantidad > 0
-     ORDER BY creado_en DESC
-     LIMIT 1`,
-    { id_bodega, id_producto, lote }
-  );
-  return rows[0]?.costo_unitario ?? 0;
-}
+// pickLotsFEFO and getLastUnitCost moved to server-shared.js
+// Imported from there for shared use across multiple route modules.
 
 /* =========================
    SALIDAS DIRECTAS (MOVIMIENTOS + KARDEX)
 ========================= */
-app.post("/api/salidas", auth, requirePermission("action.create_update", "registrar salidas"), enforceDailyCloseBeforeMutations, async (req, res) => {
+router.post("/api/salidas", auth, requirePermission("action.create_update", "registrar salidas"), enforceDailyCloseBeforeMutations, async (req, res) => {
   const { id_motivo = null, id_bodega_destino = null, observaciones = null, lines = [] } = req.body || {};
 
   if (!id_bodega_destino) return res.status(400).json({ error: "Falta bodega destino" });
@@ -624,7 +578,7 @@ app.post("/api/salidas", auth, requirePermission("action.create_update", "regist
 /* =========================
    DESPACHO (MOVIMIENTOS + KARDEX)
 ========================= */
-app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "despachar pedidos"), enforceDailyCloseBeforeMutations, async (req, res) => {
+router.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "despachar pedidos"), enforceDailyCloseBeforeMutations, async (req, res) => {
   const id_pedido = Number(req.params.id);
   if (!Number.isFinite(id_pedido) || id_pedido <= 0) {
     return res.status(400).json({ error: "Pedido invalido" });
@@ -858,7 +812,7 @@ app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "
 /* =========================
    REVERTIR DESPACHO (MISMO DIA)
 ========================= */
-app.post("/api/orders/:id/revert", auth, requirePermission("action.dispatch", "revertir despachos"), requireSensitiveApproval("reversa de despacho"), enforceDailyCloseBeforeMutations, async (req, res) => {
+router.post("/api/orders/:id/revert", auth, requirePermission("action.dispatch", "revertir despachos"), requireSensitiveApproval("reversa de despacho"), enforceDailyCloseBeforeMutations, async (req, res) => {
   const id_pedido = Number(req.params.id);
   const actorWarehouse = Number(req.user?.id_warehouse || 0);
   if (!actorWarehouse) return res.status(400).json({ error: "Usuario sin bodega" });
@@ -976,7 +930,7 @@ app.post("/api/orders/:id/revert", auth, requirePermission("action.dispatch", "r
 });
 
 
-app.get("/api/orders/:id/lots", auth, async (req, res) => {
+router.get("/api/orders/:id/lots", auth, async (req, res) => {
   const id_pedido = Number(req.params.id);
   const actorWarehouse = Number(req.user?.id_warehouse || 0);
   const stockScope = await resolveStockScope(req.user);
@@ -1014,7 +968,7 @@ app.get("/api/orders/:id/lots", auth, async (req, res) => {
 });
 
 
-app.post("/api/orders/:id/revert-line", auth, requirePermission("action.dispatch", "revertir lineas despachadas"), requireSensitiveApproval("reversa de linea despachada"), enforceDailyCloseBeforeMutations, async (req, res) => {
+router.post("/api/orders/:id/revert-line", auth, requirePermission("action.dispatch", "revertir lineas despachadas"), requireSensitiveApproval("reversa de linea despachada"), enforceDailyCloseBeforeMutations, async (req, res) => {
   const id_pedido = Number(req.params.id);
   const id_pedido_detalle = Number(req.body?.id_pedido_detalle || 0);
   if (!id_pedido_detalle) return res.status(400).json({ error: "Falta linea" });
@@ -1132,7 +1086,7 @@ app.post("/api/orders/:id/revert-line", auth, requirePermission("action.dispatch
   }
 });
 
-app.post("/api/orders/:id/cancel-line", auth, requirePermission("action.dispatch", "anular lineas de pedido"), enforceDailyCloseBeforeMutations, async (req, res) => {
+router.post("/api/orders/:id/cancel-line", auth, requirePermission("action.dispatch", "anular lineas de pedido"), enforceDailyCloseBeforeMutations, async (req, res) => {
   const id_pedido = Number(req.params.id);
   const id_pedido_detalle = Number(req.body?.id_pedido_detalle || 0);
   const justificacion = String(req.body?.justificacion || "").trim();
@@ -1215,7 +1169,7 @@ app.post("/api/orders/:id/cancel-line", auth, requirePermission("action.dispatch
   }
 });
 
-app.post("/api/orders/:id/uncancel-line", auth, requirePermission("action.dispatch", "rehabilitar lineas anuladas"), enforceDailyCloseBeforeMutations, async (req, res) => {
+router.post("/api/orders/:id/uncancel-line", auth, requirePermission("action.dispatch", "rehabilitar lineas anuladas"), enforceDailyCloseBeforeMutations, async (req, res) => {
   const id_pedido = Number(req.params.id);
   const id_pedido_detalle = Number(req.body?.id_pedido_detalle || 0);
   if (!id_pedido_detalle) return res.status(400).json({ error: "Falta linea" });
@@ -1286,7 +1240,7 @@ app.post("/api/orders/:id/uncancel-line", auth, requirePermission("action.dispat
   }
 });
 
-app.get("/api/print/order/:id", auth, async (req, res) => {
+router.get("/api/print/order/:id", auth, async (req, res) => {
   const id_pedido = Number(req.params.id);
   const actorWarehouse = Number(req.user?.id_warehouse || 0);
   const stockScope = await resolveStockScope(req.user);
@@ -1400,3 +1354,5 @@ app.get("/api/print/order/:id", auth, async (req, res) => {
   res.send(html);
 });
 
+
+export default router;

@@ -1,14 +1,16 @@
 // server-catalog.js  |  Catalog CRUD routes (modular)
-import { app, pool, auth, listActive, softDelete, buildProductWarehouseVisibilityClause, buildNamedInClause, normalizeWarehouseIdList, getUserWarehouseAccessIds, ensureProductWarehouseVisibilityTable, getActiveWarehouseIds } from '../server-shared.js';
+import { pool, auth, listActive, softDelete, buildProductWarehouseVisibilityClause, buildNamedInClause, normalizeWarehouseIdList, getUserWarehouseAccessIds, ensureProductWarehouseVisibilityTable, getActiveWarehouseIds, buildTokenizedLikeFilter, areWarehouseIdsValid, saveProductVisibleWarehouseIds, getProductVisibleWarehouseIds, setProductWarehouseVisibility, isProductVisibleInWarehouse, ensureCatalogCanDeactivate } from '../server-shared.js';
+import { Router } from 'express';
+const router = Router();
 // -------------------------------------------------------
-app.get("/api/categories", auth, async (req, res) => {
+router.get("/api/categories", auth, async (req, res) => {
   res.json(await listActive("categories", "category_name"));
 });
 
 /* =========================
    PRODUCTOS (BUSQUEDA)
 ========================= */
-app.get("/api/productos/search", auth, async (req, res) => {
+router.get("/api/productos/search", auth, async (req, res) => {
   await ensureProductWarehouseVisibilityTable();
   const q = String(req.query.q || "").trim();
   if (!q) return res.json([]);
@@ -28,7 +30,7 @@ app.get("/api/productos/search", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.get("/api/productos", auth, async (req, res) => {
+router.get("/api/productos", auth, async (req, res) => {
   const all = String(req.query.all || "") === "1";
   const qRaw = String(req.query.q || "").trim();
   const qf = buildTokenizedLikeFilter(qRaw, ["p.nombre_producto", "p.sku"], "pq");
@@ -86,7 +88,7 @@ app.get("/api/productos", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/productos", auth, async (req, res) => {
+router.post("/api/productos", auth, async (req, res) => {
   const conn = await pool.getConnection();
   try {
     const {
@@ -139,7 +141,7 @@ app.post("/api/productos", auth, async (req, res) => {
   }
 });
 
-app.patch("/api/productos/:id", auth, async (req, res) => {
+router.patch("/api/productos/:id", auth, async (req, res) => {
   const conn = await pool.getConnection();
   try {
     const id_producto = Number(req.params.id || 0);
@@ -198,7 +200,7 @@ app.patch("/api/productos/:id", auth, async (req, res) => {
   }
 });
 
-app.get("/api/productos/:id/bodegas-visibles", auth, async (req, res) => {
+router.get("/api/productos/:id/bodegas-visibles", auth, async (req, res) => {
   try {
     const id_producto = Number(req.params.id || 0);
     if (!id_producto) return res.status(400).json({ error: "Falta producto" });
@@ -223,7 +225,7 @@ app.get("/api/productos/:id/bodegas-visibles", auth, async (req, res) => {
   }
 });
 
-app.post("/api/productos/:id/visibilidad-mi-bodega", auth, async (req, res) => {
+router.post("/api/productos/:id/visibilidad-mi-bodega", auth, async (req, res) => {
   const conn = await pool.getConnection();
   try {
     const id_producto = Number(req.params.id || 0);
@@ -247,7 +249,7 @@ app.post("/api/productos/:id/visibilidad-mi-bodega", auth, async (req, res) => {
   }
 });
 
-app.get("/api/medidas", auth, async (req, res) => {
+router.get("/api/medidas", auth, async (req, res) => {
   const [rows] = await pool.query(
     `SELECT id_medida, nombre_medida
      FROM medidas
@@ -257,7 +259,7 @@ app.get("/api/medidas", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.get("/api/categorias", auth, async (req, res) => {
+router.get("/api/categorias", auth, async (req, res) => {
   const all = String(req.query.all || "") === "1";
   const [rows] = await pool.query(
     `SELECT id_categoria, nombre_categoria, activo
@@ -269,7 +271,7 @@ app.get("/api/categorias", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/categorias", auth, async (req, res) => {
+router.post("/api/categorias", auth, async (req, res) => {
   try {
     const nombre_categoria = String(req.body?.nombre_categoria || "").trim();
     const activo = Number(req.body?.activo) ? 1 : 0;
@@ -289,7 +291,7 @@ app.post("/api/categorias", auth, async (req, res) => {
   }
 });
 
-app.patch("/api/categorias/:id_categoria", auth, async (req, res) => {
+router.patch("/api/categorias/:id_categoria", auth, async (req, res) => {
   try {
     const id_categoria = Number(req.params.id_categoria || 0);
     const rawNombre = req.body?.nombre_categoria;
@@ -322,7 +324,7 @@ app.patch("/api/categorias/:id_categoria", auth, async (req, res) => {
   }
 });
 
-app.post("/api/categorias/:id_categoria/deactivate", auth, async (req, res) => {
+router.post("/api/categorias/:id_categoria/deactivate", auth, async (req, res) => {
   try {
     const id_categoria = Number(req.params.id_categoria || 0);
     if (!id_categoria) return res.status(400).json({ error: "Falta categoria" });
@@ -339,7 +341,7 @@ app.post("/api/categorias/:id_categoria/deactivate", auth, async (req, res) => {
   }
 });
 
-app.get("/api/subcategorias", auth, async (req, res) => {
+router.get("/api/subcategorias", auth, async (req, res) => {
   const id_categoria = Number(req.query.categoria || 0) || null;
   const all = String(req.query.all || "") === "1";
   const [rows] = await pool.query(
@@ -358,7 +360,7 @@ app.get("/api/subcategorias", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/subcategorias", auth, async (req, res) => {
+router.post("/api/subcategorias", auth, async (req, res) => {
   try {
     const id_categoria = Number(req.body?.id_categoria || 0);
     const nombre_subcategoria = String(req.body?.nombre_subcategoria || "").trim();
@@ -380,7 +382,7 @@ app.post("/api/subcategorias", auth, async (req, res) => {
   }
 });
 
-app.patch("/api/subcategorias/:id_subcategoria", auth, async (req, res) => {
+router.patch("/api/subcategorias/:id_subcategoria", auth, async (req, res) => {
   try {
     const id_subcategoria = Number(req.params.id_subcategoria || 0);
     const id_categoria =
@@ -419,7 +421,7 @@ app.patch("/api/subcategorias/:id_subcategoria", auth, async (req, res) => {
   }
 });
 
-app.post("/api/subcategorias/:id_subcategoria/deactivate", auth, async (req, res) => {
+router.post("/api/subcategorias/:id_subcategoria/deactivate", auth, async (req, res) => {
   try {
     const id_subcategoria = Number(req.params.id_subcategoria || 0);
     if (!id_subcategoria) return res.status(400).json({ error: "Falta subcategoria" });
@@ -436,7 +438,7 @@ app.post("/api/subcategorias/:id_subcategoria/deactivate", auth, async (req, res
   }
 });
 
-app.get("/api/limites", auth, async (req, res) => {
+router.get("/api/limites", auth, async (req, res) => {
   const all = String(req.query.all || "") === "1";
   const limit = Math.max(1, Math.min(5000, Number(req.query.limit || 1000)));
   const [rows] = await pool.query(
@@ -459,7 +461,7 @@ app.get("/api/limites", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/limites", auth, async (req, res) => {
+router.post("/api/limites", auth, async (req, res) => {
   try {
     const { id_bodega, id_producto, minimo = 0, maximo = 0, activo = 1 } = req.body || {};
     const idB = Number(id_bodega || 0);
@@ -488,7 +490,7 @@ app.post("/api/limites", auth, async (req, res) => {
   }
 });
 
-app.patch("/api/limites/:id_bodega/:id_producto", auth, async (req, res) => {
+router.patch("/api/limites/:id_bodega/:id_producto", auth, async (req, res) => {
   try {
     const idB = Number(req.params.id_bodega || 0);
     const idP = Number(req.params.id_producto || 0);
@@ -512,7 +514,7 @@ app.patch("/api/limites/:id_bodega/:id_producto", auth, async (req, res) => {
   }
 });
 
-app.post("/api/limites/:id_bodega/:id_producto/deactivate", auth, async (req, res) => {
+router.post("/api/limites/:id_bodega/:id_producto/deactivate", auth, async (req, res) => {
   try {
     const idB = Number(req.params.id_bodega || 0);
     const idP = Number(req.params.id_producto || 0);
@@ -530,7 +532,7 @@ app.post("/api/limites/:id_bodega/:id_producto/deactivate", auth, async (req, re
   }
 });
 
-app.get("/api/reglas-subcategorias", auth, async (req, res) => {
+router.get("/api/reglas-subcategorias", auth, async (req, res) => {
   const all = String(req.query.all || "") === "1";
   const [rows] = await pool.query(
     `SELECT r.id_subcategoria,
@@ -549,7 +551,7 @@ app.get("/api/reglas-subcategorias", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/reglas-subcategorias", auth, async (req, res) => {
+router.post("/api/reglas-subcategorias", auth, async (req, res) => {
   try {
     const { id_subcategoria, max_dias_vida = 0, dias_alerta_antes = 0, activo = 1 } = req.body || {};
     const idSub = Number(id_subcategoria || 0);
@@ -573,7 +575,7 @@ app.post("/api/reglas-subcategorias", auth, async (req, res) => {
   }
 });
 
-app.patch("/api/reglas-subcategorias/:id_subcategoria", auth, async (req, res) => {
+router.patch("/api/reglas-subcategorias/:id_subcategoria", auth, async (req, res) => {
   try {
     const idSub = Number(req.params.id_subcategoria || 0);
     const max = Math.max(0, Number(req.body?.max_dias_vida || 0));
@@ -593,7 +595,7 @@ app.patch("/api/reglas-subcategorias/:id_subcategoria", auth, async (req, res) =
   }
 });
 
-app.post("/api/reglas-subcategorias/:id_subcategoria/deactivate", auth, async (req, res) => {
+router.post("/api/reglas-subcategorias/:id_subcategoria/deactivate", auth, async (req, res) => {
   try {
     const idSub = Number(req.params.id_subcategoria || 0);
     if (!idSub) return res.status(400).json({ error: "Falta subcategoria" });
@@ -613,7 +615,7 @@ app.post("/api/reglas-subcategorias/:id_subcategoria/deactivate", auth, async (r
 /* =========================
    PROVEEDORES
 ========================= */
-app.get("/api/proveedores", auth, async (req, res) => {
+router.get("/api/proveedores", auth, async (req, res) => {
   const all = String(req.query.all || "") === "1";
   const [rows] = await pool.query(
     `SELECT id_proveedor, nombre_proveedor, telefono, direccion, activo
@@ -625,7 +627,7 @@ app.get("/api/proveedores", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/proveedores", auth, async (req, res) => {
+router.post("/api/proveedores", auth, async (req, res) => {
   try {
     const nombre_proveedor = String(req.body?.nombre_proveedor || "").trim();
     const telefonoRaw = String(req.body?.telefono || "").trim();
@@ -653,7 +655,7 @@ app.post("/api/proveedores", auth, async (req, res) => {
   }
 });
 
-app.patch("/api/proveedores/:id_proveedor", auth, async (req, res) => {
+router.patch("/api/proveedores/:id_proveedor", auth, async (req, res) => {
   try {
     const id_proveedor = Number(req.params.id_proveedor || 0);
     const rawNombre = req.body?.nombre_proveedor;
@@ -702,7 +704,7 @@ app.patch("/api/proveedores/:id_proveedor", auth, async (req, res) => {
   }
 });
 
-app.post("/api/proveedores/:id_proveedor/deactivate", auth, async (req, res) => {
+router.post("/api/proveedores/:id_proveedor/deactivate", auth, async (req, res) => {
   try {
     const id_proveedor = Number(req.params.id_proveedor || 0);
     if (!id_proveedor) return res.status(400).json({ error: "Falta proveedor" });
@@ -722,7 +724,7 @@ app.post("/api/proveedores/:id_proveedor/deactivate", auth, async (req, res) => 
 /* =========================
    MOTIVOS (LISTA)
 ========================= */
-app.get("/api/motivos", auth, async (req, res) => {
+router.get("/api/motivos", auth, async (req, res) => {
   const tipo = String(req.query.tipo || "").toUpperCase();
   const all = String(req.query.all || "") === "1";
   const whereTipo = tipo ? "AND tipo_movimiento=:tipo" : "";
@@ -737,7 +739,7 @@ app.get("/api/motivos", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/motivos", auth, async (req, res) => {
+router.post("/api/motivos", auth, async (req, res) => {
   try {
     const nombre_motivo = String(req.body?.nombre_motivo || "").trim();
     const tipo_movimiento = String(req.body?.tipo_movimiento || "").trim().toUpperCase();
@@ -763,7 +765,7 @@ app.post("/api/motivos", auth, async (req, res) => {
   }
 });
 
-app.patch("/api/motivos/:id_motivo", auth, async (req, res) => {
+router.patch("/api/motivos/:id_motivo", auth, async (req, res) => {
   const conn = await pool.getConnection();
   try {
     const id_motivo = Number(req.params.id_motivo || 0);
@@ -817,7 +819,7 @@ app.patch("/api/motivos/:id_motivo", auth, async (req, res) => {
   }
 });
 
-app.post("/api/motivos/:id_motivo/deactivate", auth, async (req, res) => {
+router.post("/api/motivos/:id_motivo/deactivate", auth, async (req, res) => {
   const conn = await pool.getConnection();
   try {
     const id_motivo = Number(req.params.id_motivo || 0);
@@ -842,7 +844,7 @@ app.post("/api/motivos/:id_motivo/deactivate", auth, async (req, res) => {
 /* =========================
    STOCK ACTUAL POR PRODUCTO
 ========================= */
-app.get("/api/productos/:id/stock", auth, async (req, res) => {
+router.get("/api/productos/:id/stock", auth, async (req, res) => {
   const id_producto = Number(req.params.id);
   const id_bodega = Number(req.query.warehouse || req.user.id_warehouse || 0);
   if (!id_producto) return res.status(400).json({ error: "Falta producto" });
@@ -873,6 +875,8 @@ app.get("/api/productos/:id/stock", auth, async (req, res) => {
     precio_sugerido: Number(priceRows[0]?.costo_unitario || 0),
   });
 });
+
+export default router;
 
 /* =========================
    BODEGA DEL USUARIO

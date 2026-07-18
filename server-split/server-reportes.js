@@ -1,7 +1,9 @@
 // server-reportes.js  |  Report routes (modular)
-import { app, pool, auth, resolveStockScope, requirePermission, readDashboardResumenCache, getWarehouseLogoDataUri, getWarehouseAppLogoDataUri, getWarehousePrintLogoDataUri, buildWarehouseFooterHtml, getPreferredWarehousePrintLogoDataUri, getScopedWarehouseFilter, buildTokenizedLikeFilter, buildNamedInClause, ymd, dmy, normalizeWarehouseIdList } from '../server-shared.js';
+import { pool, auth, resolveStockScope, requirePermission, readDashboardResumenCache, getWarehouseLogoDataUri, getWarehouseAppLogoDataUri, getWarehousePrintLogoDataUri, buildWarehouseFooterHtml, getPreferredWarehousePrintLogoDataUri, getScopedWarehouseFilter, buildTokenizedLikeFilter, buildNamedInClause, ymd, dmy, normalizeWarehouseIdList } from '../server-shared.js';
+import { Router } from 'express';
+const router = Router();
 // -------------------------------------------------------
-app.get("/api/reportes/stock-scope", auth, async (req, res) => {
+router.get("/api/reportes/stock-scope", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
     if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
@@ -54,7 +56,7 @@ app.get("/api/reportes/stock-scope", auth, async (req, res) => {
 /* =========================
    DASHBOARD INICIO
 ========================= */
-app.get("/api/dashboard/resumen", auth, async (req, res) => {
+router.get("/api/dashboard/resumen", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
     if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
@@ -136,7 +138,7 @@ app.get("/api/dashboard/resumen", auth, async (req, res) => {
   }
 });
 
-app.get("/api/dashboard/detalle", auth, async (req, res) => {
+router.get("/api/dashboard/detalle", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
     if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
@@ -306,7 +308,7 @@ app.get("/api/dashboard/detalle", auth, async (req, res) => {
   }
 });
 
-app.get("/api/reportes/entradas", auth, async (req, res) => {
+router.get("/api/reportes/entradas", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
     if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
@@ -407,10 +409,7 @@ app.get("/api/reportes/entradas", auth, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }
-});
-
-app.post(
-  "/api/entradas/:id_movimiento/dashboard-flag",
+});router.post("/api/entradas/:id_movimiento/dashboard-flag",
   auth,
   requirePermission("action.manage_permissions", "administrar exclusion del panel principal en entradas"),
   async (req, res) => {
@@ -459,7 +458,7 @@ app.post(
   }
 );
 
-app.get("/api/reportes/salidas", auth, async (req, res) => {
+router.get("/api/reportes/salidas", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
     if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
@@ -576,7 +575,7 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
   }
 });
 
-app.get("/api/reportes/pedidos", auth, async (req, res) => {
+router.get("/api/reportes/pedidos", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
     if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
@@ -739,7 +738,7 @@ app.get("/api/reportes/pedidos", auth, async (req, res) => {
 });
 
 
-app.get("/api/reportes/tendencia-producto", auth, async (req, res) => {
+router.get("/api/reportes/tendencia-producto", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
     if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
@@ -936,7 +935,7 @@ app.get("/api/reportes/tendencia-producto", auth, async (req, res) => {
     res.status(500).json({ error: String(e.message || e) });
   }
 });
-app.get("/api/reportes/kardex", auth, async (req, res) => {
+router.get("/api/reportes/kardex", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
     if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
@@ -1082,7 +1081,7 @@ app.get("/api/reportes/kardex", auth, async (req, res) => {
   }
 });
 
-app.get(
+router.get(
   "/api/reportes/auditoria-sensibles",
   auth,
   requirePermission("section.view.r-auditoria-sensibles", "ver reporte de auditoria sensible"),
@@ -1148,3 +1147,5 @@ app.get(
 /* =========================
    PEDIDOS (TABLAS EN ESPANOL)
 ========================= */
+
+export default router;
