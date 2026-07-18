@@ -69,6 +69,10 @@ CVS
 
 .env
 .env.*
+
+# Backup files
+backups/
+server-lib/backups/
 .node_modules
 node_modules
 .codegraph
