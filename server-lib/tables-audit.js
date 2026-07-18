@@ -1,0 +1,10 @@
+// server-lib/tables-audit.js  —  Audit and ops table creation functions
+import { pool } from "./core.js";
+
+async function ensureOpsAuditTables() {
+  await pool.query(`CREATE TABLE IF NOT EXISTS backup_audit (id_backup BIGINT NOT NULL AUTO_INCREMENT, backup_date DATE NOT NULL, trigger_type VARCHAR(30) NOT NULL, status VARCHAR(20) NOT NULL, file_path VARCHAR(500) NULL, bytes_written BIGINT NULL, creado_por INT NULL, error_message VARCHAR(500) NULL, creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, finalizado_en DATETIME NULL, PRIMARY KEY (id_backup), KEY idx_backup_date (backup_date, status)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS recovery_test_audit (id_test BIGINT NOT NULL AUTO_INCREMENT, trigger_type VARCHAR(30) NOT NULL, status VARCHAR(20) NOT NULL, source_file VARCHAR(500) NULL, summary_json LONGTEXT NULL, creado_por INT NULL, error_message VARCHAR(500) NULL, creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, finalizado_en DATETIME NULL, PRIMARY KEY (id_test), KEY idx_recovery_status (status, creado_en)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+}
+async function ensureSensitiveActionAuditTable() { await pool.query(`CREATE TABLE IF NOT EXISTS auditoria_accion_sensible (id_auditoria BIGINT NOT NULL AUTO_INCREMENT, action_key VARCHAR(80) NOT NULL, action_label VARCHAR(180) NOT NULL, endpoint VARCHAR(180) NULL, http_method VARCHAR(12) NULL, id_usuario_actor INT NOT NULL, actor_nombre VARCHAR(160) NULL, id_bodega_actor INT NULL, id_usuario_supervisor INT NULL, supervisor_usuario VARCHAR(80) NULL, supervisor_nombre VARCHAR(160) NULL, approval_method VARCHAR(40) NULL, reference_type VARCHAR(40) NULL, reference_id BIGINT NULL, detail_json LONGTEXT NULL, creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (id_auditoria), KEY idx_auditoria_fecha (creado_en), KEY idx_auditoria_accion (action_key, creado_en), KEY idx_auditoria_actor (id_usuario_actor, creado_en), KEY idx_auditoria_supervisor (id_usuario_supervisor, creado_en)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`); }
+
+export { ensureOpsAuditTables, ensureSensitiveActionAuditTable };

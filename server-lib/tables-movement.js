@@ -1,0 +1,11 @@
+// server-lib/tables-movement.js  —  Movement-related table/column creation functions
+import { pool } from "./core.js";
+
+async function ensureMovimientoDetallePrecioSalidaColumn() { const [rows] = await pool.query(`SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='movimiento_detalle' AND COLUMN_NAME='precio_salida'`); if (!(Number(rows?.[0]?.c || 0) > 0)) await pool.query(`ALTER TABLE movimiento_detalle ADD COLUMN precio_salida DECIMAL(12,2) NULL AFTER costo_unitario`); }
+async function ensureMovimientoDashboardColumn() { const [rows] = await pool.query(`SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='movimiento_encabezado' AND COLUMN_NAME='no_contar_dashboard'`); if (!(Number(rows?.[0]?.c || 0) > 0)) await pool.query(`ALTER TABLE movimiento_encabezado ADD COLUMN no_contar_dashboard TINYINT(1) NOT NULL DEFAULT 0`); }
+async function ensureMovimientoPastUpdateTrigger() {
+  await pool.query(`DROP TRIGGER IF EXISTS trg_me_no_update_pasado`);
+  await pool.query(`CREATE TRIGGER trg_me_no_update_pasado BEFORE UPDATE ON movimiento_encabezado FOR EACH ROW BEGIN IF DATE(OLD.creado_en) <> CURDATE() AND NOT (COALESCE(@allow_dashboard_flag_past_update,0)=1 AND COALESCE(OLD.no_contar_dashboard,0)<>COALESCE(NEW.no_contar_dashboard,0) AND COALESCE(OLD.tipo_movimiento,'')=COALESCE(NEW.tipo_movimiento,'') AND COALESCE(OLD.id_motivo,0)=COALESCE(NEW.id_motivo,0) AND COALESCE(OLD.id_bodega_origen,0)=COALESCE(NEW.id_bodega_origen,0) AND COALESCE(OLD.id_bodega_destino,0)=COALESCE(NEW.id_bodega_destino,0) AND COALESCE(OLD.id_proveedor,0)=COALESCE(NEW.id_proveedor,0) AND COALESCE(OLD.no_documento,'')=COALESCE(NEW.no_documento,'') AND COALESCE(OLD.observaciones,'')=COALESCE(NEW.observaciones,'') AND COALESCE(OLD.creado_por,0)=COALESCE(NEW.creado_por,0) AND COALESCE(OLD.confirmado_en,'1000-01-01 00:00:00')=COALESCE(NEW.confirmado_en,'1000-01-01 00:00:00') AND COALESCE(OLD.estado,'')=COALESCE(NEW.estado,'') AND COALESCE(OLD.creado_en,'1000-01-01 00:00:00')=COALESCE(NEW.creado_en,'1000-01-01 00:00:00')) THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='No se puede modificar un movimiento de fecha anterior.'; END IF; END`);
+}
+
+export { ensureMovimientoDetallePrecioSalidaColumn, ensureMovimientoDashboardColumn, ensureMovimientoPastUpdateTrigger };
