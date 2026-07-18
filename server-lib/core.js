@@ -38,7 +38,8 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// core.js lives in server-lib/, so go up one level to reach project root
+const __dirname = path.resolve(path.dirname(__filename), "..");
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/imagenes", express.static(path.join(__dirname, "imagenes")));
 
