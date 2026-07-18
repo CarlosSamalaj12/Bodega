@@ -4413,32 +4413,32 @@ app.get("/api/stock", auth, async (req, res) => {
     const [rows] = await pool.query(
       `
       SELECT
-        v.id_product, p.product_name, p.sku,
-        v.lot_code, v.expiration_date,
-        v.qty_on_hand
-      FROM v_stock_by_lot v
-      JOIN products p ON p.id_product=v.id_product
-      WHERE v.id_warehouse=:id_warehouse
-        ${onlyWithStock ? "AND v.qty_on_hand > 0" : ""}
-        ${notExpiredOnly ? "AND (v.expiration_date IS NULL OR v.expiration_date >= CURDATE())" : ""}
-      ORDER BY p.product_name ASC, (v.expiration_date IS NULL), v.expiration_date ASC
+        v.id_producto, p.nombre_producto, p.sku,
+        v.lote, v.fecha_vencimiento,
+        v.stock
+      FROM v_stock_por_lote v
+      JOIN productos p ON p.id_producto=v.id_producto
+      WHERE v.id_bodega=:id_bodega
+        ${onlyWithStock ? "AND v.stock > 0" : ""}
+        ${notExpiredOnly ? "AND (v.fecha_vencimiento IS NULL OR v.fecha_vencimiento >= CURDATE())" : ""}
+      ORDER BY p.nombre_producto ASC, (v.fecha_vencimiento IS NULL), v.fecha_vencimiento ASC
       `,
-      { id_warehouse }
+      { id_bodega: id_warehouse }
     );
     return res.json(rows);
   } else {
     const [rows] = await pool.query(
       `
       SELECT
-        s.id_product, p.product_name, p.sku,
-        s.qty_on_hand
-      FROM v_stock_summary s
-      JOIN products p ON p.id_product=s.id_product
-      WHERE s.id_warehouse=:id_warehouse
-        ${onlyWithStock ? "AND s.qty_on_hand > 0" : ""}
-      ORDER BY p.product_name ASC
+        s.id_producto, p.nombre_producto, p.sku,
+        s.stock
+      FROM v_stock_resumen s
+      JOIN productos p ON p.id_producto=s.id_producto
+      WHERE s.id_bodega=:id_bodega
+        ${onlyWithStock ? "AND s.stock > 0" : ""}
+      ORDER BY p.nombre_producto ASC
       `,
-      { id_warehouse }
+      { id_bodega: id_warehouse }
     );
     return res.json(rows);
   }
@@ -4468,6 +4468,7 @@ app.get("/api/reportes/existencias", auth, async (req, res) => {
   const to_date = String(req.query.to || "").trim() || null;
   const id_categoria = Number(req.query.categoria || 0) || null;
   const id_subcategoria = Number(req.query.subcategoria || 0) || null;
+  const include_zero_stock = req.query.include_zero_stock === "1" || req.query.include_zero_stock === "true";
   const limit = Math.max(1, Math.min(2000, Number(req.query.limit || 500)));
 
   const [rows] = await pool.query(
@@ -4567,7 +4568,7 @@ app.get("/api/reportes/existencias", auth, async (req, res) => {
          AND e.id_producto=v.id_producto
          AND (e.lote <=> v.lote)
          AND (e.fecha_vencimiento <=> v.fecha_vencimiento)
-     WHERE v.stock > 0
+     WHERE ${include_zero_stock ? "1=1" : "v.stock > 0"}
        AND ${accessFilter ? `v.id_bodega IN (${accessFilter.sql})` : "1=1"}
        AND (:id_bodega IS NULL OR v.id_bodega=:id_bodega)
        AND ${qf.clause}
