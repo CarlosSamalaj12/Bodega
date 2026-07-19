@@ -18,4 +18,4 @@ function addDaysYmd(baseYmd, days) { const d = new Date(`${baseYmd}T00:00:00`); 
 
 function onlyToday(dateTimeStr) { const d = new Date(dateTimeStr); const now = new Date(); return d.toDateString() === now.toDateString(); }
 
-export { ymd, dmy, normalizeYmdInput, addDaysYmd, onlyToday };
+export { ymd, dmy, normalizeYmdInput };

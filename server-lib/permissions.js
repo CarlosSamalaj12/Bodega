@@ -6,7 +6,7 @@
 
 export {
   PERM_CATALOG, permissionDefaults,
-  getUserPermissionsMap, canManageUserPermissions, userHasPermission, requirePermission,
+  getUserPermissionsMap, canManageUserPermissions, requirePermission,
 } from "./permissions-core.js";
 
 export {

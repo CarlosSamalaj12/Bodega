@@ -3,7 +3,7 @@
 import { pool } from "./core.js";
 
 // Re-export submodule functions
-export { ymd, dmy, normalizeYmdInput, addDaysYmd, onlyToday } from "./dates.js";
+export { ymd, dmy, normalizeYmdInput } from "./dates.js";
 export {
   normalizeDeviceKey, getSharedDeviceKeys,
   isValidOrderPin, isValidSupervisorPin, findOrderPinCollision,
@@ -66,5 +66,5 @@ async function resolveStockScope(user) {
 }
 
 export {
-  clampText, numMoney, numQty, listActive, softDelete, resolveStockScope,
+  clampText, numMoney, numQty, softDelete, resolveStockScope,
 };

@@ -177,11 +177,8 @@ const DASHBOARD_PREWARM_ENABLED = String(process.env.DASHBOARD_PREWARM || "1") !
 const DASHBOARD_PREWARM_MS = Math.max(60 * 1000, Number(process.env.DASHBOARD_PREWARM_MS || 5 * 60 * 1000));
 
 export {
-  app, httpServer, HOST, PORT, io, pool, bcrypt, jwt, crypto, __dirname, __filename,
-  OPS_ALERT_WINDOW_MS, OPS_PIN_WINDOW_MS,
+  app, httpServer, HOST, PORT, io, pool, bcrypt, __dirname,
   OPS_BACKUP_AUTO_ENABLED, OPS_BACKUP_INTERVAL_MS, OPS_BACKUP_BASE_DIR, OPS_RECOVERY_CHECK_INTERVAL_MS,
-  IDEMPOTENCY_WINDOW_MS, recentRequestSignatures, opsMetrics,
-  trimOldEvents, pushTimedEvent, stableSortObject, cleanupIdempotencySignatures,
-  buildRequestSignature, beginIdempotentRequest, trackPinFailure, wrapQueryWithMetrics,
+  opsMetrics, trimOldEvents, beginIdempotentRequest, trackPinFailure,
   DASHBOARD_PREWARM_ENABLED, DASHBOARD_PREWARM_MS,
 };

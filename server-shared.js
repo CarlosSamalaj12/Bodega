@@ -5,12 +5,11 @@
 // ==============================================================
 
 // 1) Core: Express app, pool, Socket.IO, middleware, metrics, idempotency
-import { app, httpServer, HOST, PORT, io, pool, bcrypt, jwt, crypto, __dirname, __filename,
-  OPS_ALERT_WINDOW_MS, OPS_PIN_WINDOW_MS, OPS_BACKUP_AUTO_ENABLED, OPS_BACKUP_INTERVAL_MS,
-  OPS_BACKUP_BASE_DIR, OPS_RECOVERY_CHECK_INTERVAL_MS, IDEMPOTENCY_WINDOW_MS,
-  recentRequestSignatures, opsMetrics, trimOldEvents, pushTimedEvent, stableSortObject,
-  cleanupIdempotencySignatures, buildRequestSignature, beginIdempotentRequest, trackPinFailure,
-  wrapQueryWithMetrics, DASHBOARD_PREWARM_ENABLED, DASHBOARD_PREWARM_MS,
+import { app, httpServer, HOST, PORT, io, pool, bcrypt,
+  OPS_BACKUP_AUTO_ENABLED, OPS_BACKUP_INTERVAL_MS,
+  OPS_BACKUP_BASE_DIR, OPS_RECOVERY_CHECK_INTERVAL_MS,
+  opsMetrics, trimOldEvents, beginIdempotentRequest, trackPinFailure,
+  DASHBOARD_PREWARM_ENABLED, DASHBOARD_PREWARM_MS,
 } from './server-lib/core.js';
 
 // 2) Auth
@@ -20,28 +19,28 @@ export { signToken, auth, emitPedidoChanged } from './server-lib/auth.js';
 export {
   PERM_CATALOG, ensureUserPermissionsTable, ensureUserWarehouseAccessTable,
   ensureProductWarehouseVisibilityTable, permissionDefaults,
-  getUserPermissionsMap, canManageUserPermissions, userHasPermission, requirePermission,
+  getUserPermissionsMap, canManageUserPermissions, requirePermission,
 } from './server-lib/permissions.js';
 
 // 4) Warehouse utils
 export {
-  getWarehouseCustomLogoRow, getWarehouseLogoDataUri, getWarehouseAppLogoDataUri,
-  getWarehousePrintLogoDataUri, getPreferredWarehousePrintLogoDataUri,
-  buildWarehouseFooterHtml, getUserWarehouseAccessIds,
+  getWarehouseCustomLogoRow, getWarehouseLogoDataUri,
+  getPreferredWarehousePrintLogoDataUri, buildWarehouseFooterHtml,
+  getUserWarehouseAccessIds,
   buildProductWarehouseVisibilityClause, areWarehouseIdsValid,
   getProductVisibleWarehouseIds, saveProductVisibleWarehouseIds,
-  isProductVisibleInWarehouse, getActiveWarehouseIds, setProductWarehouseVisibility,
+  isProductVisibleInWarehouse, setProductWarehouseVisibility,
   getScopedWarehouseFilter,
 } from './server-lib/warehouse.js';
 
 // 5) Formatters
 export {
-  ymd, dmy, normalizeYmdInput, addDaysYmd, onlyToday,
-  clampText, numMoney, numQty, normalizeDeviceKey, getSharedDeviceKeys,
-  isValidOrderPin, isValidSupervisorPin, findOrderPinCollision,
+  ymd, dmy, normalizeYmdInput,
+  normalizeDeviceKey, getSharedDeviceKeys,
+  isValidOrderPin, findOrderPinCollision,
   normalizeWarehouseIdList, buildNamedInClause, normalizeLogoData,
-  isAvatarTableMissingError, isWarehouseLogoTableMissingError,
-  buildTokenizedLikeFilter, listActive, softDelete,
+  isAvatarTableMissingError,
+  buildTokenizedLikeFilter, softDelete,
   pickLotsFEFO, getLastUnitCost, resolveStockScope,
 } from './server-lib/format.js';
 
@@ -59,8 +58,7 @@ export {
 // 7) Cuadre
 export {
   CUADRE_DENOMINACIONES, CUADRE_DOLAR_DENOM_USD, CUADRE_DOLAR_TIPO_CAMBIO,
-  CUADRE_VENTAS_KEYS, CUADRE_PAGOS_KEYS, CUADRE_EXTRAS_KEYS,
-  normalizeCuadreAmbienteKey, normalizeCuadrePayload,
+  normalizeCuadrePayload,
 } from './server-lib/cuadre.js';
 
 // 8) Sensitive actions
@@ -75,12 +73,11 @@ export { createLogicalBackup, maybeRunMonthlyRecoveryTest, prewarmDashboardCache
 
 // ========== RE-EXPORT core names (imported above) ==========
 export {
-  app, httpServer, HOST, PORT, io, pool, bcrypt, jwt, crypto, __dirname, __filename,
-  OPS_ALERT_WINDOW_MS, OPS_PIN_WINDOW_MS, OPS_BACKUP_AUTO_ENABLED, OPS_BACKUP_INTERVAL_MS,
-  OPS_BACKUP_BASE_DIR, OPS_RECOVERY_CHECK_INTERVAL_MS, IDEMPOTENCY_WINDOW_MS,
-  recentRequestSignatures, opsMetrics, trimOldEvents, pushTimedEvent, stableSortObject,
-  cleanupIdempotencySignatures, buildRequestSignature, beginIdempotentRequest, trackPinFailure,
-  wrapQueryWithMetrics, DASHBOARD_PREWARM_ENABLED, DASHBOARD_PREWARM_MS,
+  app, httpServer, HOST, PORT, io, pool, bcrypt,
+  OPS_BACKUP_AUTO_ENABLED, OPS_BACKUP_INTERVAL_MS,
+  OPS_BACKUP_BASE_DIR, OPS_RECOVERY_CHECK_INTERVAL_MS,
+  opsMetrics, trimOldEvents, beginIdempotentRequest, trackPinFailure,
+  DASHBOARD_PREWARM_ENABLED, DASHBOARD_PREWARM_MS,
 };
 
 // ========== TABLE CREATION CALLS (side effects at startup) ==========

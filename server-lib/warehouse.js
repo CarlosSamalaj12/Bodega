@@ -6,8 +6,8 @@
 // ==============================================================
 
 export {
-  getWarehouseCustomLogoRow, getWarehouseLogoDataUri, getWarehouseAppLogoDataUri,
-  getWarehousePrintLogoDataUri, getPreferredWarehousePrintLogoDataUri, buildWarehouseFooterHtml,
+  getWarehouseCustomLogoRow, getWarehouseLogoDataUri,
+  getPreferredWarehousePrintLogoDataUri, buildWarehouseFooterHtml,
 } from "./warehouse-logos.js";
 
 export {
