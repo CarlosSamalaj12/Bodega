@@ -1,4 +1,4 @@
-const STATIC_CACHE = "bodega-static-v6";
+const STATIC_CACHE = "bodega-static-v7";
 const API_CACHE = "bodega-api-v2";
 
 const STATIC_ASSETS = [

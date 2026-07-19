@@ -11,7 +11,7 @@
   <link rel="apple-touch-icon" href="./pw.ico"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css"/>
-  <link rel="stylesheet" href="./styles.css"/>
+  <link rel="stylesheet" href="./styles.css?v=20250717b"/>
 </head>
 <body class="app">
   <div class="appShell">
@@ -23,6 +23,7 @@
 </aside>
     <aside class="menu">
       <div class="menuHeader">
+<button class="menuCloseBtn" id="menuCloseBtn" aria-label="Cerrar menu" type="button">&times;</button>
 <div class="menuAvatarWrap">
 <img class="menuAvatarImg hidden" id="menuAvatarImg" alt="Avatar usuario" />
 </div>
@@ -49,23 +50,6 @@
 <button class="menuBtn" data-section="cuadre-caja">Cuadre de caja</button>
 </div>
 </div>
-      <div class="menuGroup menuAccordion is-collapsed" data-menu-group="agregar">
-<button class="menuGroupToggle" data-menu-group-toggle type="button" aria-expanded="false">
-<span class="menuTitle">Agregar</span>
-<span class="menuGroupCaret" aria-hidden="true">v</span>
-</button>
-<div class="menuGroupBody">
-<button class="menuBtn" data-section="categorias">Categorias</button>
-<button class="menuBtn" data-section="subcategorias">Subcategorias</button>
-<button class="menuBtn" data-section="motivos-movimiento">Motivo movimiento</button>
-<button class="menuBtn" data-section="proveedores">Proveedores</button>
-<button class="menuBtn" data-section="productos">Productos</button>
-<button class="menuBtn" data-section="limites">Min/Max</button>
-<button class="menuBtn" data-section="reglas-subcategorias">Reglas subcategorias</button>
-<button class="menuBtn" data-section="usuarios">Usuarios</button>
-<button class="menuBtn" data-section="bodegas">Bodegas</button>
-</div>
-</div>
       <div class="menuGroup menuAccordion is-collapsed" data-menu-group="reportes">
 <button class="menuGroupToggle" data-menu-group-toggle type="button" aria-expanded="false">
 <span class="menuTitle">Reportes</span>
@@ -83,15 +67,34 @@
 <button class="menuBtn" data-section="r-auditoria-sensibles">Auditoria sensible</button>
 </div>
 </div>
-      <div class="menuSpacer">
+      <div class="menuGroup menuAccordion is-collapsed" data-menu-group="agregar">
+<button class="menuGroupToggle" data-menu-group-toggle type="button" aria-expanded="false">
+<span class="menuTitle">Agregar</span>
+<span class="menuGroupCaret" aria-hidden="true">v</span>
+</button>
+<div class="menuGroupBody">
+<button class="menuBtn" data-section="categorias">Categorias</button>
+<button class="menuBtn" data-section="subcategorias">Subcategorias</button>
+<button class="menuBtn" data-section="motivos-movimiento">Motivo movimiento</button>
+<button class="menuBtn" data-section="proveedores">Proveedores</button>
+<button class="menuBtn" data-section="productos">Productos</button>
+<button class="menuBtn" data-section="limites">Min/Max</button>
+<button class="menuBtn" data-section="reglas-subcategorias">Reglas subcategorias</button>
+<button class="menuBtn" data-section="usuarios">Usuarios</button>
+<button class="menuBtn" data-section="bodegas">Bodegas</button>
 </div>
+</div>
+<div class="menuSpacer"></div>
 <button class="menuBtn danger" id="logout">Salir</button>
     </aside>
     <main class="stage">
       <header class="stageTop">
+<button class="hamburgerBtn" id="hamburgerBtn" aria-label="Abrir menu" type="button">
+  <span class="hamburgerIcon"></span>
+</button>
 <div class="stageHeadText">
 <div class="stageTitle" id="stageTitle">Inicio</div>
-<div class="stageSub">Selecciona una seccion del menu lateral</div>
+<div class="stageSub" id="stageSub">Selecciona una seccion del menu lateral</div>
 <div class="supervisorBadge hidden" id="supervisorAuthBadge">
 </div>
 </div>
@@ -922,59 +925,127 @@
 </div>
         <div class="view hidden" id="view-categorias">
 <div class="card light">
-<div class="grid4">
-<div>
-<label class="lbl">Nombre</label>
-<input id="catNombre" />
+
+<div class="wiz" id="catWizard">
+
+  <!-- ═══════ LIST MODE ═══════ -->
+  <div id="catWizList">
+    <div class="wizListHeader">
+      <div class="wizListTitle">Categorías</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn soft btn-sm" id="catRefresh" type="button" title="Actualizar lista" style="padding:4px 10px;font-size:12px;min-height:30px">↻</button>
+        <button class="btn ok btn-sm" id="catWizNewBtn" type="button" style="padding:5px 14px;font-size:13px">+ Nueva categoría</button>
+      </div>
+    </div>
+    <div class="wizListBody" id="catWizListBody">
+      <div class="wizListEmpty">Cargando...</div>
+    </div>
+    <div class="wizListToolbar" id="catWizToolbar">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--muted)">Importar CSV:</span>
+        <input id="catImportFile" type="file" style="font-size:12px;width:120px" />
+        <select id="catImportDelimiter" style="width:60px;font-size:12px;padding:4px 6px">
+          <option value=",">,</option>
+          <option value=";">;</option>
+        </select>
+        <button id="catImportBtn" style="font-size:12px;padding:4px 10px;min-height:28px"></button>
+        <button id="catTemplateBtn" style="font-size:12px;padding:4px 10px;min-height:28px"></button>
+      </div>
+      <div id="catImportFileName" style="font-size:11px;color:var(--muted)"></div>
+    </div>
+  </div>
+
+  <!-- ═══════ CREATE MODE ═══════ -->
+  <div id="catWizCreate" class="hidden">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <button class="btn soft btn-sm" id="catWizCancelCreate" type="button" style="padding:4px 10px;font-size:18px;line-height:1" title="Volver a la lista">←</button>
+      <span style="font-size:14px;font-weight:700;color:#E2E8F0" id="catWizCreateTitle">Nueva categoría</span>
+    </div>
+
+    <div class="wizSteps">
+      <div class="wizStep active" data-step="1">
+        <div class="wizStepDot"><span class="wizStepNum">1</span></div>
+        <div class="wizStepLabel">Nombre</div>
+      </div>
+      <div class="wizStepDivider"></div>
+      <div class="wizStep" data-step="2">
+        <div class="wizStepDot"><span class="wizStepNum">2</span></div>
+        <div class="wizStepLabel">Estado</div>
+      </div>
+      <div class="wizStepDivider"></div>
+      <div class="wizStep" data-step="3">
+        <div class="wizStepDot"><span class="wizStepNum">3</span></div>
+        <div class="wizStepLabel">Confirmar</div>
+      </div>
+    </div>
+
+    <div class="wizBody" id="catWizStep1">
+      <div class="wizBodyIcon">📁</div>
+      <div class="wizBodyTitle">¿Cómo se llama la categoría?</div>
+      <div class="wizBodyDesc">Ingresa un nombre descriptivo para agrupar los productos.</div>
+      <div class="wizField">
+        <label class="lbl">Nombre de la categoría</label>
+        <input class="in wizInput" id="catNombre" placeholder="Ej: Lácteos, Bebidas, Limpieza..." maxlength="160" autocomplete="off" />
+        <div class="wizCharCount"><span id="catCharCount">0</span>/160</div>
+      </div>
+      <div class="wizBodyError" id="catWizError1"></div>
+    </div>
+
+    <div class="wizBody hidden" id="catWizStep2">
+      <div class="wizBodyIcon">🔘</div>
+      <div class="wizBodyTitle">¿Activar la categoría?</div>
+      <div class="wizBodyDesc">Las categorías inactivas no aparecerán en los formularios hasta que se activen.</div>
+      <div class="wizField">
+        <label class="lbl">Estado inicial</label>
+        <div class="wizRadioGroup">
+          <label class="wizRadio">
+            <input type="radio" name="catWizActivo" value="1" checked />
+            <span class="wizRadioCheck"></span>
+            <div>
+              <div class="wizRadioLabel">Activo</div>
+              <div class="wizRadioDesc">Disponible para usar de inmediato</div>
+            </div>
+          </label>
+          <label class="wizRadio">
+            <input type="radio" name="catWizActivo" value="0" />
+            <span class="wizRadioCheck"></span>
+            <div>
+              <div class="wizRadioLabel">Inactivo</div>
+              <div class="wizRadioDesc">La categoría se creará oculta</div>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizBody hidden" id="catWizStep3">
+      <div class="wizBodyIcon">✅</div>
+      <div class="wizBodyTitle">Confirma los datos</div>
+      <div class="wizBodyDesc">Revisa que todo esté correcto antes de guardar.</div>
+      <div class="wizSummary">
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Nombre</span>
+          <span class="wizSummaryValue" id="catSumNombre">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Estado</span>
+          <span class="wizSummaryValue" id="catSumActivo">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizNav">
+      <button class="btn soft" id="catWizBack" type="button" style="visibility:hidden">← Atrás</button>
+      <div class="wizNavRight">
+        <button class="btn ok" id="catWizNext" type="button">Siguiente →</button>
+        <button class="btn ok" id="catWizSave" type="button" style="display:none">💾 Guardar categoría</button>
+      </div>
+    </div>
+  </div>
+
 </div>
-<div>
-<label class="lbl">Activo</label>
-<select id="catActivo">
-<option value="1">Si</option>
-<option value="0">No</option>
-</select>
-</div>
-<div>
-<label class="lbl">Archivo CSV</label>
-<input id="catImportFile" type="file" />
-<div id="catImportFileName">
-</div>
-</div>
-<div>
-<label class="lbl">Separador</label>
-<select id="catImportDelimiter">
-<option value=",">,</option>
-<option value=";">;</option>
-</select>
-</div>
-</div>
-<div class="addRow" style="justify-content:flex-end; gap:8px">
-<button id="catTemplateBtn">
-</button>
-<button id="catImportBtn">
-</button>
-<button id="catRefresh">
-</button>
-<button id="catSave">
-</button>
-</div>
-<table class="tbl grid">
-<thead>
-<tr>
-<th>ID</th>
-<th>Categoria</th>
-<th>Activo</th>
-<th>Accion</th>
-</tr>
-</thead>
-<tbody id="catManageList">
-</tbody>
-</table>
-<input id="catEditId" />
-<input id="catEditNombre" />
-<input id="catEditActivo" />
-<button id="catEditSave">
-</button>
+
+<input id="catEditId" type="hidden" />
 </div>
 </div>
         <div class="view hidden" id="view-subcategorias">
@@ -1041,228 +1112,828 @@
 </div>
         <div class="view hidden" id="view-motivos-movimiento">
 <div class="card light">
-<input id="motNombre" />
-<select id="motTipo">
-</select>
-<select id="motSigno">
-</select>
-<select id="motActivo">
-</select>
-<button id="motRefresh">
-</button>
-<button id="motSave">
-</button>
-<table class="tbl grid">
-<thead>
-<tr>
-<th>Motivo</th>
-<th>Tipo</th>
-<th>Signo</th>
-<th>Activo</th>
-<th>Accion</th>
-</tr>
-</thead>
-<tbody id="motList">
-</tbody>
-</table>
+
+<div class="wiz" id="motWizard">
+
+  <!-- ═══════ LIST MODE ═══════ -->
+  <div id="motWizList">
+    <div class="wizListHeader">
+      <div class="wizListTitle">Motivos de movimiento</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn soft btn-sm" id="motRefresh" type="button" title="Actualizar lista" style="padding:4px 10px;font-size:12px;min-height:30px">↻</button>
+        <button class="btn ok btn-sm" id="motWizNewBtn" type="button" style="padding:5px 14px;font-size:13px">+ Nuevo motivo</button>
+      </div>
+    </div>
+    <div class="wizListBody" id="motWizListBody">
+      <div class="wizListEmpty">Cargando...</div>
+    </div>
+  </div>
+
+  <!-- ═══════ CREATE MODE ═══════ -->
+  <div id="motWizCreate" class="hidden">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <button class="btn soft btn-sm" id="motWizCancelCreate" type="button" style="padding:4px 10px;font-size:18px;line-height:1" title="Volver a la lista">←</button>
+      <span style="font-size:14px;font-weight:700;color:#E2E8F0" id="motWizCreateTitle">Nuevo motivo</span>
+    </div>
+
+    <div class="wizSteps">
+      <div class="wizStep active" data-step="1">
+        <div class="wizStepDot"><span class="wizStepNum">1</span></div>
+        <div class="wizStepLabel">Nombre</div>
+      </div>
+      <div class="wizStepDivider"></div>
+      <div class="wizStep" data-step="2">
+        <div class="wizStepDot"><span class="wizStepNum">2</span></div>
+        <div class="wizStepLabel">Tipo</div>
+      </div>
+      <div class="wizStepDivider"></div>
+      <div class="wizStep" data-step="3">
+        <div class="wizStepDot"><span class="wizStepNum">3</span></div>
+        <div class="wizStepLabel">Estado</div>
+      </div>
+      <div class="wizStepDivider"></div>
+      <div class="wizStep" data-step="4">
+        <div class="wizStepDot"><span class="wizStepNum">4</span></div>
+        <div class="wizStepLabel">Confirmar</div>
+      </div>
+    </div>
+
+    <div class="wizBody" id="motWizStep1">
+      <div class="wizBodyIcon">🏷️</div>
+      <div class="wizBodyTitle">¿Cómo se llama el motivo?</div>
+      <div class="wizBodyDesc">Ingresa un nombre que describa la razón del movimiento de inventario.</div>
+      <div class="wizField">
+        <label class="lbl">Nombre del motivo</label>
+        <input class="in wizInput" id="motNombre" placeholder="Ej: Compra, Venta, Ajuste, Merma..." maxlength="160" autocomplete="off" />
+        <div class="wizCharCount"><span id="motCharCount">0</span>/160</div>
+      </div>
+      <div class="wizBodyError" id="motWizError1"></div>
+    </div>
+
+    <div class="wizBody hidden" id="motWizStep2">
+      <div class="wizBodyIcon">🔄</div>
+      <div class="wizBodyTitle">¿Qué tipo de movimiento?</div>
+      <div class="wizBodyDesc">Selecciona cómo afecta este motivo al inventario.</div>
+      <div class="wizField">
+        <label class="lbl">Tipo de movimiento</label>
+        <div class="wizRadioGroup">
+          <label class="wizRadio">
+            <input type="radio" name="motWizTipo" value="ENTRADA" checked />
+            <span class="wizRadioCheck"></span>
+            <div>
+              <div class="wizRadioLabel">Entrada <span class="wizRadioSign" style="color:#86EFAC">+1</span></div>
+              <div class="wizRadioDesc">Aumenta el inventario (compras, devoluciones, stock inicial)</div>
+            </div>
+          </label>
+          <label class="wizRadio">
+            <input type="radio" name="motWizTipo" value="SALIDA" />
+            <span class="wizRadioCheck"></span>
+            <div>
+              <div class="wizRadioLabel">Salida <span class="wizRadioSign" style="color:#FCA5A5">-1</span></div>
+              <div class="wizRadioDesc">Disminuye el inventario (ventas, mermas, consumos)</div>
+            </div>
+          </label>
+          <label class="wizRadio">
+            <input type="radio" name="motWizTipo" value="AJUSTE" />
+            <span class="wizRadioCheck"></span>
+            <div>
+              <div class="wizRadioLabel">Ajuste <span class="wizRadioSign" style="color:#FDE68A">±</span></div>
+              <div class="wizRadioDesc">Corrección manual de inventario (conteo físico, diferencia)</div>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizBody hidden" id="motWizStep3">
+      <div class="wizBodyIcon">🔘</div>
+      <div class="wizBodyTitle">¿Activar el motivo?</div>
+      <div class="wizBodyDesc">Los motivos inactivos no estarán disponibles en los formularios.</div>
+      <div class="wizField">
+        <label class="lbl">Estado inicial</label>
+        <div class="wizRadioGroup">
+          <label class="wizRadio">
+            <input type="radio" name="motWizActivo" value="1" checked />
+            <span class="wizRadioCheck"></span>
+            <div>
+              <div class="wizRadioLabel">Activo</div>
+              <div class="wizRadioDesc">Disponible para usar en entradas, salidas y ajustes</div>
+            </div>
+          </label>
+          <label class="wizRadio">
+            <input type="radio" name="motWizActivo" value="0" />
+            <span class="wizRadioCheck"></span>
+            <div>
+              <div class="wizRadioLabel">Inactivo</div>
+              <div class="wizRadioDesc">El motivo se creará oculto</div>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizBody hidden" id="motWizStep4">
+      <div class="wizBodyIcon">✅</div>
+      <div class="wizBodyTitle">Confirma los datos</div>
+      <div class="wizBodyDesc">Revisa que todo esté correcto antes de guardar.</div>
+      <div class="wizSummary">
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Nombre</span>
+          <span class="wizSummaryValue" id="motSumNombre">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Tipo</span>
+          <span class="wizSummaryValue" id="motSumTipo">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Estado</span>
+          <span class="wizSummaryValue" id="motSumActivo">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizNav">
+      <button class="btn soft" id="motWizBack" type="button" style="visibility:hidden">← Atrás</button>
+      <div class="wizNavRight">
+        <button class="btn ok" id="motWizNext" type="button">Siguiente →</button>
+        <button class="btn ok" id="motWizSave" type="button" style="display:none">💾 Guardar motivo</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<input id="motEditId" type="hidden" />
 </div>
 </div>
         <div class="view hidden" id="view-proveedores">
 <div class="card light">
-<input id="provNombre" />
-<input id="provTelefono" />
-<input id="provDireccion" />
-<select id="provActivo">
-</select>
-<input id="provImportFile" type="file" />
-<div id="provImportFileName">
+
+<div class="wiz" id="provWizard">
+
+  <!-- ═══════ LIST MODE ═══════ -->
+  <div id="provWizList">
+    <div class="wizListHeader">
+      <div class="wizListTitle">Proveedores</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn soft btn-sm" id="provRefresh" type="button" title="Actualizar lista" style="padding:4px 10px;font-size:12px;min-height:30px">↻</button>
+        <button class="btn ok btn-sm" id="provWizNewBtn" type="button" style="padding:5px 14px;font-size:13px">+ Nuevo proveedor</button>
+      </div>
+    </div>
+    <div class="wizListBody" id="provWizListBody">
+      <div class="wizListEmpty">Cargando...</div>
+    </div>
+    <div class="wizListToolbar" id="provWizToolbar">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--muted)">Importar CSV:</span>
+        <input id="provImportFile" type="file" style="font-size:12px;width:120px" />
+        <select id="provImportDelimiter" style="width:60px;font-size:12px;padding:4px 6px">
+          <option value=",">,</option>
+          <option value=";">;</option>
+        </select>
+        <button id="provImportBtn" style="font-size:12px;padding:4px 10px;min-height:28px"></button>
+        <button id="provTemplateBtn" style="font-size:12px;padding:4px 10px;min-height:28px"></button>
+      </div>
+      <div id="provImportFileName" style="font-size:11px;color:var(--muted)"></div>
+    </div>
+  </div>
+
+  <!-- ═══════ CREATE MODE ═══════ -->
+  <div id="provWizCreate" class="hidden">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <button class="btn soft btn-sm" id="provWizCancelCreate" type="button" style="padding:4px 10px;font-size:18px;line-height:1" title="Volver a la lista">←</button>
+      <span style="font-size:14px;font-weight:700;color:#E2E8F0" id="provWizCreateTitle">Nuevo proveedor</span>
+    </div>
+
+    <div class="wizSteps">
+      <div class="wizStep active" data-step="1">
+        <div class="wizStepDot"><span class="wizStepNum">1</span></div>
+        <div class="wizStepLabel">Nombre</div>
+      </div>
+      <div class="wizStepDivider"></div>
+      <div class="wizStep" data-step="2">
+        <div class="wizStepDot"><span class="wizStepNum">2</span></div>
+        <div class="wizStepLabel">Contacto</div>
+      </div>
+      <div class="wizStepDivider"></div>
+      <div class="wizStep" data-step="3">
+        <div class="wizStepDot"><span class="wizStepNum">3</span></div>
+        <div class="wizStepLabel">Estado</div>
+      </div>
+      <div class="wizStepDivider"></div>
+      <div class="wizStep" data-step="4">
+        <div class="wizStepDot"><span class="wizStepNum">4</span></div>
+        <div class="wizStepLabel">Confirmar</div>
+      </div>
+    </div>
+
+    <div class="wizBody" id="provWizStep1">
+      <div class="wizBodyIcon">🏢</div>
+      <div class="wizBodyTitle">¿Cómo se llama el proveedor?</div>
+      <div class="wizBodyDesc">Ingresa el nombre de la empresa o persona que provee los productos.</div>
+      <div class="wizField">
+        <label class="lbl">Nombre del proveedor</label>
+        <input class="in wizInput" id="provNombre" placeholder="Ej: Distribuidora XYZ, Proveedor ABC..." maxlength="160" autocomplete="off" />
+        <div class="wizCharCount"><span id="provCharCount">0</span>/160</div>
+      </div>
+      <div class="wizBodyError" id="provWizError1"></div>
+    </div>
+
+    <div class="wizBody hidden" id="provWizStep2">
+      <div class="wizBodyIcon">📞</div>
+      <div class="wizBodyTitle">Información de contacto</div>
+      <div class="wizBodyDesc">Ingresa los datos de contacto del proveedor (opcional).</div>
+      <div class="wizField">
+        <label class="lbl">Teléfono</label>
+        <input class="in wizInput" id="provTelefono" placeholder="Ej: 5555-1234" maxlength="60" autocomplete="off" />
+      </div>
+      <div class="wizField">
+        <label class="lbl">Dirección</label>
+        <input class="in wizInput" id="provDireccion" placeholder="Ej: Calle Principal #123, Ciudad" maxlength="255" autocomplete="off" />
+      </div>
+    </div>
+
+    <div class="wizBody hidden" id="provWizStep3">
+      <div class="wizBodyIcon">🔘</div>
+      <div class="wizBodyTitle">¿Activar el proveedor?</div>
+      <div class="wizBodyDesc">Los proveedores inactivos no estarán disponibles en los formularios.</div>
+      <div class="wizField">
+        <label class="lbl">Estado inicial</label>
+        <div class="wizRadioGroup">
+          <label class="wizRadio">
+            <input type="radio" name="provWizActivo" value="1" checked />
+            <span class="wizRadioCheck"></span>
+            <div>
+              <div class="wizRadioLabel">Activo</div>
+              <div class="wizRadioDesc">Disponible para usar en entradas de inventario</div>
+            </div>
+          </label>
+          <label class="wizRadio">
+            <input type="radio" name="provWizActivo" value="0" />
+            <span class="wizRadioCheck"></span>
+            <div>
+              <div class="wizRadioLabel">Inactivo</div>
+              <div class="wizRadioDesc">El proveedor se creará oculto</div>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizBody hidden" id="provWizStep4">
+      <div class="wizBodyIcon">✅</div>
+      <div class="wizBodyTitle">Confirma los datos</div>
+      <div class="wizBodyDesc">Revisa que todo esté correcto antes de guardar.</div>
+      <div class="wizSummary">
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Nombre</span>
+          <span class="wizSummaryValue" id="provSumNombre">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Teléfono</span>
+          <span class="wizSummaryValue" id="provSumTelefono">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Dirección</span>
+          <span class="wizSummaryValue" id="provSumDireccion">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Estado</span>
+          <span class="wizSummaryValue" id="provSumActivo">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizNav">
+      <button class="btn soft" id="provWizBack" type="button" style="visibility:hidden">← Atrás</button>
+      <div class="wizNavRight">
+        <button class="btn ok" id="provWizNext" type="button">Siguiente →</button>
+        <button class="btn ok" id="provWizSave" type="button" style="display:none">💾 Guardar proveedor</button>
+      </div>
+    </div>
+  </div>
+
 </div>
-<select id="provImportDelimiter">
-</select>
-<button id="provTemplateBtn">
-</button>
-<button id="provImportBtn">
-</button>
-<button id="provRefresh">
-</button>
-<button id="provSave">
-</button>
-<table class="tbl grid">
-<thead>
-<tr>
-<th>ID</th>
-<th>Proveedor</th>
-<th>Telefono</th>
-<th>Direccion</th>
-<th>Activo</th>
-<th>Accion</th>
-</tr>
-</thead>
-<tbody id="provManageList">
-</tbody>
-</table>
-<input id="provEditId" />
-<input id="provEditNombre" />
-<input id="provEditTelefono" />
-<input id="provEditDireccion" />
-<input id="provEditActivo" />
-<button id="provEditSave">
-</button>
+
+<input id="provEditId" type="hidden" />
 </div>
 </div>
         <div class="view hidden" id="view-productos">
 <div class="card light">
-<div class="grid4">
-  <div><label class="lbl">Nombre producto</label><input class="in" id="prdNombre" /></div>
-  <div><label class="lbl">SKU</label><input class="in" id="prdSku" /></div>
-  <div><label class="lbl">Medida</label><select class="in" id="prdMedida"></select></div>
-  <div><label class="lbl">Estado</label><select class="in" id="prdActivo"></select></div>
-</div>
 
-<div class="grid4">
-  <div class="prdQuickCreateCell"><label class="lbl">Categoria</label><div class="quickCreateRow"><select class="in" id="prdCategoria"></select><button class="btn iconBtnSm quickCreateBtn" id="prdQuickCatBtn" type="button" title="Crear nueva categoria">+</button></div><div class="quickCreatePanel hidden" id="prdQuickCatPanel"><input class="in" id="prdQuickCatNombre" placeholder="Nombre de la categoria" /><div class="quickCreateActions"><button class="btn soft btn-sm" id="prdQuickCatCancel" type="button">Cancelar</button><button class="btn ok btn-sm" id="prdQuickCatSave" type="button">Crear</button></div></div></div>
-  <div class="prdQuickCreateCell"><label class="lbl">Subcategoria</label><div class="quickCreateRow"><select class="in" id="prdSubcategoria"></select><button class="btn iconBtnSm quickCreateBtn" id="prdQuickSubcatBtn" type="button" title="Crear nueva subcategoria">+</button></div><div class="quickCreatePanel hidden" id="prdQuickSubcatPanel"><div class="quickCreateSubcatCat"><select class="in" id="prdQuickSubcatCategoria"></select></div><input class="in" id="prdQuickSubcatNombre" placeholder="Nombre de la subcategoria" /><div class="quickCreateActions"><button class="btn soft btn-sm" id="prdQuickSubcatCancel" type="button">Cancelar</button><button class="btn ok btn-sm" id="prdQuickSubcatSave" type="button">Crear</button></div></div></div><div style="grid-column: 1 / -1;">
-    <label class="lbl">Bodegas visibles — selecciona donde estara disponible este producto</label>
-    <div class="warehouseCheckList" id="prdVisibleWarehouses"></div>
-    <label class="warehouseCheckItem" id="prdMyWarehouseToggleWrap"><input type="checkbox" id="prdVisibleInMyWarehouse" checked /><span>Habilitado en mi bodega</span></label>
-    <div class="note" id="prdMyWarehouseHint">Puedes habilitar o inhabilitar el producto en tu bodega desde la lista.</div>
+<div class="wiz" id="prdWizard">
+
+  <!-- ═══════ LIST MODE ═══════ -->
+  <div id="prdWizList">
+    <div class="wizListHeader">
+      <div class="wizListTitle">Productos</div>
+      <div style="display:flex;gap:6px">
+        <div class="searchWrap" style="display:flex;gap:4px;align-items:center">
+          <input class="in" id="prdSearch" placeholder="Buscar nombre o SKU" style="width:160px;font-size:12px;padding:5px 8px;min-height:28px" />
+          <button class="btn soft btn-sm" id="prdSearchBtn" type="button" style="padding:4px 8px;font-size:12px;min-height:28px">Buscar</button>
+        </div>
+        <button class="btn soft btn-sm" id="prdRefresh" type="button" title="Actualizar lista" style="padding:4px 10px;font-size:12px;min-height:30px">↻</button>
+        <button class="btn ok btn-sm" id="prdWizNewBtn" type="button" style="padding:5px 14px;font-size:13px">+ Nuevo producto</button>
+      </div>
+    </div>
+    <div class="wizListBody" id="prdWizListBody">
+      <div class="wizListEmpty">Cargando...</div>
+    </div>
+    <div class="wizListToolbar" id="prdWizToolbar">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--muted)">Productos CSV:</span>
+        <input id="prdImportFile" type="file" style="font-size:12px;width:100px" />
+        <select id="prdImportDelimiter" style="width:60px;font-size:12px;padding:4px 6px">
+          <option value=",">,</option>
+          <option value=";">;</option>
+        </select>
+        <button id="prdImportBtn" style="font-size:12px;padding:4px 10px;min-height:28px"></button>
+        <button id="prdTemplateBtn" style="font-size:12px;padding:4px 10px;min-height:28px"></button>
+        <span style="font-size:11px;color:var(--muted);margin-left:8px">Stock CSV:</span>
+        <input id="prdStockImportFile" type="file" style="font-size:12px;width:100px" />
+        <select id="prdStockImportDelimiter" style="width:60px;font-size:12px;padding:4px 6px">
+          <option value=",">,</option>
+          <option value=";">;</option>
+        </select>
+        <select id="prdStockImportMotivo" style="width:100px;font-size:12px;padding:4px 6px"></select>
+        <input id="prdStockImportObs" placeholder="Observacion" style="width:100px;font-size:12px;padding:4px 6px" />
+        <button id="prdStockTemplateBtn" style="font-size:12px;padding:4px 10px;min-height:28px"></button>
+        <button id="prdStockImportBtn" style="font-size:12px;padding:4px 10px;min-height:28px"></button>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--muted)">
+        <span id="prdImportFileName">Ningun archivo productos</span>
+        <span id="prdStockImportFileName">Ningun archivo stock</span>
+      </div>
+    </div>
   </div>
+
+  <!-- ═══════ CREATE MODE ═══════ -->
+  <div id="prdWizCreate" class="hidden">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <button class="btn soft btn-sm" id="prdWizCancelCreate" type="button" style="padding:4px 10px;font-size:18px;line-height:1" title="Volver a la lista">←</button>
+      <span style="font-size:14px;font-weight:700;color:#E2E8F0" id="prdWizCreateTitle">Nuevo producto</span>
+    </div>
+
+    <div class="wizSteps">
+      <div class="wizStep active" data-step="1">
+        <div class="wizStepDot"><span class="wizStepNum">1</span></div>
+        <div class="wizStepLabel">Nombre</div>
+      </div>
+      <div class="wizStepDivider"></div>
+      <div class="wizStep" data-step="2">
+        <div class="wizStepDot"><span class="wizStepNum">2</span></div>
+        <div class="wizStepLabel">Clasificación</div>
+      </div>
+      <div class="wizStepDivider"></div>
+      <div class="wizStep" data-step="3">
+        <div class="wizStepDot"><span class="wizStepNum">3</span></div>
+        <div class="wizStepLabel">Bodegas</div>
+      </div>
+      <div class="wizStepDivider"></div>
+      <div class="wizStep" data-step="4">
+        <div class="wizStepDot"><span class="wizStepNum">4</span></div>
+        <div class="wizStepLabel">Estado</div>
+      </div>
+      <div class="wizStepDivider"></div>
+      <div class="wizStep" data-step="5">
+        <div class="wizStepDot"><span class="wizStepNum">5</span></div>
+        <div class="wizStepLabel">Confirmar</div>
+      </div>
+    </div>
+
+    <div class="wizBody" id="prdWizStep1">
+      <div class="wizBodyIcon">📦</div>
+      <div class="wizBodyTitle">¿Cómo se llama el producto?</div>
+      <div class="wizBodyDesc">Ingresa el nombre y SKU del producto. El SKU se genera automáticamente.</div>
+      <div class="wizField">
+        <label class="lbl">Nombre del producto</label>
+        <input class="in wizInput" id="prdNombre" placeholder="Ej: Arroz premium, Azúcar blanca..." maxlength="160" autocomplete="off" />
+        <div class="wizCharCount"><span id="prdCharCount">0</span>/160</div>
+      </div>
+      <div class="wizField">
+        <label class="lbl">SKU <span style="font-weight:400;color:var(--muted)">(opcional — se auto-genera)</span></label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="in wizInput" id="prdSku" placeholder="Se genera al escribir el nombre" maxlength="60" autocomplete="off" style="flex:1" />
+          <span id="prdSkuHint" style="font-size:11px;color:var(--muted);white-space:nowrap;display:none">auto</span>
+        </div>
+      </div>
+      <div class="wizBodyError" id="prdWizError1"></div>
+    </div>
+
+    <div class="wizBody hidden" id="prdWizStep2">
+      <div class="wizBodyIcon">🏷️</div>
+      <div class="wizBodyTitle">Clasificación del producto</div>
+      <div class="wizBodyDesc">Selecciona la medida, categoría y subcategoría.</div>
+      <div class="wizField">
+        <label class="lbl">Medida</label>
+        <select class="in wizInput" id="prdMedida"><option value="">Seleccione medida</option></select>
+      </div>
+      <div class="wizField">
+        <label class="lbl">Categoría</label>
+        <div class="quickCreateRow">
+          <select class="in wizInput" id="prdCategoria"><option value="">Seleccione categoria</option></select>
+          <button class="btn iconBtnSm quickCreateBtn" id="prdQuickCatBtn" type="button" title="Crear nueva categoria" style="flex-shrink:0">+</button>
+        </div>
+        <div class="quickCreatePanel hidden" id="prdQuickCatPanel">
+          <input class="in" id="prdQuickCatNombre" placeholder="Nombre de la categoria" />
+          <div class="quickCreateActions"><button class="btn soft btn-sm" id="prdQuickCatCancel" type="button">Cancelar</button><button class="btn ok btn-sm" id="prdQuickCatSave" type="button">Crear</button></div>
+        </div>
+      </div>
+      <div class="wizField">
+        <label class="lbl">Subcategoría</label>
+        <div class="quickCreateRow">
+          <select class="in wizInput" id="prdSubcategoria"><option value="">Seleccione subcategoria</option></select>
+          <button class="btn iconBtnSm quickCreateBtn" id="prdQuickSubcatBtn" type="button" title="Crear nueva subcategoria" style="flex-shrink:0">+</button>
+        </div>
+        <div class="quickCreatePanel hidden" id="prdQuickSubcatPanel">
+          <div class="quickCreateSubcatCat"><select class="in" id="prdQuickSubcatCategoria"></select></div>
+          <input class="in" id="prdQuickSubcatNombre" placeholder="Nombre de la subcategoria" />
+          <div class="quickCreateActions"><button class="btn soft btn-sm" id="prdQuickSubcatCancel" type="button">Cancelar</button><button class="btn ok btn-sm" id="prdQuickSubcatSave" type="button">Crear</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizBody hidden" id="prdWizStep3">
+      <div class="wizBodyIcon">🏭</div>
+      <div class="wizBodyTitle">Bodegas visibles</div>
+      <div class="wizBodyDesc">Selecciona las bodegas donde estará disponible este producto.</div>
+      <div class="wizField">
+        <label class="lbl">Bodegas</label>
+        <div class="warehouseCheckList" id="prdVisibleWarehouses"></div>
+        <label class="warehouseCheckItem" id="prdMyWarehouseToggleWrap" style="margin-top:8px"><input type="checkbox" id="prdVisibleInMyWarehouse" checked /><span>Habilitado en mi bodega</span></label>
+        <div class="note" id="prdMyWarehouseHint">Puedes habilitar o inhabilitar el producto en tu bodega desde la lista.</div>
+      </div>
+    </div>
+
+    <div class="wizBody hidden" id="prdWizStep4">
+      <div class="wizBodyIcon">🔘</div>
+      <div class="wizBodyTitle">¿Activar el producto?</div>
+      <div class="wizBodyDesc">Los productos inactivos no se mostrarán en los movimientos de inventario.</div>
+      <div class="wizField">
+        <label class="lbl">Estado inicial</label>
+        <div class="wizRadioGroup">
+          <label class="wizRadio">
+            <input type="radio" name="prdWizActivo" value="1" checked />
+            <span class="wizRadioCheck"></span>
+            <div>
+              <div class="wizRadioLabel">Activo</div>
+              <div class="wizRadioDesc">Disponible para entradas, salidas y ajustes</div>
+            </div>
+          </label>
+          <label class="wizRadio">
+            <input type="radio" name="prdWizActivo" value="0" />
+            <span class="wizRadioCheck"></span>
+            <div>
+              <div class="wizRadioLabel">Inactivo</div>
+              <div class="wizRadioDesc">El producto se creará oculto</div>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizBody hidden" id="prdWizStep5">
+      <div class="wizBodyIcon">✅</div>
+      <div class="wizBodyTitle">Confirma los datos</div>
+      <div class="wizBodyDesc">Revisa que todo esté correcto antes de guardar.</div>
+      <div class="wizSummary">
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Nombre</span>
+          <span class="wizSummaryValue" id="prdSumNombre">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">SKU</span>
+          <span class="wizSummaryValue" id="prdSumSku">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Medida</span>
+          <span class="wizSummaryValue" id="prdSumMedida">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Categoría</span>
+          <span class="wizSummaryValue" id="prdSumCategoria">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Subcategoría</span>
+          <span class="wizSummaryValue" id="prdSumSubcategoria">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Bodegas</span>
+          <span class="wizSummaryValue" id="prdSumBodegas">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Estado</span>
+          <span class="wizSummaryValue" id="prdSumActivo">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizNav">
+      <button class="btn soft" id="prdWizBack" type="button" style="visibility:hidden">← Atrás</button>
+      <div class="wizNavRight">
+        <button class="btn ok" id="prdWizNext" type="button">Siguiente →</button>
+        <button class="btn ok" id="prdWizSave" type="button" style="display:none">💾 Guardar producto</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
-<div class="grid4 importGrid">
-  <div class="searchWrap" style="grid-column: span 2;"><input class="in" id="prdSearch" placeholder="Buscar por nombre o SKU" /><button class="btn soft btn-sm" id="prdSearchBtn" type="button">Buscar</button></div>
-  <div><label class="lbl">CSV productos</label><input id="prdImportFile" type="file" /><div class="note" id="prdImportFileName">Ningun archivo seleccionado</div></div>
-  <div><label class="lbl">Separador</label><select class="in" id="prdImportDelimiter"></select></div>
-</div>
-
-<div class="grid4 importGrid">
-  <div><label class="lbl">CSV stock</label><input id="prdStockImportFile" type="file" /><div class="note" id="prdStockImportFileName">Ningun archivo seleccionado</div></div>
-  <div><label class="lbl">Separador stock</label><select class="in" id="prdStockImportDelimiter"></select></div>
-  <div><label class="lbl">Motivo importacion</label><select class="in" id="prdStockImportMotivo"></select></div>
-  <div><label class="lbl">Observacion importacion</label><input class="in" id="prdStockImportObs" /></div>
-</div>
-
-<div class="addRow" style="justify-content:flex-end; gap:8px; flex-wrap:wrap;">
-  <button class="btn soft btn-sm" id="prdTemplateBtn" type="button">Plantilla productos</button>
-  <button class="btn soft btn-sm" id="prdImportBtn" type="button">Importar productos</button>
-  <button class="btn soft btn-sm" id="prdStockTemplateBtn" type="button">Plantilla stock</button>
-  <button class="btn soft btn-sm" id="prdStockImportBtn" type="button">Importar stock</button>
-  <button class="btn soft btn-sm" id="prdRefresh" type="button">Actualizar</button>
-  <button class="btn ok" id="prdSave" type="button">Guardar producto</button>
-</div>
-
-<div class="tableWrap repTableScroll" style="margin-top:10px;">
-<table class="tbl grid">
-<thead>
-<tr>
-<th>ID</th><th>Producto</th><th>SKU</th><th>Medida</th><th>Categoria</th><th>Subcategoria</th><th>Bodegas visibles</th><th>Mi bodega</th><th>Estado</th><th>Accion</th>
-</tr>
-</thead>
-<tbody id="prdManageList"><tr><td colspan="10">Escribe un producto para buscar.</td></tr></tbody>
-</table>
-</div>
-
-<input type="hidden" id="prdEditId" />
-<div class="grid4">
-  <div><label class="lbl">Nombre producto</label><input class="in" id="prdEditNombre" /></div>
-  <div><label class="lbl">SKU</label><input class="in" id="prdEditSku" /></div>
-  <div><label class="lbl">Medida</label><select class="in" id="prdEditMedida"></select></div>
-  <div><label class="lbl">Estado</label><select class="in" id="prdEditActivo"></select></div>
-</div>
-<div class="grid4">
-  <div><label class="lbl">Categoria</label><select class="in" id="prdEditCategoria"></select></div>
-  <div><label class="lbl">Subcategoria</label><select class="in" id="prdEditSubcategoria"></select></div>
-  <div style="grid-column: 1 / -1;"><label class="lbl">Bodegas visibles</label><div class="warehouseCheckList" id="prdEditVisibleWarehouses"></div></div>
-</div>
-<div class="addRow" style="justify-content:flex-end;">
-  <button class="btn ok" id="prdEditSave" type="button">Guardar cambios</button>
-</div>
+<input id="prdEditId" type="hidden" />
 </div>
 </div>
 <div class="view hidden" id="view-limites">
 <div class="card light">
-<select id="limWarehouse">
-</select>
-<select id="limProduct">
-</select>
-<input id="limMin" type="number" min="0" step="1" />
-<input id="limMax" type="number" min="0" step="1" />
-<select id="limActive">
-</select>
-<input id="limImportFile" type="file" />
-<div id="limImportFileName">
+
+<div class="wiz" id="limWizard">
+
+  <!-- ═══════ LIST MODE ═══════ -->
+  <div id="limWizList">
+    <div class="wizListHeader">
+      <div class="wizListTitle">Mínimos y Máximos</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn soft btn-sm" id="limRefresh" type="button" title="Actualizar lista" style="padding:4px 10px;font-size:12px;min-height:30px">↻</button>
+        <button class="btn ok btn-sm" id="limWizNewBtn" type="button" style="padding:5px 14px;font-size:13px">+ Nuevo límite</button>
+      </div>
+    </div>
+    <div class="wizListBody" id="limWizListBody">
+      <div class="wizListEmpty">Cargando...</div>
+    </div>
+    <div class="wizListToolbar" id="limWizToolbar">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--muted)">Importar CSV:</span>
+        <input id="limImportFile" type="file" style="font-size:12px;width:120px" />
+        <select id="limImportDelimiter" style="width:60px;font-size:12px;padding:4px 6px">
+          <option value=",">,</option>
+          <option value=";">;</option>
+        </select>
+        <button id="limImportBtn" style="font-size:12px;padding:4px 10px;min-height:28px"></button>
+        <button id="limTemplateBtn" style="font-size:12px;padding:4px 10px;min-height:28px"></button>
+      </div>
+      <div id="limImportFileName" style="font-size:11px;color:var(--muted)"></div>
+    </div>
+  </div>
+
+  <!-- ═══════ CREATE MODE ═══════ -->
+  <div id="limWizCreate" class="hidden">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <button class="btn soft btn-sm" id="limWizCancelCreate" type="button" style="padding:4px 10px;font-size:18px;line-height:1" title="Volver a la lista">←</button>
+      <span style="font-size:14px;font-weight:700;color:#E2E8F0" id="limWizCreateTitle">Nuevo límite</span>
+    </div>
+
+    <div class="wizSteps">
+      <div class="wizStep active" data-step="1">
+        <div class="wizStepDot"><span class="wizStepNum">1</span></div>
+        <div class="wizStepLabel">Bodega</div>
+      </div>
+      <div class="wizStepDivider"></div>
+      <div class="wizStep" data-step="2">
+        <div class="wizStepDot"><span class="wizStepNum">2</span></div>
+        <div class="wizStepLabel">Producto</div>
+      </div>
+      <div class="wizStepDivider"></div>
+      <div class="wizStep" data-step="3">
+        <div class="wizStepDot"><span class="wizStepNum">3</span></div>
+        <div class="wizStepLabel">Valores</div>
+      </div>
+      <div class="wizStepDivider"></div>
+      <div class="wizStep" data-step="4">
+        <div class="wizStepDot"><span class="wizStepNum">4</span></div>
+        <div class="wizStepLabel">Confirmar</div>
+      </div>
+    </div>
+
+    <div class="wizBody" id="limWizStep1">
+      <div class="wizBodyIcon">🏭</div>
+      <div class="wizBodyTitle">Selecciona la bodega</div>
+      <div class="wizBodyDesc">Elige la bodega para la cual configurarás el límite.</div>
+      <div class="wizField">
+        <label class="lbl">Bodega</label>
+        <select class="in wizInput" id="limWarehouse"><option value="">Seleccione bodega</option></select>
+        <div class="wizBodyHint" id="limWizBodegaReadonly" style="display:none;padding:8px 12px;background:rgba(2,6,23,.5);border-radius:8px;font-size:13px;color:#E2E8F0"></div>
+      </div>
+      <div class="wizBodyError" id="limWizError1"></div>
+    </div>
+
+    <div class="wizBody hidden" id="limWizStep2">
+      <div class="wizBodyIcon">📦</div>
+      <div class="wizBodyTitle">Selecciona el producto</div>
+      <div class="wizBodyDesc">Elige el producto para este límite.</div>
+      <div class="wizField">
+        <label class="lbl">Producto</label>
+        <select class="in wizInput" id="limProduct"><option value="">Seleccione producto</option></select>
+        <div class="wizBodyHint" id="limWizProductoReadonly" style="display:none;padding:8px 12px;background:rgba(2,6,23,.5);border-radius:8px;font-size:13px;color:#E2E8F0"></div>
+      </div>
+      <div class="wizBodyError" id="limWizError2"></div>
+    </div>
+
+    <div class="wizBody hidden" id="limWizStep3">
+      <div class="wizBodyIcon">⚖️</div>
+      <div class="wizBodyTitle">Valores mínimo y máximo</div>
+      <div class="wizBodyDesc">Define los límites de inventario para este producto en la bodega seleccionada.</div>
+      <div class="wizField">
+        <label class="lbl">Mínimo</label>
+        <input class="in wizInput" id="limMin" type="number" min="0" step="1" placeholder="0" />
+      </div>
+      <div class="wizField">
+        <label class="lbl">Máximo <span style="font-weight:400;color:var(--muted)">(0 = sin límite superior)</span></label>
+        <input class="in wizInput" id="limMax" type="number" min="0" step="1" placeholder="0" />
+      </div>
+      <div class="wizField">
+        <label class="lbl">Estado</label>
+        <div class="wizRadioGroup">
+          <label class="wizRadio">
+            <input type="radio" name="limWizActivo" value="1" checked />
+            <span class="wizRadioCheck"></span>
+            <div>
+              <div class="wizRadioLabel">Activo</div>
+              <div class="wizRadioDesc">El límite se aplica al inventario</div>
+            </div>
+          </label>
+          <label class="wizRadio">
+            <input type="radio" name="limWizActivo" value="0" />
+            <span class="wizRadioCheck"></span>
+            <div>
+              <div class="wizRadioLabel">Inactivo</div>
+              <div class="wizRadioDesc">El límite se creará desactivado</div>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizBody hidden" id="limWizStep4">
+      <div class="wizBodyIcon">✅</div>
+      <div class="wizBodyTitle">Confirma los datos</div>
+      <div class="wizBodyDesc">Revisa que todo esté correcto antes de guardar.</div>
+      <div class="wizSummary">
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Bodega</span>
+          <span class="wizSummaryValue" id="limSumBodega">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Producto</span>
+          <span class="wizSummaryValue" id="limSumProducto">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Mínimo</span>
+          <span class="wizSummaryValue" id="limSumMin">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Máximo</span>
+          <span class="wizSummaryValue" id="limSumMax">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Estado</span>
+          <span class="wizSummaryValue" id="limSumActivo">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizNav">
+      <button class="btn soft" id="limWizBack" type="button" style="visibility:hidden">← Atrás</button>
+      <div class="wizNavRight">
+        <button class="btn ok" id="limWizNext" type="button">Siguiente →</button>
+        <button class="btn ok" id="limWizSave" type="button" style="display:none">💾 Guardar límite</button>
+      </div>
+    </div>
+  </div>
+
 </div>
-<select id="limImportDelimiter">
-</select>
-<button id="limTemplateBtn">
-</button>
-<button id="limImportBtn">
-</button>
-<button id="limRefresh">
-</button>
-<button id="limSave">
-</button>
-<table class="tbl grid">
-<thead>
-<tr>
-<th>Bodega</th>
-<th>Producto</th>
-<th>SKU</th>
-<th>Minimo</th>
-<th>Maximo</th>
-<th>Activo</th>
-<th>Accion</th>
-</tr>
-</thead>
-<tbody id="limList">
-</tbody>
-</table>
-<input id="limEditWarehouse" type="hidden" />
-<input id="limEditWarehouseName" />
-<input id="limEditProduct" type="hidden" />
-<input id="limEditProductName" />
-<input id="limEditMin" type="number" min="0" step="1" />
-<input id="limEditMax" type="number" min="0" step="1" />
-<select id="limEditActive">
-</select>
-<button id="limEditSave">
-</button>
+
+<input id="limEditBodega" type="hidden" />
+<input id="limEditProducto" type="hidden" />
 </div>
 </div>
         <div class="view hidden" id="view-reglas-subcategorias">
 <div class="card light">
-<select id="regSubcat">
-</select>
-<input id="regMaxDays" />
-<input id="regAlertDays" />
-<select id="regActive">
-</select>
-<button id="regRefresh">
-</button>
-<button id="regSave">
-</button>
-<table class="tbl grid">
-<thead>
-<tr>
-<th>Categoria</th>
-<th>Subcategoria</th>
-<th>Dias max</th>
-<th>Dias alerta</th>
-<th>Activo</th>
-<th>Estado regla</th>
-<th>Accion</th>
-</tr>
-</thead>
-<tbody id="regList">
-</tbody>
-</table>
-<input id="regEditSubcatId" />
-<input id="regEditSubcatName" />
-<input id="regEditMaxDays" />
-<input id="regEditAlertDays" />
-<input id="regEditActive" />
-<button id="regEditSave">
-</button>
+
+<div class="wiz" id="regWizard">
+
+  <!-- ═══════ LIST MODE ═══════ -->
+  <div id="regWizList">
+    <div class="wizListHeader">
+      <div class="wizListTitle">Reglas de subcategoría</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn soft btn-sm" id="regRefresh" type="button" title="Actualizar lista" style="padding:4px 10px;font-size:12px;min-height:30px">↻</button>
+        <button class="btn ok btn-sm" id="regWizNewBtn" type="button" style="padding:5px 14px;font-size:13px">+ Nueva regla</button>
+      </div>
+    </div>
+    <div class="wizListBody" id="regWizListBody">
+      <div class="wizListEmpty">Cargando...</div>
+    </div>
+  </div>
+
+  <!-- ═══════ CREATE MODE ═══════ -->
+  <div id="regWizCreate" class="hidden">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <button class="btn soft btn-sm" id="regWizCancelCreate" type="button" style="padding:4px 10px;font-size:18px;line-height:1" title="Volver a la lista">←</button>
+      <span style="font-size:14px;font-weight:700;color:#E2E8F0" id="regWizCreateTitle">Nueva regla</span>
+    </div>
+
+    <div class="wizSteps">
+      <div class="wizStep active" data-step="1">
+        <div class="wizStepDot"><span class="wizStepNum">1</span></div>
+        <div class="wizStepLabel">Subcategoría</div>
+      </div>
+      <div class="wizStepDivider"></div>
+      <div class="wizStep" data-step="2">
+        <div class="wizStepDot"><span class="wizStepNum">2</span></div>
+        <div class="wizStepLabel">Configuración</div>
+      </div>
+      <div class="wizStepDivider"></div>
+      <div class="wizStep" data-step="3">
+        <div class="wizStepDot"><span class="wizStepNum">3</span></div>
+        <div class="wizStepLabel">Confirmar</div>
+      </div>
+    </div>
+
+    <div class="wizBody" id="regWizStep1">
+      <div class="wizBodyIcon">🏷️</div>
+      <div class="wizBodyTitle">Selecciona la subcategoría</div>
+      <div class="wizBodyDesc">Elige la subcategoría para la cual configurarás la regla de vigencia.</div>
+      <div class="wizField">
+        <label class="lbl">Subcategoría</label>
+        <select class="in wizInput" id="regSubcat"><option value="">Seleccione subcategoria</option></select>
+        <div class="wizBodyHint" id="regWizSubcatReadonly" style="display:none;padding:8px 12px;background:rgba(2,6,23,.5);border-radius:8px;font-size:13px;color:#E2E8F0"></div>
+      </div>
+      <div class="wizBodyError" id="regWizError1"></div>
+    </div>
+
+    <div class="wizBody hidden" id="regWizStep2">
+      <div class="wizBodyIcon">⚙️</div>
+      <div class="wizBodyTitle">Configuración de la regla</div>
+      <div class="wizBodyDesc">Define los días máximos de vida y la alerta previa para esta subcategoría.</div>
+      <div class="wizField">
+        <label class="lbl">Días máximos de vigencia</label>
+        <input class="in wizInput" id="regMaxDays" type="number" min="0" step="1" placeholder="0 = sin límite" />
+        <div class="note" style="font-size:11px;color:var(--muted);margin-top:4px">0 significa que el producto no tiene vigencia.</div>
+      </div>
+      <div class="wizField">
+        <label class="lbl">Días de alerta antes del vencimiento</label>
+        <input class="in wizInput" id="regAlertDays" type="number" min="0" step="1" placeholder="0 = sin alerta" />
+        <div class="note" style="font-size:11px;color:var(--muted);margin-top:4px">Se mostrará una advertencia cuando falten esta cantidad de días para vencer.</div>
+      </div>
+      <div class="wizField">
+        <label class="lbl">Estado</label>
+        <div class="wizRadioGroup">
+          <label class="wizRadio">
+            <input type="radio" name="regWizActivo" value="1" checked />
+            <span class="wizRadioCheck"></span>
+            <div>
+              <div class="wizRadioLabel">Activo</div>
+              <div class="wizRadioDesc">La regla se aplica al inventario</div>
+            </div>
+          </label>
+          <label class="wizRadio">
+            <input type="radio" name="regWizActivo" value="0" />
+            <span class="wizRadioCheck"></span>
+            <div>
+              <div class="wizRadioLabel">Inactivo</div>
+              <div class="wizRadioDesc">La regla se creará desactivada</div>
+            </div>
+          </label>
+        </div>
+      </div>
+      <div class="wizBodyError" id="regWizError2"></div>
+    </div>
+
+    <div class="wizBody hidden" id="regWizStep3">
+      <div class="wizBodyIcon">✅</div>
+      <div class="wizBodyTitle">Confirma los datos</div>
+      <div class="wizBodyDesc">Revisa que todo esté correcto antes de guardar.</div>
+      <div class="wizSummary">
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Subcategoría</span>
+          <span class="wizSummaryValue" id="regSumSubcat">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Días máximos</span>
+          <span class="wizSummaryValue" id="regSumMaxDays">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Días alerta</span>
+          <span class="wizSummaryValue" id="regSumAlertDays">—</span>
+        </div>
+        <div class="wizSummaryRow">
+          <span class="wizSummaryLabel">Estado</span>
+          <span class="wizSummaryValue" id="regSumActivo">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizNav">
+      <button class="btn soft" id="regWizBack" type="button" style="visibility:hidden">← Atrás</button>
+      <div class="wizNavRight">
+        <button class="btn ok" id="regWizNext" type="button">Siguiente →</button>
+        <button class="btn ok" id="regWizSave" type="button" style="display:none">💾 Guardar regla</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<input id="regEditSubcatId" type="hidden" />
 </div>
 </div>
         <div class="view hidden" id="view-usuarios">
@@ -2248,6 +2919,7 @@
       </section>
     </main>
   </div>
+  <div class="menuBackdrop" id="menuBackdrop"></div>
   <div class="toast" id="entToast">
 </div>
 <div class="toastStack" id="toastStack">
@@ -2437,11 +3109,21 @@
 </script>
   <script>
     (function ensureCompatIds(){
-      try{var xhr=new XMLHttpRequest();xhr.open('GET','./app.js?v=20260525c',false);xhr.send(null);if(xhr.status<200||xhr.status>=300)return;var js=String(xhr.responseText||'');var rx=/#([A-Za-z][A-Za-z0-9_-]*)/g;var seen=Object.create(null);var m;var host=document.createElement('div');host.style.display='none';host.id='compatAutoIds';while((m=rx.exec(js))){var id=m[1];if(seen[id])continue;seen[id]=true;if(document.getElementById(id))continue;var el=document.createElement('div');el.id=id;host.appendChild(el);}if(host.childNodes.length)document.body.appendChild(host);}catch(e){}
+      try{var xhr=new XMLHttpRequest();xhr.open('GET','./js/shared.js?v=20250717a',false);xhr.send(null);if(xhr.status<200||xhr.status>=300)return;var js=String(xhr.responseText||'');var rx=/#([A-Za-z][A-Za-z0-9_-]*)/g;var seen=Object.create(null);var m;var host=document.createElement('div');host.style.display='none';host.id='compatAutoIds';while((m=rx.exec(js))){var id=m[1];if(seen[id])continue;seen[id]=true;if(document.getElementById(id))continue;var el=document.createElement('div');el.id=id;host.appendChild(el);}if(host.childNodes.length)document.body.appendChild(host);}catch(e){}
     })();
   </script>
-  <script src="./app.js?v=20260525c">
-</script>
+  <!-- Modular JS — load order matters (shared globals must be available first) -->
+  <script src="./js/shared.js?v=20250717a"></script>
+  <script src="./js/auth.js?v=20250717a"></script>
+  <script src="./js/navigation.js?v=20250717a"></script>
+  <script src="./js/home.js?v=20250717a"></script>
+  <script src="./js/entradas.js?v=20250717a"></script>
+  <script src="./js/salidas.js?v=20250717a"></script>
+  <script src="./js/reportes.js?v=20250717a"></script>
+  <script src="./js/despachar.js?v=20250717a"></script>
+  <script src="./js/ajustes.js?v=20250717a"></script>
+  <script src="./js/admin.js?v=20250717a"></script>
+  <script src="./js/cuadre.js?v=20250717a"></script>
   <div class="connIndicator" id="connIndicator">
     <span class="connDot" id="connDot"></span>
     <span class="connText" id="connText">En l&iacute;nea</span>
