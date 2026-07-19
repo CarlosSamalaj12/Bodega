@@ -1,13 +1,17 @@
 // server-admin.js  |  Admin routes — BARREL
 import { Router } from 'express';
 import impresionRouter from './server-admin-impresion.js';
-import usuariosRouter from './server-admin-usuarios.js';
+import usuariosCrudRouter from './server-admin-usuarios-crud.js';
+import rolesPermisosRouter from './server-admin-roles-permisos.js';
+import accesoBodegasRouter from './server-admin-acceso-bodegas.js';
 import configRouter from './server-admin-config.js';
 import opsRouter from './server-admin-ops.js';
 
 const router = Router();
 router.use(impresionRouter);
-router.use(usuariosRouter);
+router.use(usuariosCrudRouter);
+router.use(rolesPermisosRouter);
+router.use(accesoBodegasRouter);
 router.use(configRouter);
 router.use(opsRouter);
 

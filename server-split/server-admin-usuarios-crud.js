@@ -1,35 +1,19 @@
-// server-admin-usuarios.js  |  Usuarios / roles / permisos / acceso routes (modular)
-import { pool, auth, requirePermission, isAvatarTableMissingError, getUserPermissionsMap, canManageUserPermissions, PERM_CATALOG, isValidOrderPin, findOrderPinCollision, bcrypt, normalizeWarehouseIdList, buildNamedInClause, resolveStockScope, ensureUserWarehouseAccessTable, permissionDefaults } from '../server-shared.js';
+// server-admin-usuarios-crud.js  |  Usuarios CRUD: crear, editar, desactivar, reset pass/pin, listar
+import { pool, auth, requirePermission, isAvatarTableMissingError, isValidOrderPin, findOrderPinCollision, bcrypt } from '../server-shared.js';
 import { Router } from 'express';
 const router = Router();
 
-// ======= Local helper (extracted from monolithic backup) =======
+// ======= Local helper =======
 function normalizeAvatarData(value) {
   if (value === null || value === undefined) return null;
   const s = String(value).trim();
   if (!s) return null;
-  if (!/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=\\r\\n]+$/i.test(s)) return null;
+  if (!/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=\\\r\\n]+$/i.test(s)) return null;
   if (s.length > 1_400_000) return null;
   return s;
 }
 
 // -------------------------------------------------------
-/* =========================
-   ROLES (LISTA)
-========================= */
-router.get("/api/roles", auth, async (req, res) => {
-  const [rows] = await pool.query(
-    `SELECT id_rol AS id_role, nombre_rol AS role_name
-     FROM roles
-     WHERE activo=1
-     ORDER BY nombre_rol ASC`
-  );
-  res.json(rows);
-});
-
-/* =========================
-   USUARIOS (CREAR)
-========================= */
 router.post("/api/usuarios", auth, async (req, res) => {
   try {
     const {
@@ -122,9 +106,6 @@ router.post("/api/usuarios", auth, async (req, res) => {
   }
 });
 
-/* =========================
-   USUARIOS (RESET PASSWORD)
-========================= */
 router.post("/api/usuarios/:id/reset-password", auth, async (req, res) => {
   try {
     const id_user = Number(req.params.id || 0);
@@ -181,9 +162,6 @@ router.post("/api/usuarios/:id/reset-order-pin", auth, requirePermission("action
   }
 });
 
-/* =========================
-   USUARIOS (EDITAR)
-========================= */
 router.patch("/api/usuarios/:id", auth, async (req, res) => {
   try {
     const id_user = Number(req.params.id || 0);
@@ -255,9 +233,6 @@ router.patch("/api/usuarios/:id", auth, async (req, res) => {
   }
 });
 
-/* =========================
-   USUARIOS (DESACTIVAR)
-========================= */
 router.post("/api/usuarios/:id/deactivate", auth, async (req, res) => {
   try {
     const id_user = Number(req.params.id || 0);
@@ -284,9 +259,6 @@ router.post("/api/usuarios/:id/deactivate", auth, async (req, res) => {
   }
 });
 
-/* =========================
-   USUARIOS (LISTA)
-========================= */
 router.get("/api/usuarios", auth, async (req, res) => {
   const all = String(req.query.all || "") === "1";
   let rows = [];
@@ -346,196 +318,6 @@ router.get("/api/usuarios", auth, async (req, res) => {
     );
   }
   res.json(rows);
-});
-
-/* =========================
-   PERMISOS
-========================= */
-router.get("/api/permisos/catalogo", auth, async (req, res) => {
-  res.json(PERM_CATALOG);
-});
-
-router.get("/api/me/permisos", auth, async (req, res) => {
-  try {
-    const id_usuario = Number(req.user?.id_user || 0);
-    if (!id_usuario) return res.status(400).json({ error: "Usuario invalido" });
-    const map = await getUserPermissionsMap(id_usuario);
-    const scope = await resolveStockScope(req.user);
-    res.json({
-      permisos: map,
-      catalogo: PERM_CATALOG,
-      is_admin_role: Number(scope?.is_admin_role ? 1 : 0),
-    });
-  } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
-  }
-});
-
-router.get("/api/usuarios/:id/permisos", auth, async (req, res) => {
-  try {
-    const requester = Number(req.user?.id_user || 0);
-    if (!requester) return res.status(401).json({ error: "Usuario invalido" });
-    const allowed = await canManageUserPermissions(requester);
-    if (!allowed) return res.status(403).json({ error: "Sin permiso para administrar permisos" });
-
-    const id_usuario = Number(req.params.id || 0);
-    if (!id_usuario) return res.status(400).json({ error: "Usuario invalido" });
-    const map = await getUserPermissionsMap(id_usuario);
-    res.json({ id_usuario, permisos: map, catalogo: PERM_CATALOG });
-  } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
-  }
-});
-
-/* =========================
-   USUARIOS BODEGAS ACCESO
-========================= */
-router.get("/api/usuarios/:id/bodegas-acceso", auth, async (req, res) => {
-  try {
-    await ensureUserWarehouseAccessTable();
-    const requester = Number(req.user?.id_user || 0);
-    if (!requester) return res.status(401).json({ error: "Usuario invalido" });
-    const allowed = await canManageUserPermissions(requester);
-    if (!allowed) return res.status(403).json({ error: "Sin permiso para administrar accesos de bodegas" });
-
-    const id_usuario = Number(req.params.id || 0);
-    if (!id_usuario) return res.status(400).json({ error: "Usuario invalido" });
-
-    const [rows] = await pool.query(
-      `SELECT uba.id_bodega, b.nombre_bodega
-       FROM usuario_bodegas_acceso uba
-       JOIN bodegas b ON b.id_bodega=uba.id_bodega
-       WHERE uba.id_usuario=:id_usuario
-       ORDER BY b.nombre_bodega ASC, uba.id_bodega ASC`,
-      { id_usuario }
-    );
-    res.json({
-      id_usuario,
-      bodegas: rows || [],
-      ids: normalizeWarehouseIdList((rows || []).map((r) => r.id_bodega)),
-    });
-  } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
-  }
-});
-
-router.put("/api/usuarios/:id/bodegas-acceso", auth, async (req, res) => {
-  const conn = await pool.getConnection();
-  try {
-    await ensureUserWarehouseAccessTable();
-    const requester = Number(req.user?.id_user || 0);
-    if (!requester) return res.status(401).json({ error: "Usuario invalido" });
-    const allowed = await canManageUserPermissions(requester);
-    if (!allowed) return res.status(403).json({ error: "Sin permiso para administrar accesos de bodegas" });
-
-    const id_usuario = Number(req.params.id || 0);
-    if (!id_usuario) return res.status(400).json({ error: "Usuario invalido" });
-    const ids = normalizeWarehouseIdList(req.body?.id_bodegas || []);
-
-    const [[userRow]] = await conn.query(
-      `SELECT u.id_usuario, r.nombre_rol
-       FROM usuarios u
-       LEFT JOIN roles r ON r.id_rol=u.id_rol
-       WHERE u.id_usuario=:id_usuario
-       LIMIT 1`,
-      { id_usuario }
-    );
-    if (!userRow) return res.status(404).json({ error: "Usuario no existe" });
-
-    const roleName = String(userRow?.nombre_rol || "").trim().toUpperCase();
-    const isReportRole = roleName.includes("REPORTE");
-    const isAdminRole = roleName.includes("ADMIN");
-    if (!isReportRole || isAdminRole) {
-      return res.status(400).json({ error: "Solo usuarios de reportes no administradores pueden tener este filtro" });
-    }
-
-    if (ids.length) {
-      const inClause = buildNamedInClause(ids, "uba");
-      const [validRows] = await conn.query(
-        `SELECT id_bodega
-         FROM bodegas
-         WHERE activo=1
-           AND id_bodega IN (${inClause.sql})`,
-        inClause.params
-      );
-      const validIds = normalizeWarehouseIdList((validRows || []).map((r) => r.id_bodega));
-      if (validIds.length !== ids.length) {
-        return res.status(400).json({ error: "Una o mas bodegas no son validas o no estan activas" });
-      }
-    }
-
-    await conn.beginTransaction();
-    await conn.query(
-      `DELETE FROM usuario_bodegas_acceso
-       WHERE id_usuario=:id_usuario`,
-      { id_usuario }
-    );
-    for (const id_bodega of ids) {
-      await conn.query(
-        `INSERT INTO usuario_bodegas_acceso (id_usuario, id_bodega)
-         VALUES (:id_usuario, :id_bodega)`,
-        { id_usuario, id_bodega }
-      );
-    }
-    await conn.commit();
-    res.json({ ok: true, id_usuario, id_bodegas: ids });
-  } catch (e) {
-    await conn.rollback();
-    res.status(500).json({ error: String(e.message || e) });
-  } finally {
-    conn.release();
-  }
-});
-
-/* =========================
-   USUARIOS PERMISOS (GUARDAR)
-========================= */
-router.put("/api/usuarios/:id/permisos", auth, async (req, res) => {
-  const conn = await pool.getConnection();
-  try {
-    const requester = Number(req.user?.id_user || 0);
-    if (!requester) return res.status(401).json({ error: "Usuario invalido" });
-    const allowed = await canManageUserPermissions(requester);
-    if (!allowed) return res.status(403).json({ error: "Sin permiso para administrar permisos" });
-
-    const id_usuario = Number(req.params.id || 0);
-    if (!id_usuario) return res.status(400).json({ error: "Usuario invalido" });
-    const input = req.body?.permisos || {};
-    const map = permissionDefaults();
-
-    if (Array.isArray(input)) {
-      for (const it of input) {
-        const k = String(it?.permiso || "");
-        if (!Object.prototype.hasOwnProperty.call(map, k)) continue;
-        map[k] = Number(it?.activo) ? 1 : 0;
-      }
-    } else if (input && typeof input === "object") {
-      for (const k of Object.keys(map)) {
-        if (Object.prototype.hasOwnProperty.call(input, k)) {
-          map[k] = Number(input[k]) ? 1 : 0;
-        }
-      }
-    } else {
-      return res.status(400).json({ error: "Formato de permisos invalido" });
-    }
-
-    await conn.beginTransaction();
-    for (const k of Object.keys(map)) {
-      await conn.query(
-        `INSERT INTO usuario_permisos (id_usuario, permiso, activo)
-         VALUES (:id_usuario, :permiso, :activo)
-         ON DUPLICATE KEY UPDATE activo=VALUES(activo)`,
-        { id_usuario, permiso: k, activo: map[k] }
-      );
-    }
-    await conn.commit();
-    res.json({ ok: true });
-  } catch (e) {
-    await conn.rollback();
-    res.status(500).json({ error: String(e.message || e) });
-  } finally {
-    conn.release();
-  }
 });
 
 export default router;
