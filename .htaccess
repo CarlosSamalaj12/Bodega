@@ -9,11 +9,11 @@
 
   # Socket.IO WebSocket transport.
   RewriteCond %{HTTP:Upgrade} =websocket [NC]
-  RewriteRule ^socket\.io/(.*)$ ws://127.0.0.1:3001/socket.io/$1 [P,L,NC]
+  RewriteRule ^socket\.io/(.*)$ ws://127.0.0.1:3003/socket.io/$1 [P,L,NC]
 
   # Socket.IO HTTP fallback (polling).
-  RewriteRule ^socket\.io/(.*)$ http://127.0.0.1:3001/socket.io/$1 [P,L,NC]
+  RewriteRule ^socket\.io/(.*)$ http://127.0.0.1:3003/socket.io/$1 [P,L,NC]
 
   # API reverse proxy to local Node backend.
-  RewriteRule ^api/(.*)$ http://127.0.0.1:3001/api/$1 [P,L,NC]
+  RewriteRule ^api/(.*)$ http://127.0.0.1:3003/api/$1 [P,L,NC]
 </IfModule>

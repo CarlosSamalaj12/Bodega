@@ -1,0 +1,45 @@
+@media (max-width: 900px) {
+  .rail { display: none; }
+  .menu {
+    left: 0; transform: translateX(-100%); z-index: 200;
+  }
+  .menu.open { transform: translateX(0); }
+  .menuCloseBtn { display: block; }
+  .hamburgerBtn { display: block; }
+  .stage { margin-left: 0; }
+  .stageBody { padding: 12px; }
+  .grid2, .grid3, .grid4 {
+    grid-template-columns: 1fr;
+  }
+  .homeDashGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .desktop-only { display: none; }
+  .mobile-only { display: block; }
+  .stageTop { padding: 0 12px; }
+  .stageHeadLogo { display: none; }
+  .connIndicator { left: 8px; }
+
+  .cuadreShell { flex-direction: column; }
+  .cuadrePreviewWrap { position: static; width: 100%; }
+
+  .orderWorkspace { flex-direction: column; }
+  .orderSide { position: fixed; right: -100%; top: 0; bottom: 0; width: 85%; z-index: 300; transition: right 0.3s ease; }
+  .orderSide.open { right: 0; }
+}
+
+@media (max-width: 500px) {
+  .homeDashGrid { grid-template-columns: 1fr 1fr; }
+  .stageTop { padding: 0 8px; }
+  .stageTitle { font-size: 15px; }
+  .tbl th, .tbl td { padding: 6px 8px; font-size: 12px; }
+}
+
+@media print {
+  .rail, .menu, .stageTop, .hamburgerBtn, .connIndicator, .updateBanner,
+  .addRow, .btn, .repFilterToggle, .orderActions, .pedCartFab,
+  .menuAccordion .menuGroupToggle { display: none !important; }
+  .stage { margin-left: 0; }
+  .view.hidden { display: block !important; }
+  .view { page-break-after: always; }
+}

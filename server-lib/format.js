@@ -56,7 +56,7 @@ async function resolveStockScope(user) {
   const is_admin_role = roleName.includes("ADMIN");
   const can_all_bodegas = is_admin_role || roleName.includes("REPORT") || (roleName.includes("GERENT") && !roleName.includes("BODEGUER"));
   const can_view_existencias = is_bodeguero || is_report_role || is_admin_role;
-  const [[bodegaRow]] = await pool.query(`SELECT maneja_stock, tipo_bodega FROM bodegas WHERE id_bodega=:id_bodega LIMIT 1`, { id_bodega });
+  const [[bodegaRow]] = await pool.query(`SELECT b.tipo_bodega, COALESCE(cb.maneja_stock, 0) AS maneja_stock FROM bodegas b LEFT JOIN configuracion_bodega cb ON cb.id_bodega=b.id_bodega WHERE b.id_bodega=:id_bodega LIMIT 1`, { id_bodega });
   const maneja_stock = Number(bodegaRow?.maneja_stock || 0) === 1;
   const is_principal = String(bodegaRow?.tipo_bodega || "").toUpperCase() === "PRINCIPAL";
   const { getUserWarehouseAccessIds } = await import("./warehouse.js");

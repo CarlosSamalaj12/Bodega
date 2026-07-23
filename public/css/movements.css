@@ -1,0 +1,54 @@
+.ajFlowCard {
+  background: var(--bg3); border-radius: var(--radius); padding: 12px;
+  margin-bottom: 8px; border-left: 3px solid var(--info);
+}
+.ajFlowTitle { font-size: 14px; font-weight: 600; color: var(--text); }
+.ajFlowDesc { font-size: 12px; color: var(--text2); margin-top: 4px; }
+
+.ajMiniHelp { background: var(--surface); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; border: 1px solid var(--border); }
+.ajMiniHelpTitle { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.ajMiniHelpStep { font-size: 12px; color: var(--text2); margin: 2px 0; }
+
+.ajResume { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.ajImpactBox { margin-top: 4px; font-size: 11px; }
+.ajEntradaOnly { display: block; }
+
+.salCountPanel { margin-top: 12px; }
+
+.cuadreStickyHead { position: sticky; top: 0; background: var(--bg2); padding-bottom: 8px; z-index: 10; }
+.cuadreActions { margin: 8px 0; }
+.cuadreResumeGrid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px; margin: 12px 0;
+}
+.cuadreResumeCard {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px; text-align: center;
+}
+.cuadreResumeCard.accent { border-color: var(--primary); }
+.cuadreResumeLabel { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; }
+
+.cuadreShell { display: flex; gap: 16px; position: relative; }
+.cuadreMain { flex: 1; min-width: 0; }
+.cuadreBlock { margin-bottom: 16px; }
+.cuadreBlockHead { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.cuadreDenomInput { width: 160px; }
+.cuadreDenomTableWrap { max-height: 200px; overflow-y: auto; }
+.cuadreMiniGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 8px; }
+
+.cuadrePreviewWrap { width: 320px; flex-shrink: 0; position: sticky; top: 0; align-self: flex-start; }
+.cuadrePreviewCard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.cuadrePreviewHead { padding: 12px; border-bottom: 1px solid var(--border); }
+.cuadrePreviewEyebrow { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 2px; }
+
+.cuadreTicket { padding: 16px; font-size: 12px; }
+.cuadreTicketBrand { font-size: 14px; font-weight: 700; text-align: center; margin-bottom: 12px; }
+.cuadreTicketMeta { margin-bottom: 12px; }
+.cuadreTicketMeta > div { display: flex; justify-content: space-between; padding: 2px 0; }
+.cuadreTicketSection { margin-bottom: 12px; }
+.cuadreTicketTitle { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.cuadreTicketLines { }
+.cuadreTicketLine { display: flex; justify-content: space-between; padding: 2px 0; }
+.cuadreTicketLine.total { border-top: 1px solid var(--border); padding-top: 4px; margin-top: 4px; }
+.cuadreTicketLine.strong { font-weight: 700; }
+.cuadreTicketFooter { font-size: 10px; color: var(--muted); text-align: center; margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border); }

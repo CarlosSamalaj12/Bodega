@@ -73,6 +73,12 @@ CVS
 # Backup files
 backups/
 server-lib/backups/
+
+# Large SQL dumps and monolithic backups
+bdbodega.sql
+server.js.monolithic-backup
+
+# Dependencies
 .node_modules
 node_modules
 .codegraph
