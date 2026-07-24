@@ -1,0 +1,20 @@
+@use '@/styles/abstracts' as *;
+
+.spinner {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-2;
+  color: $color-text-muted;
+
+  svg {
+    animation: spin 0.8s linear infinite;
+  }
+
+  &__label {
+    font-size: $font-size-sm;
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

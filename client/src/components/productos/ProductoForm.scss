@@ -1,0 +1,101 @@
+@use '@/styles/abstracts' as *;
+
+.producto-form {
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+
+  &__row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: $space-3;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+  }
+
+  &__label {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: $color-text-muted;
+  }
+
+  &__hint {
+    font-size: $font-size-xs;
+    color: $color-text-subtle;
+  }
+
+  &__muted {
+    color: $color-text-subtle;
+    font-size: $font-size-sm;
+  }
+
+  &__bodegas {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: $space-2;
+    padding: $space-3;
+    background: $color-bg-2;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+    max-height: 200px;
+    overflow: auto;
+    @include custom-scrollbar;
+  }
+
+  &__bodega-item {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-2 $space-3;
+    background: $color-surface;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-sm;
+    cursor: pointer;
+    font-size: $font-size-sm;
+    transition: background $transition-fast, border-color $transition-fast;
+
+    &:hover {
+      background: $color-surface-hover;
+    }
+
+    input {
+      accent-color: $color-accent;
+    }
+  }
+
+  &__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-2;
+    font-size: $font-size-sm;
+    color: $color-text;
+    cursor: pointer;
+    user-select: none;
+
+    input {
+      accent-color: $color-accent;
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  &__error {
+    padding: $space-3 $space-4;
+    background: $color-danger-soft;
+    color: $color-danger;
+    border-radius: $radius-md;
+    font-size: $font-size-sm;
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: $space-3;
+    padding-top: $space-3;
+    border-top: 1px solid $color-stroke;
+  }
+}

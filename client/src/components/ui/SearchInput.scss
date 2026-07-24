@@ -1,0 +1,45 @@
+@use '@/styles/abstracts' as *;
+
+.search-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  &__icon {
+    position: absolute;
+    left: $space-3;
+    color: $color-text-subtle;
+    font-size: $font-size-md;
+    pointer-events: none;
+  }
+
+  &__field {
+    @include input-base;
+    padding-left: $space-7;
+    padding-right: $space-7;
+
+    &::-webkit-search-cancel-button {
+      display: none;
+    }
+  }
+
+  &__clear {
+    position: absolute;
+    right: $space-2;
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    color: $color-text-muted;
+    border: none;
+    border-radius: $radius-pill;
+    cursor: pointer;
+    transition: background $transition-fast, color $transition-fast;
+
+    &:hover {
+      background: $color-surface-hover;
+      color: $color-text;
+    }
+  }
+}

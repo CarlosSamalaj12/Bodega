@@ -2797,14 +2797,18 @@ app.get("/api/productos/search", auth, async (req, res) => {
   if (!q) return res.json([]);
   const id_bodega = Number(req.query.warehouse || 0) || null;
   const qf = buildTokenizedLikeFilter(q, ["nombre_producto", "sku"], "psq");
-  const visibilityClause = buildProductWarehouseVisibilityClause("productos.id_producto", "id_bodega");
+  const visibilityClause = buildProductWarehouseVisibilityClause("p.id_producto", "id_bodega");
   const [rows] = await pool.query(
-    `SELECT id_producto, nombre_producto, sku
-     FROM productos
-     WHERE activo=1
+    `SELECT p.id_producto, p.nombre_producto, p.sku,
+            p.id_categoria, c.nombre_categoria,
+            p.id_medida, m.nombre_medida
+     FROM productos p
+     JOIN medidas m ON m.id_medida=p.id_medida
+     JOIN categorias c ON c.id_categoria=p.id_categoria
+     WHERE p.activo=1
        AND ${visibilityClause}
        AND ${qf.clause}
-     ORDER BY nombre_producto ASC
+     ORDER BY p.nombre_producto ASC
      LIMIT 20`,
     { id_bodega, ...qf.params }
   );

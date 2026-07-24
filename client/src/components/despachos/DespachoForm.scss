@@ -1,0 +1,173 @@
+@use '@/styles/abstracts' as *;
+
+.despacho-form {
+  display: flex;
+  flex-direction: column;
+  gap: $space-5;
+
+  &__empty {
+    padding: $space-7;
+    color: $color-text-muted;
+    text-align: center;
+  }
+
+  &__error {
+    padding: $space-3 $space-4;
+    background: $color-danger-soft;
+    color: $color-danger;
+    border-radius: $radius-md;
+    font-size: $font-size-sm;
+  }
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: $space-3;
+    padding: $space-3 $space-4;
+    background: $color-surface;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+  }
+
+  &__label {
+    font-size: $font-size-md;
+    font-weight: $font-weight-semibold;
+    color: $color-text;
+  }
+
+  &__sub {
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+    margin-top: 2px;
+  }
+
+  &__product {
+    font-size: $font-size-sm;
+    color: $color-text;
+    font-weight: $font-weight-medium;
+  }
+
+  &__num {
+    font-variant-numeric: tabular-nums;
+    color: $color-text;
+
+    &--warn {
+      color: $color-warning;
+      font-weight: $font-weight-semibold;
+    }
+  }
+
+  &__input {
+    padding: $space-2 $space-3;
+    font-size: $font-size-sm;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    max-width: 100px;
+
+    &--warn {
+      border-color: $color-warning;
+    }
+  }
+
+  &__cantidad-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+
+  &__warn {
+    font-size: $font-size-xs;
+    color: $color-warning;
+  }
+
+  &__pill {
+    display: inline-block;
+    padding: 2px $space-2;
+    border-radius: $radius-pill;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+    border: 1px solid transparent;
+
+    &--pending {
+      background: $color-warning-soft;
+      color: $color-warning;
+      border-color: $color-warning;
+    }
+
+    &--partial {
+      background: $color-info-soft;
+      color: $color-info;
+      border-color: $color-info;
+    }
+
+    &--done {
+      background: $color-success-soft;
+      color: $color-success;
+      border-color: $color-success;
+    }
+
+    &--void {
+      background: $color-danger-soft;
+      color: $color-danger;
+      border-color: $color-danger;
+    }
+  }
+
+  &__anular {
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    color: $color-text-muted;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-pill;
+    cursor: pointer;
+    transition: background $transition-fast, color $transition-fast, border-color $transition-fast;
+
+    &:hover {
+      background: $color-danger-soft;
+      color: $color-danger;
+      border-color: $color-danger;
+    }
+  }
+
+  &__anular-mobile {
+    display: none;
+    flex-direction: column;
+    gap: $space-2;
+  }
+
+  &__anular-mobile-btn {
+    @include button-base;
+    background: transparent;
+    color: $color-danger;
+    border-color: $color-danger;
+    font-size: $font-size-sm;
+    padding: $space-2 $space-3;
+    min-height: 40px;
+    justify-content: flex-start;
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: $space-3;
+    padding-top: $space-4;
+    border-top: 1px solid $color-stroke;
+
+    @media (max-width: $bp-md) {
+      flex-direction: column-reverse;
+      gap: $space-2;
+    }
+  }
+
+  // ---------- Móvil ----------
+  @media (max-width: $bp-md) {
+    &__anular-mobile {
+      display: flex;
+    }
+  }
+}

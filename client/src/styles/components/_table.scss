@@ -1,0 +1,58 @@
+@use '../abstracts' as *;
+
+// =============================================================
+// Tabla
+// =============================================================
+
+.table-wrapper {
+  @include custom-scrollbar;
+  overflow: auto;
+  border: 1px solid $color-stroke;
+  border-radius: $radius-lg;
+  background: $color-surface;
+}
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: $font-size-base;
+
+  thead th {
+    text-align: left;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: $color-text-muted;
+    padding: $space-3 $space-4;
+    background: $color-bg-2;
+    border-bottom: 1px solid $color-stroke;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  tbody td {
+    padding: $space-3 $space-4;
+    border-bottom: 1px solid $color-stroke;
+    color: $color-text;
+    vertical-align: middle;
+  }
+
+  tbody tr {
+    transition: background $transition-fast;
+    &:hover {
+      background: $color-surface-hover;
+    }
+    &:last-child td {
+      border-bottom: none;
+    }
+  }
+
+  &--compact {
+    thead th, tbody td {
+      padding: $space-2 $space-3;
+    }
+  }
+}

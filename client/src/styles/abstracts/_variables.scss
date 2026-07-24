@@ -1,0 +1,129 @@
+// =============================================================
+// Design Tokens — Sistema de diseño
+// Colores neutros: negro/blanco. Acentos pastel apagados, sin neón.
+// Los colores base se exponen como CSS custom properties (var(--xxx))
+// para soportar temas dinámicos. Espaciado, tipografía y resto
+// siguen como variables Sass de compile-time.
+// =============================================================
+
+// ---------- Colores (referencias a CSS custom properties) ----------
+$color-bg-0: var(--color-bg-0);
+$color-bg-1: var(--color-bg-1);
+$color-bg-2: var(--color-bg-2);
+$color-bg-elevated: var(--color-bg-elevated);
+
+$color-surface: var(--color-surface);
+$color-surface-hover: var(--color-surface-hover);
+$color-surface-active: var(--color-surface-active);
+
+$color-stroke: var(--color-stroke);
+$color-stroke-strong: var(--color-stroke-strong);
+$color-stroke-focus: rgba(107, 142, 127, 0.4);
+
+$color-text: var(--color-text);
+$color-text-muted: var(--color-text-muted);
+$color-text-subtle: var(--color-text-subtle);
+$color-text-inverse: var(--color-text-inverse);
+
+// ---------- Colores semánticos (pastel apagado) ----------
+// Acento: verde salvia suave, funciona en ambos temas
+$color-accent: #6b8e7f;
+$color-accent-hover: #5a7a6c;
+$color-accent-active: #4a6859;
+$color-accent-soft: rgba(107, 142, 127, 0.12);
+
+$color-secondary: #8a9bb4;        // azul acero apagado
+$color-secondary-hover: #758aa3;
+$color-secondary-soft: rgba(138, 155, 180, 0.12);
+
+$color-success: #6b8e7f;         // mismo verde salvia
+$color-success-soft: rgba(107, 142, 127, 0.12);
+
+$color-warning: #d4a373;         // terracota suave
+$color-warning-soft: rgba(212, 163, 115, 0.12);
+
+$color-danger: #c08585;          // rosa palo apagado
+$color-danger-hover: #b07575;
+$color-danger-soft: rgba(192, 133, 133, 0.12);
+
+$color-info: #8a9bb4;            // mismo azul acero
+$color-info-soft: rgba(138, 155, 180, 0.12);
+
+// ---------- Tipografía ----------
+$font-main: "Inter", "ITC Avant Garde Gothic", "Century Gothic",
+  -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+$font-mono: "JetBrains Mono", "Fira Code", Consolas, Monaco, monospace;
+
+$font-size-xs: 0.75rem;
+$font-size-sm: 0.8125rem;
+$font-size-base: 0.875rem;
+$font-size-md: 0.9375rem;
+$font-size-lg: 1rem;
+$font-size-xl: 1.125rem;
+$font-size-2xl: 1.375rem;
+$font-size-3xl: 1.75rem;
+$font-size-4xl: 2.25rem;
+
+$font-weight-regular: 400;
+$font-weight-medium: 500;
+$font-weight-semibold: 600;
+$font-weight-bold: 700;
+
+$line-height-tight: 1.2;
+$line-height-base: 1.5;
+$line-height-relaxed: 1.7;
+
+// ---------- Espaciado (escala 4px) ----------
+$space-0: 0;
+$space-1: 0.25rem;
+$space-2: 0.5rem;
+$space-3: 0.75rem;
+$space-4: 1rem;
+$space-5: 1.25rem;
+$space-6: 1.5rem;
+$space-7: 2rem;
+$space-8: 2.5rem;
+$space-9: 3rem;
+$space-10: 4rem;
+
+// ---------- Radios ----------
+$radius-xs: 4px;
+$radius-sm: 6px;
+$radius-md: 10px;
+$radius-lg: 14px;
+$radius-xl: 20px;
+$radius-pill: 9999px;
+
+// ---------- Sombras (suaves, no glow neón) ----------
+$shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+$shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+$shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12);
+$shadow-glow-accent: 0 0 0 3px rgba(107, 142, 127, 0.25);
+$shadow-glow-danger: 0 0 0 3px rgba(192, 133, 133, 0.25);
+
+// ---------- Z-index ----------
+$z-dropdown: 100;
+$z-sticky: 200;
+$z-fixed: 300;
+$z-modal-backdrop: 1000;
+$z-modal: 1001;
+$z-toast: 2000;
+$z-tooltip: 3000;
+
+// ---------- Transiciones ----------
+$transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
+$transition-base: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+$transition-slow: 280ms cubic-bezier(0.4, 0, 0.2, 1);
+
+// ---------- Layout ----------
+$sidebar-width: 248px;
+$sidebar-width-collapsed: 64px;
+$header-height: 60px;
+$max-content-width: 1440px;
+
+// ---------- Breakpoints ----------
+$bp-sm: 640px;
+$bp-md: 768px;
+$bp-lg: 1024px;
+$bp-xl: 1280px;
+$bp-2xl: 1536px;

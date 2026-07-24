@@ -1,0 +1,158 @@
+@use 'variables' as *;
+
+// =============================================================
+// Mixins reutilizables
+// =============================================================
+
+// Media queries mobile-first
+@mixin breakpoint($size) {
+  @if $size == sm {
+    @media (min-width: $bp-sm) { @content; }
+  } @else if $size == md {
+    @media (min-width: $bp-md) { @content; }
+  } @else if $size == lg {
+    @media (min-width: $bp-lg) { @content; }
+  } @else if $size == xl {
+    @media (min-width: $bp-xl) { @content; }
+  } @else if $size == 2xl {
+    @media (min-width: $bp-2xl) { @content; }
+  }
+}
+
+// Botones base
+@mixin button-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: $space-2;
+  border: 1px solid transparent;
+  border-radius: $radius-md;
+  font-family: $font-main;
+  font-size: $font-size-base;
+  font-weight: $font-weight-medium;
+  line-height: 1;
+  padding: $space-3 $space-4;
+  // Hit area mínima táctil
+  min-height: 44px;
+  cursor: pointer;
+  transition: background $transition-fast, border-color $transition-fast,
+    color $transition-fast, transform $transition-fast,
+    box-shadow $transition-fast;
+  user-select: none;
+  white-space: nowrap;
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: $shadow-glow-accent;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+}
+
+// Inputs base
+@mixin input-base {
+  display: block;
+  width: 100%;
+  background: $color-bg-2;
+  border: 1px solid $color-stroke;
+  border-radius: $radius-md;
+  color: $color-text;
+  font-family: $font-main;
+  // 16px mínimo en móvil para evitar zoom automático de iOS
+  font-size: max(16px, $font-size-base);
+  line-height: 1.4;
+  padding: $space-3 $space-4;
+  // Altura mínima para hit area táctil cómoda
+  min-height: 44px;
+  transition: border-color $transition-fast, background $transition-fast,
+    box-shadow $transition-fast;
+
+  &::placeholder {
+    color: $color-text-subtle;
+  }
+
+  &:hover:not(:disabled):not(:focus) {
+    border-color: $color-stroke-strong;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $color-accent;
+    box-shadow: $shadow-glow-accent;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+// Card plano (estilo minimalista)
+@mixin card-glass {
+  background: $color-surface;
+  border: 1px solid $color-stroke;
+  border-radius: $radius-lg;
+}
+
+// Truncar texto
+@mixin truncate($lines: 1) {
+  @if $lines == 1 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  } @else {
+    display: -webkit-box;
+    -webkit-line-clamp: $lines;
+    line-clamp: $lines;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+// Scrollbar customizada
+@mixin custom-scrollbar($thumb: $color-accent, $track: $color-bg-2) {
+  scrollbar-width: thin;
+  scrollbar-color: $thumb $track;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  &::-webkit-scrollbar-track {
+    background: $track;
+    border-radius: $radius-pill;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: $thumb;
+    border-radius: $radius-pill;
+  }
+}
+
+// Visualmente oculto pero accesible
+@mixin sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+// Focus ring consistente
+@mixin focus-ring($color: $color-accent) {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  &:focus-visible {
+    outline-color: $color;
+  }
+}

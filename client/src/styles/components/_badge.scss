@@ -1,0 +1,50 @@
+@use '../abstracts' as *;
+
+// =============================================================
+// Badge — etiqueta de estado
+// =============================================================
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-1;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px $space-2;
+  border-radius: $radius-pill;
+  background: $color-surface;
+  color: $color-text-muted;
+  border: 1px solid $color-stroke;
+
+  &--success {
+    background: $color-success-soft;
+    color: $color-success;
+    border-color: transparent;
+  }
+
+  &--warning {
+    background: $color-warning-soft;
+    color: $color-warning;
+    border-color: transparent;
+  }
+
+  &--danger {
+    background: $color-danger-soft;
+    color: $color-danger;
+    border-color: transparent;
+  }
+
+  &--info {
+    background: $color-info-soft;
+    color: $color-info;
+    border-color: transparent;
+  }
+
+  &--accent {
+    background: $color-accent-soft;
+    color: $color-accent;
+    border-color: transparent;
+  }
+}

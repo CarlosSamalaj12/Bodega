@@ -1,0 +1,56 @@
+// =============================================================
+// Themes — CSS custom properties
+// Paleta minimalista: negro/blanco puro, acentos pastel apagados.
+// Se activan con [data-theme="light"] en <html>.
+// =============================================================
+
+// DARK — negro puro, sin tintes
+:root,
+[data-theme='dark'] {
+  --color-bg-0: #0a0a0a;
+  --color-bg-1: #111111;
+  --color-bg-2: #161616;
+  --color-bg-elevated: #1a1a1a;
+
+  --color-surface: #1a1a1a;
+  --color-surface-hover: #232323;
+  --color-surface-active: #2a2a2a;
+
+  --color-stroke: #262626;
+  --color-stroke-strong: #3a3a3a;
+
+  --color-text: #ededed;
+  --color-text-muted: #a3a3a3;
+  --color-text-subtle: #6b6b6b;
+  --color-text-inverse: #0a0a0a;
+
+  --scrollbar-thumb: #3a3a3a;
+  --scrollbar-track: #161616;
+
+  color-scheme: dark;
+}
+
+// LIGHT — blanco puro
+[data-theme='light'] {
+  --color-bg-0: #ffffff;
+  --color-bg-1: #fafafa;
+  --color-bg-2: #f4f4f4;
+  --color-bg-elevated: #ffffff;
+
+  --color-surface: #ffffff;
+  --color-surface-hover: #f7f7f7;
+  --color-surface-active: #eeeeee;
+
+  --color-stroke: #e5e5e5;
+  --color-stroke-strong: #d4d4d4;
+
+  --color-text: #0a0a0a;
+  --color-text-muted: #525252;
+  --color-text-subtle: #a3a3a3;
+  --color-text-inverse: #ffffff;
+
+  --scrollbar-thumb: #d4d4d4;
+  --scrollbar-track: #fafafa;
+
+  color-scheme: light;
+}

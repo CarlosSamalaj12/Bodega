@@ -1,0 +1,112 @@
+@use '@/styles/abstracts' as *;
+
+.entrada-form {
+  display: flex;
+  flex-direction: column;
+  gap: $space-5;
+
+  &__error {
+    padding: $space-3 $space-4;
+    background: $color-danger-soft;
+    color: $color-danger;
+    border-radius: $radius-md;
+    font-size: $font-size-sm;
+  }
+
+  &__section {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+  }
+
+  &__section-title {
+    font-size: $font-size-md;
+    font-weight: $font-weight-semibold;
+    color: $color-text;
+    margin: 0;
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: $space-3;
+  }
+
+  &__bodega {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-3 $space-4;
+    background: $color-surface;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+    font-size: $font-size-sm;
+
+    &-label {
+      color: $color-text-muted;
+    }
+  }
+
+  &__num,
+  &__text {
+    padding: $space-2 $space-3;
+    font-size: $font-size-sm;
+  }
+
+  &__subtotal {
+    font-variant-numeric: tabular-nums;
+    color: $color-text;
+    font-weight: $font-weight-medium;
+  }
+
+  &__total-label {
+    color: $color-text-muted;
+    font-weight: $font-weight-semibold;
+    font-size: $font-size-sm;
+  }
+
+  &__total {
+    font-variant-numeric: tabular-nums;
+    color: $color-text;
+    font-weight: $font-weight-semibold;
+    font-size: $font-size-md;
+  }
+
+  &__total-mobile {
+    display: none;
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: $space-3;
+    padding-top: $space-4;
+    border-top: 1px solid $color-stroke;
+
+    @media (max-width: $bp-md) {
+      flex-direction: column-reverse;
+      gap: $space-2;
+    }
+  }
+
+  // ---------- Móvil ----------
+  @media (max-width: $bp-md) {
+    &__total-mobile {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: $space-3 $space-4;
+      background: $color-surface;
+      border: 1px solid $color-stroke;
+      border-radius: $radius-md;
+      font-size: $font-size-md;
+      color: $color-text;
+
+      strong {
+        font-variant-numeric: tabular-nums;
+        font-size: $font-size-lg;
+        font-weight: $font-weight-semibold;
+      }
+    }
+  }
+}

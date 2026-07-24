@@ -1,0 +1,65 @@
+@use '@/styles/abstracts' as *;
+
+.toast-container {
+  position: fixed;
+  bottom: $space-5;
+  right: $space-5;
+  z-index: $z-toast;
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: $space-3;
+  min-width: 280px;
+  max-width: 420px;
+  padding: $space-3 $space-4;
+  background: $color-bg-elevated;
+  border: 1px solid $color-stroke;
+  border-radius: $radius-md;
+  box-shadow: $shadow-md;
+  color: $color-text;
+  font-size: $font-size-sm;
+  animation: slideIn $transition-base;
+
+  &--success { border-left: 3px solid $color-success; }
+  &--danger  { border-left: 3px solid $color-danger; }
+  &--warning { border-left: 3px solid $color-warning; }
+  &--info    { border-left: 3px solid $color-info; }
+  &--default { border-left: 3px solid $color-accent; }
+
+  &__message {
+    flex: 1;
+  }
+
+  &__close {
+    background: transparent;
+    color: $color-text-muted;
+    border: none;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: $radius-xs;
+    transition: color $transition-fast, background $transition-fast;
+
+    &:hover {
+      color: $color-text;
+      background: $color-surface-hover;
+    }
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

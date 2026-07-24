@@ -1,0 +1,138 @@
+@use '@/styles/abstracts' as *;
+
+// =============================================================
+// DataList — tabla en desktop, cards en móvil
+// =============================================================
+
+.data-list {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+
+  &__state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: $space-2;
+    padding: $space-7;
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+  }
+
+  // ---------- Cards (móvil) ----------
+  &--mobile {
+    .data-list__card {
+      width: 100%;
+      text-align: left;
+      background: $color-surface;
+      border: 1px solid $color-stroke;
+      border-radius: $radius-lg;
+      padding: $space-4;
+      display: flex;
+      flex-direction: column;
+      gap: $space-3;
+      font: inherit;
+      color: inherit;
+      cursor: default;
+      transition: border-color $transition-fast, background $transition-fast, transform $transition-fast;
+
+      &--clickable {
+        cursor: pointer;
+
+        &:hover {
+          border-color: $color-stroke-strong;
+          background: $color-surface-hover;
+        }
+
+        &:active {
+          transform: scale(0.99);
+        }
+
+        &:focus-visible {
+          outline: none;
+          border-color: $color-accent;
+          box-shadow: $shadow-glow-accent;
+        }
+      }
+    }
+
+    .data-list__card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: $space-3;
+      padding-bottom: $space-3;
+      border-bottom: 1px solid $color-stroke;
+    }
+
+    .data-list__card-primary {
+      font-size: $font-size-md;
+      font-weight: $font-weight-semibold;
+      color: $color-text;
+      min-width: 0;
+      flex: 1 1 auto;
+      @include truncate;
+    }
+
+    .data-list__card-body {
+      display: flex;
+      flex-direction: column;
+      gap: $space-2;
+      margin: 0;
+    }
+
+    .data-list__row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+      gap: $space-3;
+      align-items: baseline;
+      margin: 0;
+    }
+
+    .data-list__label {
+      color: $color-text-muted;
+      font-size: $font-size-xs;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: $font-weight-medium;
+      margin: 0;
+    }
+
+    .data-list__value {
+      color: $color-text;
+      font-size: $font-size-sm;
+      font-weight: $font-weight-medium;
+      text-align: right;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      margin: 0;
+    }
+
+    .data-list__card-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: $space-2;
+      flex-wrap: wrap;
+      padding-top: $space-3;
+      border-top: 1px solid $color-stroke;
+    }
+  }
+
+  // Density sm
+  &--sm {
+    .data-list__card {
+      padding: $space-3;
+      gap: $space-2;
+    }
+    .data-list__card-head {
+      padding-bottom: $space-2;
+    }
+  }
+}
+
+// Clickable row cursor (desktop)
+.table__row--clickable {
+  cursor: pointer;
+}

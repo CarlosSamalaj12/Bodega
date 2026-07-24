@@ -1,0 +1,81 @@
+@use '@/styles/abstracts' as *;
+
+.salidas-page {
+  padding: $space-6;
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+
+  &__steps {
+    padding-left: $space-5;
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+    color: $color-text;
+    font-size: $font-size-sm;
+    line-height: $line-height-base;
+
+    li::marker {
+      color: $color-text-muted;
+    }
+
+    strong {
+      font-weight: $font-weight-semibold;
+    }
+  }
+
+  &__bodega {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    font-size: $font-size-base;
+    color: $color-text;
+
+    span {
+      color: $color-text-muted;
+    }
+
+    strong {
+      font-weight: $font-weight-semibold;
+    }
+  }
+
+  &__loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: $space-2;
+    padding: $space-3;
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+  }
+
+  &__catalog-error {
+    padding: $space-4;
+    background: $color-danger-soft;
+    color: $color-danger;
+    border-radius: $radius-md;
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+    align-items: flex-start;
+  }
+
+  &__catalog-error-detail {
+    font-family: $font-mono;
+    font-size: $font-size-xs;
+    background: rgba(0, 0, 0, 0.15);
+    padding: $space-2 $space-3;
+    border-radius: $radius-sm;
+    width: 100%;
+  }
+
+  &__warn {
+    margin-top: $space-3;
+    padding: $space-3 $space-4;
+    background: $color-warning-soft;
+    color: $color-warning;
+    border-radius: $radius-md;
+    font-size: $font-size-sm;
+  }
+}

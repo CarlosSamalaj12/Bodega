@@ -1,0 +1,146 @@
+@use '@/styles/abstracts' as *;
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: $z-sticky;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-3;
+  padding: $space-3 $space-6;
+  background: var(--color-bg-1);
+  border-bottom: 1px solid $color-stroke;
+  min-height: $header-height;
+  flex-wrap: wrap;
+
+  &__title {
+    min-width: 0;
+    flex: 1 1 240px;
+  }
+
+  &__h1 {
+    font-size: $font-size-xl;
+    font-weight: $font-weight-semibold;
+    color: $color-text;
+    margin: 0;
+    @include truncate;
+  }
+
+  &__subtitle {
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+    margin-top: 2px;
+    @include truncate;
+  }
+
+  &__right {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    flex-wrap: wrap;
+  }
+
+  &__user {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: 2px $space-3 2px 2px;
+    border-radius: $radius-pill;
+    background: $color-surface;
+    border: 1px solid $color-stroke;
+    min-width: 0;
+    max-width: 220px;
+  }
+
+  &__avatar {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: $radius-pill;
+    background: $color-accent;
+    color: $color-text-inverse;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    line-height: 1;
+    letter-spacing: 0.02em;
+  }
+
+  &__user-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.15;
+  }
+
+  &__user-name {
+    font-size: $font-size-sm;
+    color: $color-text;
+    font-weight: $font-weight-medium;
+    @include truncate;
+  }
+
+  &__user-role {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    @include truncate;
+  }
+
+  // ---------- Móvil ----------
+  @media (max-width: $bp-md) {
+    padding: $space-3 $space-4;
+    flex-direction: column;
+    align-items: stretch;
+    gap: $space-3;
+
+    &__title {
+      flex: 1 1 100%;
+      min-width: 0;
+    }
+
+    &__h1 {
+      font-size: $font-size-lg;
+    }
+
+    &__subtitle {
+      font-size: $font-size-xs;
+    }
+
+    &__right {
+      width: 100%;
+      justify-content: flex-end;
+      gap: $space-2;
+    }
+
+    &__actions {
+      flex: 1 1 auto;
+      min-width: 0;
+      // Los botones de crear pueden ser muy anchos: hacer que el texto
+      // se trunque con ellipsis en lugar de desbordar
+      > * {
+        min-width: 0;
+      }
+    }
+
+    // En móvil: ocultar texto del usuario (solo avatar).
+    &__user {
+      padding: 2px;
+      max-width: none;
+    }
+
+    &__user-text {
+      display: none;
+    }
+  }
+}

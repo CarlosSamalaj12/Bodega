@@ -1,0 +1,314 @@
+@use '@/styles/abstracts' as *;
+
+.product-picker {
+  position: relative;
+  width: 100%;
+
+  // ---------- Input ----------
+  &__input-wrap {
+    position: relative !important;
+  }
+
+  &__search-icon {
+    position: absolute !important;
+    left: 12px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    color: $color-accent !important;
+    pointer-events: none;
+    z-index: 2;
+    width: 20px !important;
+    height: 20px !important;
+    display: grid !important;
+    place-items: center;
+
+    svg {
+      display: block !important;
+      width: 20px !important;
+      height: 20px !important;
+      stroke-width: 2.5 !important;
+    }
+  }
+
+  &__input {
+    width: 100% !important;
+    padding-left: 44px !important;
+    padding-right: 40px !important;
+  }
+
+  &__clear {
+    position: absolute;
+    right: $space-2;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    color: $color-text-muted;
+    border: none;
+    border-radius: $radius-pill;
+    cursor: pointer;
+    transition: background $transition-fast, color $transition-fast;
+
+    &:hover {
+      background: $color-surface-hover;
+      color: $color-text;
+    }
+  }
+
+  // ---------- Dropdown (se monta en portal con position: fixed) ----------
+  &__dropdown {
+    z-index: $z-tooltip;  // muy alto para estar sobre todo
+    background: var(--color-bg-elevated);
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+    box-shadow: $shadow-lg;
+    max-height: 360px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: pickerIn 120ms ease-out;
+  }
+
+  @keyframes pickerIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  &__results-meta {
+    padding: $space-2 $space-4;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid $color-stroke;
+    background: $color-bg-2;
+  }
+
+  &__list {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    padding: 4px;
+    @include custom-scrollbar;
+  }
+
+  &__status {
+    display: flex;
+    align-items: flex-start;
+    gap: $space-3;
+    padding: $space-4;
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+
+    &--muted {
+      align-items: center;
+
+      .product-picker__status-icon {
+        font-size: 24px;
+        color: $color-text-subtle;
+        flex-shrink: 0;
+      }
+    }
+  }
+
+  &__status-hint {
+    margin-top: 2px;
+    font-size: $font-size-xs;
+    color: $color-text-subtle;
+  }
+
+  &__hint {
+    padding: $space-2 $space-4;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    border-top: 1px solid $color-stroke;
+    background: $color-bg-2;
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+
+    kbd {
+      display: inline-block;
+      padding: 1px $space-1;
+      font-family: $font-mono;
+      font-size: 10px;
+      color: $color-text;
+      background: $color-surface;
+      border: 1px solid $color-stroke;
+      border-radius: $radius-xs;
+      margin: 0 1px;
+    }
+  }
+
+  // ---------- Opción individual ----------
+  &__option {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    width: 100%;
+    padding: $space-3;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: $radius-sm;
+    text-align: left;
+    cursor: pointer;
+    color: $color-text;
+    transition: background $transition-fast, border-color $transition-fast;
+
+    &:hover {
+      background: $color-surface-hover;
+    }
+
+    &--active {
+      background: $color-surface-active;
+      border-color: $color-stroke-strong;
+    }
+  }
+
+  &__option-icon {
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    background: $color-bg-2;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-sm;
+    color: $color-text-muted;
+    font-size: $font-size-md;
+    flex-shrink: 0;
+  }
+
+  &__option-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__option-name {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: $color-text;
+    @include truncate;
+  }
+
+  &__option-meta {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+  }
+
+  &__option-sku {
+    font-family: $font-mono;
+    color: $color-secondary;
+    background: $color-secondary-soft;
+    padding: 1px $space-2;
+    border-radius: $radius-xs;
+    font-size: $font-size-xs;
+  }
+
+  &__option-cat,
+  &__option-unit {
+    @include truncate;
+  }
+
+  &__option-cat::before {
+    content: '·';
+    margin-right: $space-2;
+    color: $color-text-subtle;
+  }
+
+  // ---------- Highlight de coincidencia ----------
+  &__mark {
+    background: $color-accent-soft;
+    color: $color-accent;
+    font-weight: $font-weight-semibold;
+    padding: 0 1px;
+    border-radius: 2px;
+  }
+
+  // ---------- Estado: producto seleccionado ----------
+  &--selected {
+    .product-picker__chip {
+      display: flex;
+      align-items: center;
+      gap: $space-3;
+      padding: $space-3;
+      background: $color-surface;
+      border: 1px solid $color-stroke;
+      border-radius: $radius-md;
+    }
+
+    .product-picker__chip-icon {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      background: $color-accent-soft;
+      color: $color-accent;
+      border-radius: $radius-sm;
+      flex-shrink: 0;
+    }
+
+    .product-picker__chip-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .product-picker__chip-name {
+      @include truncate;
+      font-size: $font-size-sm;
+      font-weight: $font-weight-medium;
+      color: $color-text;
+    }
+
+    .product-picker__chip-meta {
+      display: flex;
+      align-items: center;
+      gap: $space-2;
+      margin-top: 2px;
+      font-size: $font-size-xs;
+      color: $color-text-muted;
+    }
+
+    .product-picker__chip-sku {
+      font-family: $font-mono;
+      color: $color-secondary;
+      background: $color-secondary-soft;
+      padding: 1px $space-2;
+      border-radius: $radius-xs;
+    }
+
+    .product-picker__chip-cat::before {
+      content: '·';
+      margin-right: $space-2;
+      color: $color-text-subtle;
+    }
+
+    .product-picker__chip-remove {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      background: transparent;
+      color: $color-text-muted;
+      border: none;
+      border-radius: $radius-pill;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background $transition-fast, color $transition-fast;
+
+      &:hover {
+        background: $color-danger-soft;
+        color: $color-danger;
+      }
+    }
+  }
+}

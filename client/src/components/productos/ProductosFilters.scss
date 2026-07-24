@@ -1,0 +1,56 @@
+@use '@/styles/abstracts' as *;
+
+.productos-filters {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr auto;
+  gap: $space-3;
+  align-items: end;
+
+  @include breakpoint(md) {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  &__search {
+    grid-column: span 1;
+  }
+
+  &__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-3 $space-3;
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+
+    input[type='checkbox'] {
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: $color-bg-2;
+      border: 1px solid $color-stroke;
+      border-radius: $radius-xs;
+      cursor: pointer;
+      position: relative;
+      transition: background $transition-fast, border-color $transition-fast;
+
+      &:checked {
+        background: $color-accent;
+        border-color: $color-accent;
+        &::after {
+          content: '';
+          position: absolute;
+          left: 4px;
+          top: 1px;
+          width: 4px;
+          height: 8px;
+          border: solid $color-text;
+          border-width: 0 2px 2px 0;
+          transform: rotate(45deg);
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,152 @@
+@use '@/styles/abstracts' as *;
+
+.lines-editor {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: $space-2;
+  }
+
+  &__table {
+    th { white-space: nowrap; }
+  }
+
+  &__remove {
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    color: $color-text-muted;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-pill;
+    cursor: pointer;
+    transition: background $transition-fast, color $transition-fast, border-color $transition-fast;
+
+    &:hover:not(:disabled) {
+      background: $color-danger-soft;
+      color: $color-danger;
+      border-color: $color-danger;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  }
+
+  &__cards {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+  }
+
+  &__empty {
+    padding: $space-4;
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    text-align: center;
+    background: $color-surface;
+    border: 1px dashed $color-stroke;
+    border-radius: $radius-md;
+  }
+
+  &__card {
+    background: $color-surface;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-lg;
+    padding: $space-3;
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+  }
+
+  &__card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: $space-2;
+    padding-bottom: $space-2;
+    border-bottom: 1px solid $color-stroke;
+  }
+
+  &__card-primary {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  &__card-label {
+    font-size: $font-size-xs;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: $color-text-muted;
+    font-weight: $font-weight-medium;
+  }
+
+  &__card-primary-content {
+    min-width: 0;
+    width: 100%;
+
+    // El ProductPicker u otros inputs deben llenar el ancho
+    > * {
+      width: 100%;
+      max-width: 100%;
+    }
+  }
+
+  &__card-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-3;
+
+    // Si solo hay 1 campo no-primary, que ocupe todo el ancho
+    &--single {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+    min-width: 0;
+    width: 100%;
+  }
+
+  &__field-label {
+    font-size: $font-size-xs;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: $color-text-muted;
+    font-weight: $font-weight-medium;
+  }
+
+  &__field-control {
+    min-width: 0;
+    width: 100%;
+
+    > * {
+      width: 100%;
+      max-width: 100%;
+    }
+  }
+
+  // Si un campo necesita todo el ancho (full-width field)
+  &__field--full {
+    grid-column: 1 / -1;
+  }
+
+  &--compact {
+    .lines-editor__card {
+      padding: $space-3;
+    }
+  }
+}

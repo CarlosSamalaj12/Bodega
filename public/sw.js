@@ -1,8 +1,9 @@
-const STATIC_CACHE = "bodega-static-v2";
-const API_CACHE = "bodega-api-v2";
+const STATIC_CACHE = "bodega-static-v4";
+const API_CACHE = "bodega-api-v4";
 
 const STATIC_ASSETS = [
   "./app.html",
+  "./app.js",
   "./styles.css",
   "./manifest.webmanifest",
   "./pw.ico",
@@ -12,6 +13,7 @@ const STATIC_ASSETS = [
   "https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css",
   "https://cdn.jsdelivr.net/npm/flatpickr",
   "https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js",
+  "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200",
 ];
 
 // ─── Install: pre-cache app shell ───────────────────────────────────

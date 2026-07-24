@@ -1,0 +1,91 @@
+@use '../abstracts' as *;
+
+// =============================================================
+// Form controls
+// =============================================================
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+
+  &__label {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: $color-text-muted;
+  }
+
+  &__hint {
+    font-size: $font-size-xs;
+    color: $color-text-subtle;
+  }
+
+  &__error {
+    font-size: $font-size-xs;
+    color: $color-danger;
+  }
+}
+
+.input,
+.select,
+.textarea {
+  @include input-base;
+}
+
+.textarea {
+  min-height: 88px;
+  resize: vertical;
+  font-family: $font-main;
+}
+
+.select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='%23A9B3D0' d='M6 8L0 0h12z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right $space-4 center;
+  background-size: 10px;
+  padding-right: $space-7;
+  cursor: pointer;
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-2;
+  cursor: pointer;
+  user-select: none;
+
+  input[type='checkbox'] {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: $color-bg-2;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-xs;
+    cursor: pointer;
+    position: relative;
+    transition: background $transition-fast, border-color $transition-fast;
+
+    &:checked {
+      background: $color-accent;
+      border-color: $color-accent;
+
+      &::after {
+        content: '';
+        position: absolute;
+        left: 5px;
+        top: 1px;
+        width: 5px;
+        height: 10px;
+        border: solid $color-text;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+      }
+    }
+
+    &:focus-visible {
+      outline: 2px solid $color-accent;
+      outline-offset: 2px;
+    }
+  }
+}

@@ -1,0 +1,64 @@
+@use '@/styles/abstracts' as *;
+
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: $space-5;
+
+  &__panel {
+    @include card-glass;
+    width: min(420px, 100%);
+    padding: $space-7 $space-6;
+    animation: rise $transition-slow;
+  }
+
+  &__brand {
+    text-align: center;
+    margin-bottom: $space-7;
+  }
+
+  &__logo {
+    width: 56px;
+    height: 56px;
+    border-radius: $radius-lg;
+    display: grid;
+    place-items: center;
+    margin: 0 auto $space-4;
+    background: $color-accent;
+    color: $color-text-inverse;
+    font-weight: $font-weight-bold;
+    font-size: $font-size-2xl;
+  }
+
+  &__title {
+    font-size: $font-size-2xl;
+    font-weight: $font-weight-bold;
+    color: $color-text;
+  }
+
+  &__subtitle {
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+    margin-top: $space-1;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

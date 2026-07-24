@@ -11,7 +11,8 @@
   <link rel="apple-touch-icon" href="./pw.ico"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css"/>
-  <link rel="stylesheet" href="./styles.css"/>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"/>
+  <link rel="stylesheet" href="./styles.css?v=20260709a"/>
 </head>
 <body class="app">
   <div class="appShell">
@@ -49,22 +50,8 @@
 <button class="menuBtn" data-section="cuadre-caja">Cuadre de caja</button>
 </div>
 </div>
-      <div class="menuGroup menuAccordion is-collapsed" data-menu-group="agregar">
-<button class="menuGroupToggle" data-menu-group-toggle type="button" aria-expanded="false">
-<span class="menuTitle">Agregar</span>
-<span class="menuGroupCaret" aria-hidden="true">v</span>
-</button>
-<div class="menuGroupBody">
-<button class="menuBtn" data-section="categorias">Categorias</button>
-<button class="menuBtn" data-section="subcategorias">Subcategorias</button>
-<button class="menuBtn" data-section="motivos-movimiento">Motivo movimiento</button>
-<button class="menuBtn" data-section="proveedores">Proveedores</button>
-<button class="menuBtn" data-section="productos">Productos</button>
-<button class="menuBtn" data-section="limites">Min/Max</button>
-<button class="menuBtn" data-section="reglas-subcategorias">Reglas subcategorias</button>
-<button class="menuBtn" data-section="usuarios">Usuarios</button>
-<button class="menuBtn" data-section="bodegas">Bodegas</button>
-</div>
+      <div class="menuGroup">
+<button class="menuBtn" data-section="configuracion">Configuracion</button>
 </div>
       <div class="menuGroup menuAccordion is-collapsed" data-menu-group="reportes">
 <button class="menuGroupToggle" data-menu-group-toggle type="button" aria-expanded="false">
@@ -172,6 +159,1185 @@
 </tbody>
 </table>
 </div>
+</div>
+</div>
+        <div class="view hidden" id="view-configuracion">
+<div class="settingsCenter">
+  <aside class="settingsSidebar">
+    <div class="settingsSidebarHeader">
+      <div class="settingsSidebarTitle">Configuracion</div>
+      <div class="settingsSidebarSub">Modulos del sistema</div>
+    </div>
+    <div class="settingsSearchWrap">
+      <span class="material-symbols-outlined settingsSearchIcon">search</span>
+      <input class="settingsSearch" type="text" placeholder="Buscar modulo..." id="settingsSearchInput" />
+    </div>
+    <nav class="settingsNav" id="settingsNav">
+      <button class="settingsNavBtn active" data-settings-module="overview">
+        <span class="material-symbols-outlined settingsNavIcon">dashboard</span>
+        <span>Resumen</span>
+      </button>
+      <button class="settingsNavBtn" data-settings-module="categorias">
+        <span class="material-symbols-outlined settingsNavIcon">category</span>
+        <span>Categorias y Subcategorias</span>
+      </button>
+      <button class="settingsNavBtn" data-settings-module="motivos-movimiento">
+        <span class="material-symbols-outlined settingsNavIcon">swap_vert</span>
+        <span>Motivo movimiento</span>
+      </button>
+      <button class="settingsNavBtn" data-settings-module="proveedores">
+        <span class="material-symbols-outlined settingsNavIcon">local_shipping</span>
+        <span>Proveedores</span>
+      </button>
+      <button class="settingsNavBtn" data-settings-module="productos">
+        <span class="material-symbols-outlined settingsNavIcon">inventory_2</span>
+        <span>Productos</span>
+      </button>
+      <button class="settingsNavBtn" data-settings-module="limites">
+        <span class="material-symbols-outlined settingsNavIcon">trending_up</span>
+        <span>Min / Max</span>
+      </button>
+      <button class="settingsNavBtn" data-settings-module="reglas-subcategorias">
+        <span class="material-symbols-outlined settingsNavIcon">rule</span>
+        <span>Reglas subcategorias</span>
+      </button>
+      <button class="settingsNavBtn" data-settings-module="usuarios">
+        <span class="material-symbols-outlined settingsNavIcon">group</span>
+        <span>Usuarios</span>
+      </button>
+      <button class="settingsNavBtn" data-settings-module="bodegas">
+        <span class="material-symbols-outlined settingsNavIcon">warehouse</span>
+        <span>Bodegas</span>
+      </button>
+    </nav>
+  </aside>
+  <main class="settingsMain">
+    <div class="settingsOverview settingsContent active" data-settings-content="overview">
+      <div class="settingsOverviewHeader">
+        <div class="settingsOverviewTitle">Modulos de configuracion</div>
+        <div class="settingsOverviewDesc">Selecciona un modulo para administrar</div>
+      </div>
+      <div class="settingsGrid" id="settingsGrid">
+        <button class="settingsCard" data-settings-module="categorias" style="--card-grad-1:#7C3AED;--card-grad-2:#22D3EE">
+          <div class="settingsCardIconWrap">
+            <span class="material-symbols-outlined settingsCardIcon">category</span>
+          </div>
+          <div class="settingsCardBody">
+            <div class="settingsCardTitle">Categorias y Subcategorias</div>
+            <div class="settingsCardDesc">Administra categorias y subcategorias de productos</div>
+          </div>
+          <span class="material-symbols-outlined settingsCardArrow">chevron_right</span>
+        </button>
+
+        <button class="settingsCard" data-settings-module="motivos-movimiento" style="--card-grad-1:#F59E0B;--card-grad-2:#D97706">
+          <div class="settingsCardIconWrap">
+            <span class="material-symbols-outlined settingsCardIcon">swap_vert</span>
+          </div>
+          <div class="settingsCardBody">
+            <div class="settingsCardTitle">Motivos de movimiento</div>
+            <div class="settingsCardDesc">Define motivos para entradas y salidas</div>
+          </div>
+          <span class="material-symbols-outlined settingsCardArrow">chevron_right</span>
+        </button>
+        <button class="settingsCard" data-settings-module="proveedores" style="--card-grad-1:#10B981;--card-grad-2:#059669">
+          <div class="settingsCardIconWrap">
+            <span class="material-symbols-outlined settingsCardIcon">local_shipping</span>
+          </div>
+          <div class="settingsCardBody">
+            <div class="settingsCardTitle">Proveedores</div>
+            <div class="settingsCardDesc">Registra y administra proveedores</div>
+          </div>
+          <span class="material-symbols-outlined settingsCardArrow">chevron_right</span>
+        </button>
+        <button class="settingsCard" data-settings-module="productos" style="--card-grad-1:#8B5CF6;--card-grad-2:#6D28D9">
+          <div class="settingsCardIconWrap">
+            <span class="material-symbols-outlined settingsCardIcon">inventory_2</span>
+          </div>
+          <div class="settingsCardBody">
+            <div class="settingsCardTitle">Productos</div>
+            <div class="settingsCardDesc">Gestiona el catalogo de productos</div>
+          </div>
+          <span class="material-symbols-outlined settingsCardArrow">chevron_right</span>
+        </button>
+        <button class="settingsCard" data-settings-module="limites" style="--card-grad-1:#F97316;--card-grad-2:#EA580C">
+          <div class="settingsCardIconWrap">
+            <span class="material-symbols-outlined settingsCardIcon">trending_up</span>
+          </div>
+          <div class="settingsCardBody">
+            <div class="settingsCardTitle">Minimos / Maximos</div>
+            <div class="settingsCardDesc">Configura limites de stock por producto</div>
+          </div>
+          <span class="material-symbols-outlined settingsCardArrow">chevron_right</span>
+        </button>
+        <button class="settingsCard" data-settings-module="reglas-subcategorias" style="--card-grad-1:#EC4899;--card-grad-2:#DB2777">
+          <div class="settingsCardIconWrap">
+            <span class="material-symbols-outlined settingsCardIcon">rule</span>
+          </div>
+          <div class="settingsCardBody">
+            <div class="settingsCardTitle">Reglas por subcategoria</div>
+            <div class="settingsCardDesc">Define reglas de vencimiento y alertas</div>
+          </div>
+          <span class="material-symbols-outlined settingsCardArrow">chevron_right</span>
+        </button>
+        <button class="settingsCard" data-settings-module="usuarios" style="--card-grad-1:#14B8A6;--card-grad-2:#0D9488">
+          <div class="settingsCardIconWrap">
+            <span class="material-symbols-outlined settingsCardIcon">group</span>
+          </div>
+          <div class="settingsCardBody">
+            <div class="settingsCardTitle">Usuarios</div>
+            <div class="settingsCardDesc">Administra usuarios y permisos</div>
+          </div>
+          <span class="material-symbols-outlined settingsCardArrow">chevron_right</span>
+        </button>
+        <button class="settingsCard" data-settings-module="bodegas" style="--card-grad-1:#6366F1;--card-grad-2:#4F46E5">
+          <div class="settingsCardIconWrap">
+            <span class="material-symbols-outlined settingsCardIcon">warehouse</span>
+          </div>
+          <div class="settingsCardBody">
+            <div class="settingsCardTitle">Bodegas</div>
+            <div class="settingsCardDesc">Configura bodegas y sus propiedades</div>
+          </div>
+          <span class="material-symbols-outlined settingsCardArrow">chevron_right</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="view-categorias" class="settingsSubView settingsContent hidden" data-settings-content="categorias">
+<div class="settingsDualPanel">
+  <div class="settingsDualCol">
+    <div class="card light settingsDualCard" data-sectioned="1" data-prd-sectioned="1">
+      <div class="settingsDualHead">
+        <span class="material-symbols-outlined settingsDualHeadIcon">category</span>
+        <span class="settingsDualHeadTitle">Categorias</span>
+      </div>
+      <div class="settingsDualBody">
+        <div class="settingsDualForm" id="catCreateForm">
+          <div class="settingsDualField">
+            <label class="settingsDualLabel">Nombre</label>
+            <input class="in" id="catNombre" placeholder="Nombre de la categoria" />
+          </div>
+          <div class="settingsDualField sm">
+            <label class="settingsDualLabel">Activo</label>
+            <select class="in" id="catActivo">
+              <option value="1">Si</option>
+              <option value="0">No</option>
+            </select>
+          </div>
+          <div class="settingsDualActions">
+            <button class="btn ok" id="catSave">Guardar</button>
+            <button class="btn soft" id="catRefresh" type="button">Refrescar</button>
+          </div>
+        </div>
+        <div class="settingsDualEditBar hidden" id="catEditBar">
+          <div class="settingsDualEditBadge">
+            <span class="material-symbols-outlined" style="font-size:16px">edit</span>
+            Editando categoria #<span id="catEditIdDisplay"></span>
+          </div>
+          <div class="settingsDualField">
+            <label class="settingsDualLabel">Nombre</label>
+            <input class="in" id="catEditNombre" />
+          </div>
+          <div class="settingsDualField sm">
+            <label class="settingsDualLabel">Activo</label>
+            <select class="in" id="catEditActivo">
+              <option value="1">Si</option>
+              <option value="0">No</option>
+            </select>
+          </div>
+          <div class="settingsDualActions">
+            <button class="btn ok" id="catEditSave">Actualizar</button>
+            <button class="btn soft" id="catEditCancel" type="button">Cancelar</button>
+          </div>
+          <input type="hidden" id="catEditId" />
+        </div>
+        <details class="settingsDualImport">
+          <summary class="settingsDualImportSummary">
+            <span class="material-symbols-outlined" style="font-size:16px">upload_file</span>
+            Importar CSV
+          </summary>
+          <div class="settingsDualImportBody">
+            <div class="settingsDualFormRow">
+              <div>
+                <label class="settingsDualLabel">Archivo</label>
+                <input id="catImportFile" type="file" />
+                <div id="catImportFileName"></div>
+              </div>
+              <div>
+                <label class="settingsDualLabel">Separador</label>
+                <select class="in" id="catImportDelimiter">
+                  <option value=",">,</option>
+                  <option value=";">;</option>
+                </select>
+              </div>
+              <div class="settingsDualActions" style="align-self:end">
+                <button class="btn soft btn-sm" id="catTemplateBtn">Plantilla</button>
+                <button class="btn soft btn-sm" id="catImportBtn">Importar</button>
+              </div>
+            </div>
+          </div>
+        </details>
+        <div class="settingsDualTableWrap">
+          <table class="tbl grid">
+            <thead>
+              <tr><th>ID</th><th>Categoria</th><th>Activo</th><th>Accion</th></tr>
+            </thead>
+            <tbody id="catManageList"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="settingsDualCol">
+    <div class="card light settingsDualCard" data-sectioned="1">
+      <div class="settingsDualHead">
+        <span class="material-symbols-outlined settingsDualHeadIcon">layers</span>
+        <span class="settingsDualHeadTitle">Subcategorias</span>
+      </div>
+      <div class="settingsDualBody">
+        <div class="settingsDualForm" id="subCatCreateForm">
+          <div class="settingsDualField">
+            <label class="settingsDualLabel">Nombre</label>
+            <input class="in" id="subCatNombre" placeholder="Nombre de la subcategoria" />
+          </div>
+          <div class="settingsDualField">
+            <label class="settingsDualLabel">Categoria</label>
+            <select class="in" id="subCatCategoria"></select>
+          </div>
+          <div class="settingsDualField sm">
+            <label class="settingsDualLabel">Activo</label>
+            <select class="in" id="subCatActivo"></select>
+          </div>
+          <div class="settingsDualActions">
+            <button class="btn ok" id="subCatSave">Guardar</button>
+            <button class="btn soft" id="subCatRefresh" type="button">Refrescar</button>
+          </div>
+        </div>
+        <div class="settingsDualEditBar hidden" id="subCatEditBar">
+          <div class="settingsDualEditBadge">
+            <span class="material-symbols-outlined" style="font-size:16px">edit</span>
+            Editando subcategoria #<span id="subCatEditIdDisplay"></span>
+          </div>
+          <div class="settingsDualField">
+            <label class="settingsDualLabel">Nombre</label>
+            <input class="in" id="subCatEditNombre" />
+          </div>
+          <div class="settingsDualField">
+            <label class="settingsDualLabel">Categoria</label>
+            <select class="in" id="subCatEditCategoria"></select>
+          </div>
+          <div class="settingsDualField sm">
+            <label class="settingsDualLabel">Activo</label>
+            <select class="in" id="subCatEditActivo"></select>
+          </div>
+          <div class="settingsDualActions">
+            <button class="btn ok" id="subCatEditSave">Actualizar</button>
+            <button class="btn soft" id="subCatEditCancel" type="button">Cancelar</button>
+          </div>
+          <input type="hidden" id="subCatEditId" />
+        </div>
+        <details class="settingsDualImport">
+          <summary class="settingsDualImportSummary">
+            <span class="material-symbols-outlined" style="font-size:16px">upload_file</span>
+            Importar CSV
+          </summary>
+          <div class="settingsDualImportBody">
+            <div class="settingsDualFormRow">
+              <div>
+                <label class="settingsDualLabel">Archivo</label>
+                <input id="subCatImportFile" type="file" />
+                <div id="subCatImportFileName"></div>
+              </div>
+              <div>
+                <label class="settingsDualLabel">Separador</label>
+                <select class="in" id="subCatImportDelimiter"></select>
+              </div>
+              <div class="settingsDualActions" style="align-self:end">
+                <button class="btn soft btn-sm" id="subCatTemplateBtn">Plantilla</button>
+                <button class="btn soft btn-sm" id="subCatImportBtn">Importar</button>
+              </div>
+            </div>
+          </div>
+        </details>
+        <div class="settingsDualTableWrap">
+          <table class="tbl grid">
+            <thead>
+              <tr><th>ID</th><th>Categoria</th><th>Subcategoria</th><th>Activo</th><th>Accion</th></tr>
+            </thead>
+            <tbody id="subCatManageList"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+    <div id="view-subcategorias" class="settingsSubView settingsContent hidden" data-settings-content="subcategorias">
+<div class="settingsRedirectCard">
+  <div class="settingsRedirectIconWrap">
+    <span class="material-symbols-outlined" style="font-size:48px; color:var(--accent2)">layers</span>
+  </div>
+  <div class="settingsRedirectTitle">Subcategorias</div>
+  <div class="settingsRedirectDesc">Las subcategorias ahora se administran junto con las categorias en la vista combinada.</div>
+  <button class="btn ok" id="gotoCategoriasFromSubBtn" type="button">Ir a Categorias y Subcategorias</button>
+</div>
+</div>
+
+    <div id="view-motivos-movimiento" class="settingsSubView settingsContent hidden" data-settings-content="motivos-movimiento">
+<div class="card light settingsDualCard" data-sectioned="1">
+  <div class="settingsDualHead">
+    <span class="material-symbols-outlined" style="font-size:22px;">swap_horiz</span>
+    <span class="settingsDualHeadTitle">Motivos de movimiento</span>
+  </div>
+  <div class="settingsDualBody">
+    <div class="settingsDualForm">
+      <div class="settingsDualFormGrid">
+        <div>
+          <label class="settingsDualLabel">Nombre</label>
+          <input class="settingsDualInput" id="motNombre" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Tipo</label>
+          <select class="settingsDualInput" id="motTipo"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Signo</label>
+          <select class="settingsDualInput" id="motSigno"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Activo</label>
+          <select class="settingsDualInput" id="motActivo"></select>
+        </div>
+      </div>
+      <div class="settingsDualActions">
+        <button class="btn ok" id="motSave">Guardar</button>
+        <button class="btn soft btn-sm" id="motRefresh">Refrescar</button>
+      </div>
+    </div>
+    <div class="settingsDualTableWrap">
+      <table class="tbl grid">
+        <thead>
+          <tr><th>Motivo</th><th>Tipo</th><th>Signo</th><th>Activo</th><th>Accion</th></tr>
+        </thead>
+        <tbody id="motList"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+    <div id="view-proveedores" class="settingsSubView settingsContent hidden" data-settings-content="proveedores">
+<div class="card light settingsDualCard" data-sectioned="1">
+  <div class="settingsDualHead">
+    <span class="material-symbols-outlined" style="font-size:22px;">local_shipping</span>
+    <span class="settingsDualHeadTitle">Proveedores</span>
+  </div>
+  <div class="settingsDualBody">
+    <div class="settingsDualForm">
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Nombre</label>
+          <input class="settingsDualInput" id="provNombre" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Telefono</label>
+          <input class="settingsDualInput" id="provTelefono" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Direccion</label>
+          <input class="settingsDualInput" id="provDireccion" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Activo</label>
+          <select class="settingsDualInput" id="provActivo"></select>
+        </div>
+      </div>
+      <div class="settingsDualActions">
+        <button class="btn ok" id="provSave">Guardar</button>
+        <button class="btn soft btn-sm" id="provRefresh">Refrescar</button>
+      </div>
+    </div>
+
+    <div class="settingsDualEditBar hidden" id="provEditBar">
+      <div class="settingsDualEditBarTitle">Editando proveedor #<span id="provEditIdDisplay"></span></div>
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Nombre</label>
+          <input class="settingsDualInput" id="provEditNombre" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Telefono</label>
+          <input class="settingsDualInput" id="provEditTelefono" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Direccion</label>
+          <input class="settingsDualInput" id="provEditDireccion" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Activo</label>
+          <select class="settingsDualInput" id="provEditActivo"></select>
+        </div>
+      </div>
+      <input type="hidden" id="provEditId" />
+      <div class="settingsDualActions">
+        <button class="btn ok" id="provEditSave">Actualizar</button>
+        <button class="btn soft" id="provEditCancel">Cancelar</button>
+      </div>
+    </div>
+
+    <details class="settingsDualImport">
+      <summary class="settingsDualImportSummary">
+        <span class="material-symbols-outlined">upload_file</span>
+        Importar CSV
+      </summary>
+      <div class="settingsDualImportBody">
+        <div class="settingsDualFormRow">
+          <div>
+            <label class="settingsDualLabel">Archivo</label>
+            <input id="provImportFile" type="file" />
+            <div id="provImportFileName"></div>
+          </div>
+          <div>
+            <label class="settingsDualLabel">Separador</label>
+            <select class="settingsDualInput" id="provImportDelimiter"></select>
+          </div>
+          <div class="settingsDualActions" style="align-self:end">
+            <button class="btn soft btn-sm" id="provTemplateBtn">Plantilla</button>
+            <button class="btn soft btn-sm" id="provImportBtn">Importar</button>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <div class="settingsDualTableWrap">
+      <table class="tbl grid">
+        <thead>
+          <tr><th>ID</th><th>Proveedor</th><th>Telefono</th><th>Direccion</th><th>Activo</th><th>Accion</th></tr>
+        </thead>
+        <tbody id="provManageList"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+    <div id="view-productos" class="settingsSubView settingsContent hidden" data-settings-content="productos">
+<div class="card light settingsDualCard" data-sectioned="1" data-prd-sectioned="1">
+  <div class="settingsDualHead">
+    <span class="material-symbols-outlined" style="font-size:22px;">inventory_2</span>
+    <span class="settingsDualHeadTitle">Productos</span>
+  </div>
+  <div class="settingsDualBody">
+    <div class="settingsDualForm">
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Nombre producto</label>
+          <input class="settingsDualInput" id="prdNombre" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">SKU</label>
+          <input class="settingsDualInput" id="prdSku" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Medida</label>
+          <select class="settingsDualInput" id="prdMedida"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Estado</label>
+          <select class="settingsDualInput" id="prdActivo"></select>
+        </div>
+      </div>
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Categoria</label>
+          <select class="settingsDualInput" id="prdCategoria"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Subcategoria</label>
+          <select class="settingsDualInput" id="prdSubcategoria"></select>
+        </div>
+        <div style="grid-column: span 2;">
+          <label class="settingsDualLabel">Bodegas visibles</label>
+          <div class="warehouseCheckList" id="prdVisibleWarehouses"></div>
+          <label class="warehouseCheckItem" id="prdMyWarehouseToggleWrap"><input type="checkbox" id="prdVisibleInMyWarehouse" checked /><span>Habilitado en mi bodega</span></label>
+          <div class="note" id="prdMyWarehouseHint">Puedes habilitar o inhabilitar el producto en tu bodega desde la lista.</div>
+        </div>
+      </div>
+      <div class="settingsDualActions">
+        <button class="btn ok" id="prdSave">Guardar producto</button>
+        <button class="btn soft btn-sm" id="prdRefresh">Refrescar</button>
+      </div>
+    </div>
+
+    <div class="settingsDualEditBar hidden" id="prdEditBar">
+      <div class="settingsDualEditBarTitle">Editando producto #<span id="prdEditIdDisplay"></span></div>
+      <input type="hidden" id="prdEditId" />
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Nombre producto</label>
+          <input class="settingsDualInput" id="prdEditNombre" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">SKU</label>
+          <input class="settingsDualInput" id="prdEditSku" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Medida</label>
+          <select class="settingsDualInput" id="prdEditMedida"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Estado</label>
+          <select class="settingsDualInput" id="prdEditActivo"></select>
+        </div>
+      </div>
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Categoria</label>
+          <select class="settingsDualInput" id="prdEditCategoria"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Subcategoria</label>
+          <select class="settingsDualInput" id="prdEditSubcategoria"></select>
+        </div>
+        <div style="grid-column: span 2;">
+          <label class="settingsDualLabel">Bodegas visibles</label>
+          <div class="warehouseCheckList" id="prdEditVisibleWarehouses"></div>
+        </div>
+      </div>
+      <div class="settingsDualActions">
+        <button class="btn ok" id="prdEditSave">Actualizar</button>
+        <button class="btn soft" id="prdEditCancel">Cancelar</button>
+      </div>
+    </div>
+
+    <div class="settingsDualFormGrid grid4" style="margin-bottom:10px;">
+      <div class="searchWrap" style="grid-column: span 2;">
+        <label class="settingsDualLabel">Buscar producto</label>
+        <div style="display:flex; gap:6px;">
+          <input class="settingsDualInput" id="prdSearch" placeholder="Buscar por nombre o SKU" />
+          <button class="btn soft btn-sm" id="prdSearchBtn" type="button">Buscar</button>
+        </div>
+      </div>
+    </div>
+
+    <details class="settingsDualImport">
+      <summary class="settingsDualImportSummary">
+        <span class="material-symbols-outlined">upload_file</span>
+        Importar productos / stock
+      </summary>
+      <div class="settingsDualImportBody" style="display:flex; flex-direction:column; gap:12px;">
+        <div class="settingsDualFormGrid grid4">
+          <div>
+            <label class="settingsDualLabel">CSV productos</label>
+            <input id="prdImportFile" type="file" />
+            <div class="note" id="prdImportFileName">Ningun archivo seleccionado</div>
+          </div>
+          <div>
+            <label class="settingsDualLabel">Separador</label>
+            <select class="settingsDualInput" id="prdImportDelimiter"></select>
+          </div>
+        </div>
+        <div class="settingsDualFormGrid grid4">
+          <div>
+            <label class="settingsDualLabel">CSV stock</label>
+            <input id="prdStockImportFile" type="file" />
+            <div class="note" id="prdStockImportFileName">Ningun archivo seleccionado</div>
+          </div>
+          <div>
+            <label class="settingsDualLabel">Separador stock</label>
+            <select class="settingsDualInput" id="prdStockImportDelimiter"></select>
+          </div>
+          <div>
+            <label class="settingsDualLabel">Motivo importacion</label>
+            <select class="settingsDualInput" id="prdStockImportMotivo"></select>
+          </div>
+          <div>
+            <label class="settingsDualLabel">Observacion importacion</label>
+            <input class="settingsDualInput" id="prdStockImportObs" />
+          </div>
+        </div>
+        <div class="settingsDualActions" style="justify-content:flex-end; gap:6px;">
+          <button class="btn soft btn-sm" id="prdTemplateBtn">Plantilla productos</button>
+          <button class="btn soft btn-sm" id="prdImportBtn">Importar productos</button>
+          <button class="btn soft btn-sm" id="prdStockTemplateBtn">Plantilla stock</button>
+          <button class="btn soft btn-sm" id="prdStockImportBtn">Importar stock</button>
+        </div>
+      </div>
+    </details>
+
+    <div class="settingsDualTableWrap">
+      <table class="tbl grid">
+        <thead>
+          <tr><th>ID</th><th>Producto</th><th>SKU</th><th>Medida</th><th>Categoria</th><th>Subcategoria</th><th>Bodegas visibles</th><th>Mi bodega</th><th>Estado</th><th>Accion</th></tr>
+        </thead>
+        <tbody id="prdManageList"><tr><td colspan="10">Escribe un producto para buscar.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+    <div id="view-limites" class="settingsSubView settingsContent hidden" data-settings-content="limites">
+<div class="card light settingsDualCard" data-sectioned="1">
+  <div class="settingsDualHead">
+    <span class="material-symbols-outlined" style="font-size:22px;">monitoring</span>
+    <span class="settingsDualHeadTitle">Minimos y maximos</span>
+  </div>
+  <div class="settingsDualBody">
+    <div class="settingsDualForm">
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Bodega</label>
+          <select class="settingsDualInput" id="limWarehouse"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Producto</label>
+          <select class="settingsDualInput" id="limProduct"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Minimo</label>
+          <input class="settingsDualInput" id="limMin" type="number" min="0" step="1" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Maximo</label>
+          <input class="settingsDualInput" id="limMax" type="number" min="0" step="1" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Activo</label>
+          <select class="settingsDualInput" id="limActive"></select>
+        </div>
+      </div>
+      <div class="settingsDualActions">
+        <button class="btn ok" id="limSave">Guardar</button>
+        <button class="btn soft btn-sm" id="limRefresh">Refrescar</button>
+      </div>
+    </div>
+
+    <div class="settingsDualEditBar hidden" id="limEditBar">
+      <div class="settingsDualEditBarTitle">Editando limite</div>
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Bodega</label>
+          <input class="settingsDualInput" id="limEditWarehouseName" readonly />
+          <input type="hidden" id="limEditWarehouse" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Producto</label>
+          <input class="settingsDualInput" id="limEditProductName" readonly />
+          <input type="hidden" id="limEditProduct" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Minimo</label>
+          <input class="settingsDualInput" id="limEditMin" type="number" min="0" step="1" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Maximo</label>
+          <input class="settingsDualInput" id="limEditMax" type="number" min="0" step="1" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Activo</label>
+          <select class="settingsDualInput" id="limEditActive"></select>
+        </div>
+      </div>
+      <div class="settingsDualActions">
+        <button class="btn ok" id="limEditSave">Actualizar</button>
+        <button class="btn soft" id="limEditCancel">Cancelar</button>
+      </div>
+    </div>
+
+    <details class="settingsDualImport">
+      <summary class="settingsDualImportSummary">
+        <span class="material-symbols-outlined">upload_file</span>
+        Importar CSV
+      </summary>
+      <div class="settingsDualImportBody">
+        <div class="settingsDualFormRow">
+          <div>
+            <label class="settingsDualLabel">Archivo</label>
+            <input id="limImportFile" type="file" />
+            <div id="limImportFileName"></div>
+          </div>
+          <div>
+            <label class="settingsDualLabel">Separador</label>
+            <select class="settingsDualInput" id="limImportDelimiter"></select>
+          </div>
+          <div class="settingsDualActions" style="align-self:end">
+            <button class="btn soft btn-sm" id="limTemplateBtn">Plantilla</button>
+            <button class="btn soft btn-sm" id="limImportBtn">Importar</button>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <div class="settingsDualTableWrap">
+      <table class="tbl grid">
+        <thead>
+          <tr><th>Bodega</th><th>Producto</th><th>SKU</th><th>Minimo</th><th>Maximo</th><th>Activo</th><th>Accion</th></tr>
+        </thead>
+        <tbody id="limList"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+    <div id="view-reglas-subcategorias" class="settingsSubView settingsContent hidden" data-settings-content="reglas-subcategorias">
+<div class="card light settingsDualCard" data-sectioned="1">
+  <div class="settingsDualHead">
+    <span class="material-symbols-outlined" style="font-size:22px;">rule</span>
+    <span class="settingsDualHeadTitle">Reglas por subcategoria</span>
+  </div>
+  <div class="settingsDualBody">
+    <div class="settingsDualForm">
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Subcategoria</label>
+          <select class="settingsDualInput" id="regSubcat"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Dias max</label>
+          <input class="settingsDualInput" id="regMaxDays" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Dias alerta</label>
+          <input class="settingsDualInput" id="regAlertDays" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Activo</label>
+          <select class="settingsDualInput" id="regActive"></select>
+        </div>
+      </div>
+      <div class="settingsDualActions">
+        <button class="btn ok" id="regSave">Guardar</button>
+        <button class="btn soft btn-sm" id="regRefresh">Refrescar</button>
+      </div>
+    </div>
+
+    <div class="settingsDualEditBar hidden" id="regEditBar">
+      <div class="settingsDualEditBarTitle">Editando regla</div>
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Subcategoria</label>
+          <input class="settingsDualInput" id="regEditSubcatName" readonly />
+          <input type="hidden" id="regEditSubcatId" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Dias max</label>
+          <input class="settingsDualInput" id="regEditMaxDays" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Dias alerta</label>
+          <input class="settingsDualInput" id="regEditAlertDays" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Activo</label>
+          <select class="settingsDualInput" id="regEditActive"></select>
+        </div>
+      </div>
+      <div class="settingsDualActions">
+        <button class="btn ok" id="regEditSave">Actualizar</button>
+        <button class="btn soft" id="regEditCancel">Cancelar</button>
+      </div>
+    </div>
+
+    <div class="settingsDualTableWrap">
+      <table class="tbl grid">
+        <thead>
+          <tr><th>Categoria</th><th>Subcategoria</th><th>Dias max</th><th>Dias alerta</th><th>Activo</th><th>Estado regla</th><th>Accion</th></tr>
+        </thead>
+        <tbody id="regList"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+    <div id="view-usuarios" class="settingsSubView settingsContent hidden" data-settings-content="usuarios">
+<div class="card light settingsDualCard" data-sectioned="1" data-usr-sectioned="1">
+  <div class="settingsDualHead">
+    <span class="material-symbols-outlined" style="font-size:22px;">group</span>
+    <span class="settingsDualHeadTitle">Usuarios</span>
+  </div>
+  <div class="settingsDualBody">
+    <div class="settingsDualForm">
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Usuario</label>
+          <input class="settingsDualInput" id="usrUsername" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Nombre completo</label>
+          <input class="settingsDualInput" id="usrFullName" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Rol</label>
+          <select class="settingsDualInput" id="usrRole"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Bodega</label>
+          <select class="settingsDualInput" id="usrWarehouse"></select>
+        </div>
+      </div>
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Password</label>
+          <input class="settingsDualInput" id="usrPassword" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">PIN de pedido</label>
+          <input class="settingsDualInput" id="usrOrderPin" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Activo</label>
+          <select class="settingsDualInput" id="usrActive"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Supervisor</label>
+          <select class="settingsDualInput" id="usrCanSupervisor"></select>
+        </div>
+      </div>
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Sin auto logout</label>
+          <select class="settingsDualInput" id="usrNoAutoLogout"></select>
+        </div>
+        <div style="grid-column: span 3;">
+          <label class="settingsDualLabel">Avatar</label>
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <input id="usrAvatarFile" type="file" accept="image/*" />
+            <input id="usrAvatarData" type="hidden" />
+            <button class="btn soft btn-sm" id="usrAvatarClear" type="button">Limpiar</button>
+            <img id="usrAvatarPreviewImg" style="max-width:48px;max-height:48px;border-radius:50%;" />
+            <div id="usrAvatarPreviewFallback"></div>
+          </div>
+        </div>
+      </div>
+      <div class="settingsDualActions">
+        <button class="btn ok" id="usrSave">Guardar</button>
+        <button class="btn soft btn-sm" id="usrRefresh">Refrescar</button>
+      </div>
+    </div>
+
+    <div class="settingsDualEditBar hidden" id="usrEditBar">
+      <div class="settingsDualEditBarTitle">Editando usuario #<span id="usrEditIdDisplay"></span></div>
+      <input type="hidden" id="usrEditId" />
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Usuario</label>
+          <input class="settingsDualInput" id="usrEditUsername" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Nombre completo</label>
+          <input class="settingsDualInput" id="usrEditFullName" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Rol</label>
+          <select class="settingsDualInput" id="usrEditRole"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Bodega</label>
+          <select class="settingsDualInput" id="usrEditWarehouse"></select>
+        </div>
+      </div>
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Activo</label>
+          <select class="settingsDualInput" id="usrEditActive"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Supervisor</label>
+          <select class="settingsDualInput" id="usrEditCanSupervisor"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Sin auto logout</label>
+          <select class="settingsDualInput" id="usrEditNoAutoLogout"></select>
+        </div>
+        <div style="grid-column: span 1;">
+          <label class="settingsDualLabel">Avatar</label>
+          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            <input id="usrEditAvatarFile" type="file" accept="image/*" style="max-width:140px;" />
+            <input id="usrEditAvatarData" type="hidden" />
+            <button class="btn soft btn-sm" id="usrEditAvatarClear">Limpiar</button>
+            <img id="usrEditAvatarPreviewImg" style="max-width:36px;max-height:36px;border-radius:50%;" />
+            <div id="usrEditAvatarPreviewFallback"></div>
+          </div>
+        </div>
+      </div>
+      <div class="settingsDualActions">
+        <button class="btn ok" id="usrEditSave">Actualizar</button>
+        <button class="btn soft" id="usrEditCancel">Cancelar</button>
+      </div>
+    </div>
+
+    <details class="settingsDualImport">
+      <summary class="settingsDualImportSummary">
+        <span class="material-symbols-outlined">password</span>
+        Reset password / PIN
+      </summary>
+      <div class="settingsDualImportBody">
+        <div class="settingsDualFormGrid grid4">
+          <div>
+            <label class="settingsDualLabel">Usuario</label>
+            <select class="settingsDualInput" id="usrResetUser"></select>
+          </div>
+          <div>
+            <label class="settingsDualLabel">Nuevo password</label>
+            <input class="settingsDualInput" id="usrResetPassword" />
+          </div>
+          <div>
+            <label class="settingsDualLabel">Confirmar password</label>
+            <input class="settingsDualInput" id="usrResetPassword2" />
+          </div>
+          <div>
+            <label class="settingsDualLabel">Nuevo PIN</label>
+            <input class="settingsDualInput" id="usrResetOrderPin" />
+          </div>
+          <div>
+            <label class="settingsDualLabel">Confirmar PIN</label>
+            <input class="settingsDualInput" id="usrResetOrderPin2" />
+          </div>
+        </div>
+        <div class="settingsDualActions">
+          <button class="btn ok btn-sm" id="usrResetSave">Reset password</button>
+          <button class="btn soft btn-sm" id="usrResetOrderPinSave">Reset PIN</button>
+        </div>
+      </div>
+    </details>
+
+    <details class="settingsDualImport">
+      <summary class="settingsDualImportSummary">
+        <span class="material-symbols-outlined">manage_accounts</span>
+        Permisos
+      </summary>
+      <div class="settingsDualImportBody" style="display:flex; flex-direction:column; gap:10px;">
+        <div class="settingsDualFormGrid grid4">
+          <div>
+            <label class="settingsDualLabel">Usuario</label>
+            <select class="settingsDualInput" id="usrPermUser"></select>
+          </div>
+        </div>
+        <table class="tbl grid">
+          <tbody id="usrPermList"></tbody>
+        </table>
+        <div class="settingsDualActions">
+          <button class="btn soft btn-sm" id="usrPermReload">Recargar</button>
+          <button class="btn ok btn-sm" id="usrPermSave">Guardar permisos</button>
+        </div>
+      </div>
+    </details>
+
+    <details class="settingsDualImport">
+      <summary class="settingsDualImportSummary">
+        <span class="material-symbols-outlined">warehouse</span>
+        Acceso a bodegas
+      </summary>
+      <div class="settingsDualImportBody" style="display:flex; flex-direction:column; gap:10px;">
+        <div class="settingsDualFormGrid grid4">
+          <div>
+            <label class="settingsDualLabel">Usuario</label>
+            <select class="settingsDualInput" id="usrWhAccessUser"></select>
+          </div>
+        </div>
+        <table class="tbl grid">
+          <tbody id="usrWhAccessList"></tbody>
+        </table>
+        <div class="settingsDualActions">
+          <button class="btn soft btn-sm" id="usrWhAccessReload">Recargar</button>
+          <button class="btn ok btn-sm" id="usrWhAccessSave">Guardar accesos</button>
+        </div>
+      </div>
+    </details>
+
+    <div class="settingsDualTableWrap">
+      <table class="tbl grid">
+        <thead>
+          <tr><th>ID</th><th>Avatar</th><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Bodega</th><th>Supervisor</th><th>Estado</th><th>Accion</th></tr>
+        </thead>
+        <tbody id="usrManageList"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+    <div id="view-bodegas" class="settingsSubView settingsContent hidden" data-settings-content="bodegas">
+<div class="card light settingsDualCard" data-sectioned="1" data-bod-sectioned="1">
+  <div class="settingsDualHead">
+    <span class="material-symbols-outlined" style="font-size:22px;">store</span>
+    <span class="settingsDualHeadTitle">Bodegas</span>
+  </div>
+  <div class="settingsDualBody">
+    <div class="settingsDualForm">
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Nombre</label>
+          <input class="settingsDualInput" id="bodNombre" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Tipo</label>
+          <select class="settingsDualInput" id="bodTipo"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Telefono</label>
+          <input class="settingsDualInput" id="bodTelefono" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Direccion</label>
+          <input class="settingsDualInput" id="bodDireccion" />
+        </div>
+      </div>
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Activo</label>
+          <select class="settingsDualInput" id="bodActivo"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Maneja stock</label>
+          <select class="settingsDualInput" id="bodStock"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Puede recibir</label>
+          <select class="settingsDualInput" id="bodRecibir"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Puede despachar</label>
+          <select class="settingsDualInput" id="bodDespachar"></select>
+        </div>
+      </div>
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Modo despacho</label>
+          <select class="settingsDualInput" id="bodModo"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Destino default</label>
+          <select class="settingsDualInput" id="bodDestino"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Conteo final salida</label>
+          <select class="settingsDualInput" id="bodConteoFinal"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Precio salida</label>
+          <select class="settingsDualInput" id="bodPrecioSalida"></select>
+        </div>
+      </div>
+      <div class="settingsDualActions">
+        <button class="btn ok" id="bodSave">Guardar</button>
+        <button class="btn soft btn-sm" id="bodRefresh">Refrescar</button>
+      </div>
+    </div>
+
+    <details class="settingsDualImport">
+      <summary class="settingsDualImportSummary">
+        <span class="material-symbols-outlined">image</span>
+        Logos
+      </summary>
+      <div class="settingsDualImportBody">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+          <div>
+            <label class="settingsDualLabel">Logo app</label>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <input id="bodLogoAppFile" type="file" />
+              <input id="bodLogoAppData" />
+              <button class="btn soft btn-sm" id="bodLogoAppClear">Limpiar</button>
+              <img id="bodLogoAppPreviewImg" style="max-width:64px;max-height:64px;" />
+              <div id="bodLogoAppPreviewFallback"></div>
+            </div>
+          </div>
+          <div>
+            <label class="settingsDualLabel">Logo impresion</label>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <input id="bodLogoPrintFile" type="file" />
+              <input id="bodLogoPrintData" />
+              <button class="btn soft btn-sm" id="bodLogoPrintClear">Limpiar</button>
+              <img id="bodLogoPrintPreviewImg" style="max-width:64px;max-height:64px;" />
+              <div id="bodLogoPrintPreviewFallback"></div>
+            </div>
+          </div>
+        </div>
+        <div class="settingsDualActions">
+          <button class="btn ok btn-sm" id="bodLogoSave">Guardar logos</button>
+        </div>
+      </div>
+    </details>
+
+    <div class="settingsDualEditBar hidden" id="bodEditBar">
+      <div class="settingsDualEditBarTitle">Editando bodega #<span id="bodEditIdDisplay"></span></div>
+      <input type="hidden" id="bodEditId" />
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Nombre</label>
+          <input class="settingsDualInput" id="bodEditNombre" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Tipo</label>
+          <select class="settingsDualInput" id="bodEditTipo"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Telefono</label>
+          <input class="settingsDualInput" id="bodEditTelefono" />
+        </div>
+        <div>
+          <label class="settingsDualLabel">Direccion</label>
+          <input class="settingsDualInput" id="bodEditDireccion" />
+        </div>
+      </div>
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Activo</label>
+          <select class="settingsDualInput" id="bodEditActivo"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Maneja stock</label>
+          <select class="settingsDualInput" id="bodEditStock"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Puede recibir</label>
+          <select class="settingsDualInput" id="bodEditRecibir"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Puede despachar</label>
+          <select class="settingsDualInput" id="bodEditDespachar"></select>
+        </div>
+      </div>
+      <div class="settingsDualFormGrid grid4">
+        <div>
+          <label class="settingsDualLabel">Modo despacho</label>
+          <select class="settingsDualInput" id="bodEditModo"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Destino default</label>
+          <select class="settingsDualInput" id="bodEditDestino"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Conteo final salida</label>
+          <select class="settingsDualInput" id="bodEditConteoFinal"></select>
+        </div>
+        <div>
+          <label class="settingsDualLabel">Precio salida</label>
+          <select class="settingsDualInput" id="bodEditPrecioSalida"></select>
+        </div>
+      </div>
+      <div class="settingsDualActions">
+        <button class="btn ok" id="bodEditSave">Actualizar</button>
+        <button class="btn soft" id="bodEditCancel">Cancelar</button>
+      </div>
+    </div>
+
+    <div class="settingsDualTableWrap">
+      <table class="tbl grid">
+        <thead>
+          <tr><th>ID</th><th>Bodega</th><th>Tipo</th><th>Estado</th><th>Modo despacho</th><th>Destino default</th><th>Accion</th></tr>
+        </thead>
+        <tbody id="bodManageList"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+  </main>
 </div>
 </div>
         <div class="view hidden" id="view-entradas">
@@ -917,525 +2083,6 @@
 </div>
 </aside>
 </div>
-</div>
-</div>
-        <div class="view hidden" id="view-categorias">
-<div class="card light">
-<div class="cardTitle">Categorias</div>
-<div class="grid4">
-<div>
-<label class="lbl">Nombre</label>
-<input id="catNombre" />
-</div>
-<div>
-<label class="lbl">Activo</label>
-<select id="catActivo">
-<option value="1">Si</option>
-<option value="0">No</option>
-</select>
-</div>
-<div>
-<label class="lbl">Archivo CSV</label>
-<input id="catImportFile" type="file" />
-<div id="catImportFileName">
-</div>
-</div>
-<div>
-<label class="lbl">Separador</label>
-<select id="catImportDelimiter">
-<option value=",">,</option>
-<option value=";">;</option>
-</select>
-</div>
-</div>
-<div class="addRow" style="justify-content:flex-end; gap:8px">
-<button id="catTemplateBtn">
-</button>
-<button id="catImportBtn">
-</button>
-<button id="catRefresh">
-</button>
-<button id="catSave">
-</button>
-</div>
-<table class="tbl grid">
-<thead>
-<tr>
-<th>ID</th>
-<th>Categoria</th>
-<th>Activo</th>
-<th>Accion</th>
-</tr>
-</thead>
-<tbody id="catManageList">
-</tbody>
-</table>
-<input id="catEditId" />
-<input id="catEditNombre" />
-<input id="catEditActivo" />
-<button id="catEditSave">
-</button>
-</div>
-</div>
-        <div class="view hidden" id="view-subcategorias">
-<div class="card light">
-<div class="cardTitle">Subcategorias</div>
-<div class="grid4">
-<div>
-<label class="lbl">Nombre</label>
-<input id="subCatNombre" />
-</div>
-<div>
-<label class="lbl">Categoria</label>
-<select id="subCatCategoria">
-</select>
-</div>
-<div>
-<label class="lbl">Activo</label>
-<select id="subCatActivo">
-</select>
-</div>
-<div>
-<label class="lbl">Archivo CSV</label>
-<input id="subCatImportFile" type="file" />
-<div id="subCatImportFileName">
-</div>
-</div>
-</div>
-<div class="grid4">
-<div>
-<label class="lbl">Separador</label>
-<select id="subCatImportDelimiter">
-</select>
-</div>
-</div>
-<div class="addRow" style="justify-content:flex-end; gap:8px">
-<button id="subCatTemplateBtn">
-</button>
-<button id="subCatImportBtn">
-</button>
-<button id="subCatRefresh">
-</button>
-<button id="subCatSave">
-</button>
-</div>
-<table class="tbl grid">
-<thead>
-<tr>
-<th>ID</th>
-<th>Categoria</th>
-<th>Subcategoria</th>
-<th>Activo</th>
-<th>Accion</th>
-</tr>
-</thead>
-<tbody id="subCatManageList">
-</tbody>
-</table>
-<input id="subCatEditId" />
-<input id="subCatEditNombre" />
-<input id="subCatEditCategoria" />
-<input id="subCatEditActivo" />
-<button id="subCatEditSave">
-</button>
-</div>
-</div>
-        <div class="view hidden" id="view-motivos-movimiento">
-<div class="card light">
-<input id="motNombre" />
-<select id="motTipo">
-</select>
-<select id="motSigno">
-</select>
-<select id="motActivo">
-</select>
-<button id="motRefresh">
-</button>
-<button id="motSave">
-</button>
-<table class="tbl grid">
-<thead>
-<tr>
-<th>Motivo</th>
-<th>Tipo</th>
-<th>Signo</th>
-<th>Activo</th>
-<th>Accion</th>
-</tr>
-</thead>
-<tbody id="motList">
-</tbody>
-</table>
-</div>
-</div>
-        <div class="view hidden" id="view-proveedores">
-<div class="card light">
-<input id="provNombre" />
-<input id="provTelefono" />
-<input id="provDireccion" />
-<select id="provActivo">
-</select>
-<input id="provImportFile" type="file" />
-<div id="provImportFileName">
-</div>
-<select id="provImportDelimiter">
-</select>
-<button id="provTemplateBtn">
-</button>
-<button id="provImportBtn">
-</button>
-<button id="provRefresh">
-</button>
-<button id="provSave">
-</button>
-<table class="tbl grid">
-<thead>
-<tr>
-<th>ID</th>
-<th>Proveedor</th>
-<th>Telefono</th>
-<th>Direccion</th>
-<th>Activo</th>
-<th>Accion</th>
-</tr>
-</thead>
-<tbody id="provManageList">
-</tbody>
-</table>
-<input id="provEditId" />
-<input id="provEditNombre" />
-<input id="provEditTelefono" />
-<input id="provEditDireccion" />
-<input id="provEditActivo" />
-<button id="provEditSave">
-</button>
-</div>
-</div>
-        <div class="view hidden" id="view-productos">
-<div class="card light">
-<div class="cardTitle">Productos</div>
-<div class="note prdFlowHint">Flujo recomendado: 1) Captura manual para crear producto, 2) Listado productos para buscar, 3) Editar producto para actualizar.</div>
-
-<div class="grid4">
-  <div><label class="lbl">Nombre producto</label><input class="in" id="prdNombre" /></div>
-  <div><label class="lbl">SKU</label><input class="in" id="prdSku" /></div>
-  <div><label class="lbl">Medida</label><select class="in" id="prdMedida"></select></div>
-  <div><label class="lbl">Estado</label><select class="in" id="prdActivo"></select></div>
-</div>
-
-<div class="grid4">
-  <div><label class="lbl">Categoria</label><select class="in" id="prdCategoria"></select></div>
-  <div><label class="lbl">Subcategoria</label><select class="in" id="prdSubcategoria"></select></div>
-  <div style="grid-column: span 2;"><label class="lbl">Bodegas visibles (activar/desactivar por bodega)</label><div class="warehouseCheckList" id="prdVisibleWarehouses"></div><label class="warehouseCheckItem" id="prdMyWarehouseToggleWrap"><input type="checkbox" id="prdVisibleInMyWarehouse" checked /><span>Habilitado en mi bodega</span></label><div class="note" id="prdMyWarehouseHint">Puedes habilitar o inhabilitar el producto en tu bodega desde la lista.</div></div>
-</div>
-
-<div class="grid4 importGrid">
-  <div class="searchWrap" style="grid-column: span 2;"><input class="in" id="prdSearch" placeholder="Buscar por nombre o SKU" /><button class="btn soft btn-sm" id="prdSearchBtn" type="button">Buscar</button></div>
-  <div><label class="lbl">CSV productos</label><input id="prdImportFile" type="file" /><div class="note" id="prdImportFileName">Ningun archivo seleccionado</div></div>
-  <div><label class="lbl">Separador</label><select class="in" id="prdImportDelimiter"></select></div>
-</div>
-
-<div class="grid4 importGrid">
-  <div><label class="lbl">CSV stock</label><input id="prdStockImportFile" type="file" /><div class="note" id="prdStockImportFileName">Ningun archivo seleccionado</div></div>
-  <div><label class="lbl">Separador stock</label><select class="in" id="prdStockImportDelimiter"></select></div>
-  <div><label class="lbl">Motivo importacion</label><select class="in" id="prdStockImportMotivo"></select></div>
-  <div><label class="lbl">Observacion importacion</label><input class="in" id="prdStockImportObs" /></div>
-</div>
-
-<div class="addRow" style="justify-content:flex-end; gap:8px; flex-wrap:wrap;">
-  <button class="btn soft btn-sm" id="prdTemplateBtn" type="button">Plantilla productos</button>
-  <button class="btn soft btn-sm" id="prdImportBtn" type="button">Importar productos</button>
-  <button class="btn soft btn-sm" id="prdStockTemplateBtn" type="button">Plantilla stock</button>
-  <button class="btn soft btn-sm" id="prdStockImportBtn" type="button">Importar stock</button>
-  <button class="btn soft btn-sm" id="prdRefresh" type="button">Actualizar</button>
-  <button class="btn ok" id="prdSave" type="button">Guardar producto</button>
-</div>
-
-<div class="tableWrap repTableScroll" style="margin-top:10px;">
-<table class="tbl grid">
-<thead>
-<tr>
-<th>ID</th><th>Producto</th><th>SKU</th><th>Medida</th><th>Categoria</th><th>Subcategoria</th><th>Bodegas visibles</th><th>Mi bodega</th><th>Estado</th><th>Accion</th>
-</tr>
-</thead>
-<tbody id="prdManageList"><tr><td colspan="10">Escribe un producto para buscar.</td></tr></tbody>
-</table>
-</div>
-
-<input type="hidden" id="prdEditId" />
-<div class="grid4">
-  <div><label class="lbl">Nombre producto</label><input class="in" id="prdEditNombre" /></div>
-  <div><label class="lbl">SKU</label><input class="in" id="prdEditSku" /></div>
-  <div><label class="lbl">Medida</label><select class="in" id="prdEditMedida"></select></div>
-  <div><label class="lbl">Estado</label><select class="in" id="prdEditActivo"></select></div>
-</div>
-<div class="grid4">
-  <div><label class="lbl">Categoria</label><select class="in" id="prdEditCategoria"></select></div>
-  <div><label class="lbl">Subcategoria</label><select class="in" id="prdEditSubcategoria"></select></div>
-  <div style="grid-column: 1 / -1;"><label class="lbl">Bodegas visibles</label><div class="warehouseCheckList" id="prdEditVisibleWarehouses"></div></div>
-</div>
-<div class="addRow" style="justify-content:flex-end;">
-  <button class="btn ok" id="prdEditSave" type="button">Guardar cambios</button>
-</div>
-</div>
-</div>
-<div class="view hidden" id="view-limites">
-<div class="card light">
-<select id="limWarehouse">
-</select>
-<select id="limProduct">
-</select>
-<input id="limMin" type="number" min="0" step="1" />
-<input id="limMax" type="number" min="0" step="1" />
-<select id="limActive">
-</select>
-<input id="limImportFile" type="file" />
-<div id="limImportFileName">
-</div>
-<select id="limImportDelimiter">
-</select>
-<button id="limTemplateBtn">
-</button>
-<button id="limImportBtn">
-</button>
-<button id="limRefresh">
-</button>
-<button id="limSave">
-</button>
-<table class="tbl grid">
-<thead>
-<tr>
-<th>Bodega</th>
-<th>Producto</th>
-<th>SKU</th>
-<th>Minimo</th>
-<th>Maximo</th>
-<th>Activo</th>
-<th>Accion</th>
-</tr>
-</thead>
-<tbody id="limList">
-</tbody>
-</table>
-<input id="limEditWarehouse" type="hidden" />
-<input id="limEditWarehouseName" />
-<input id="limEditProduct" type="hidden" />
-<input id="limEditProductName" />
-<input id="limEditMin" type="number" min="0" step="1" />
-<input id="limEditMax" type="number" min="0" step="1" />
-<select id="limEditActive">
-</select>
-<button id="limEditSave">
-</button>
-</div>
-</div>
-        <div class="view hidden" id="view-reglas-subcategorias">
-<div class="card light">
-<select id="regSubcat">
-</select>
-<input id="regMaxDays" />
-<input id="regAlertDays" />
-<select id="regActive">
-</select>
-<button id="regRefresh">
-</button>
-<button id="regSave">
-</button>
-<table class="tbl grid">
-<thead>
-<tr>
-<th>Categoria</th>
-<th>Subcategoria</th>
-<th>Dias max</th>
-<th>Dias alerta</th>
-<th>Activo</th>
-<th>Estado regla</th>
-<th>Accion</th>
-</tr>
-</thead>
-<tbody id="regList">
-</tbody>
-</table>
-<input id="regEditSubcatId" />
-<input id="regEditSubcatName" />
-<input id="regEditMaxDays" />
-<input id="regEditAlertDays" />
-<input id="regEditActive" />
-<button id="regEditSave">
-</button>
-</div>
-</div>
-        <div class="view hidden" id="view-usuarios">
-<div class="card light">
-<input id="usrUsername" />
-<input id="usrFullName" />
-<select id="usrRole">
-</select>
-<select id="usrWarehouse">
-</select>
-<input id="usrPassword" />
-<input id="usrOrderPin" />
-<select id="usrActive">
-</select>
-<select id="usrCanSupervisor">
-</select>
-<select id="usrNoAutoLogout">
-</select>
-<input id="usrAvatarFile" type="file" accept="image/*" />
-<input id="usrAvatarData" type="hidden" />
-<img id="usrAvatarPreviewImg" />
-<div id="usrAvatarPreviewFallback">
-</div>
-<button id="usrAvatarClear">
-</button>
-<button id="usrRefresh">
-</button>
-<button id="usrSave">
-</button>
-<table class="tbl grid">
-<thead>
-<tr>
-<th>ID</th>
-<th>Avatar</th>
-<th>Usuario</th>
-<th>Nombre</th>
-<th>Rol</th>
-<th>Bodega</th>
-<th>Supervisor</th>
-<th>Estado</th>
-<th>Accion</th>
-</tr>
-</thead>
-<tbody id="usrManageList">
-</tbody>
-</table>
-<select id="usrResetUser">
-</select>
-<input id="usrResetPassword" />
-<input id="usrResetPassword2" />
-<input id="usrResetOrderPin" />
-<input id="usrResetOrderPin2" />
-<button id="usrResetOrderPinSave">
-</button>
-<button id="usrResetSave">
-</button>
-<select id="usrPermUser">
-</select>
-<table class="tbl grid">
-<tbody id="usrPermList">
-</tbody>
-</table>
-<button id="usrPermReload">
-</button>
-<button id="usrPermSave">
-</button>
-<select id="usrWhAccessUser">
-</select>
-<table class="tbl grid">
-<tbody id="usrWhAccessList">
-</tbody>
-</table>
-<button id="usrWhAccessReload">
-</button>
-<button id="usrWhAccessSave">
-</button>
-<input id="usrEditId" />
-<input id="usrEditUsername" />
-<input id="usrEditFullName" />
-<select id="usrEditRole">
-</select>
-<select id="usrEditWarehouse">
-</select>
-<select id="usrEditActive">
-</select>
-<select id="usrEditCanSupervisor">
-</select>
-<select id="usrEditNoAutoLogout">
-</select>
-<input id="usrEditAvatarData" type="hidden" />
-<input id="usrEditAvatarFile" type="file" accept="image/*" />
-<div id="usrEditAvatarPreviewFallback">
-</div>
-<img id="usrEditAvatarPreviewImg" />
-<button id="usrEditAvatarClear">
-</button>
-<button id="usrEditSave">
-</button>
-</div>
-</div>
-        <div class="view hidden" id="view-bodegas">
-<div class="card light">
-<input id="bodNombre" />
-<select id="bodTipo">
-</select>
-<input id="bodTelefono" />
-<input id="bodDireccion" />
-<select id="bodActivo">
-</select>
-<select id="bodStock">
-</select>
-<select id="bodRecibir">
-</select>
-<select id="bodDespachar">
-</select>
-<select id="bodModo">
-</select>
-<select id="bodDestino">
-</select>
-<select id="bodConteoFinal">
-</select>
-<select id="bodPrecioSalida">
-</select>
-<input id="bodLogoAppFile" type="file" />
-<input id="bodLogoAppData" />
-<img id="bodLogoAppPreviewImg" />
-<div id="bodLogoAppPreviewFallback">
-</div>
-<button id="bodLogoAppClear">
-</button>
-<input id="bodLogoPrintFile" type="file" />
-<input id="bodLogoPrintData" />
-<img id="bodLogoPrintPreviewImg" />
-<div id="bodLogoPrintPreviewFallback">
-</div>
-<button id="bodLogoPrintClear">
-</button>
-<button id="bodLogoSave">
-</button>
-<button id="bodRefresh">
-</button>
-<button id="bodSave">
-</button>
-<table class="tbl grid">
-<thead>
-<tr>
-<th>ID</th>
-<th>Bodega</th>
-<th>Tipo</th>
-<th>Estado</th>
-<th>Modo despacho</th>
-<th>Destino default</th>
-<th>Accion</th>
-</tr>
-</thead>
-<tbody id="bodManageList">
-</tbody>
-</table>
-<input id="bodEditId" />
-<input id="bodEditNombre" />
-<select id="bodEditTipo"></select>
-<input id="bodEditTelefono" />
-<input id="bodEditDireccion" />
-<select id="bodEditActivo"></select>
-<select id="bodEditStock"></select>
-<select id="bodEditRecibir"></select>
-<select id="bodEditDespachar"></select>
-<select id="bodEditModo"></select>
-<select id="bodEditDestino"></select>
-<select id="bodEditConteoFinal"></select>
-<select id="bodEditPrecioSalida"></select>
-<button id="bodEditSave">
-</button>
 </div>
 </div>
         <div class="view hidden" id="view-r-corte-diario">
@@ -2437,10 +3084,10 @@
 </script>
   <script>
     (function ensureCompatIds(){
-      try{var xhr=new XMLHttpRequest();xhr.open('GET','./app.js?v=20260525b',false);xhr.send(null);if(xhr.status<200||xhr.status>=300)return;var js=String(xhr.responseText||'');var rx=/#([A-Za-z][A-Za-z0-9_-]*)/g;var seen=Object.create(null);var m;var host=document.createElement('div');host.style.display='none';host.id='compatAutoIds';while((m=rx.exec(js))){var id=m[1];if(seen[id])continue;seen[id]=true;if(document.getElementById(id))continue;var el=document.createElement('div');el.id=id;host.appendChild(el);}if(host.childNodes.length)document.body.appendChild(host);}catch(e){}
+      try{var xhr=new XMLHttpRequest();xhr.open('GET','./app.js?v=20260709a',false);xhr.send(null);if(xhr.status<200||xhr.status>=300)return;var js=String(xhr.responseText||'');var rx=/#([A-Za-z][A-Za-z0-9_-]*)/g;var seen=Object.create(null);var m;var host=document.createElement('div');host.style.display='none';host.id='compatAutoIds';while((m=rx.exec(js))){var id=m[1];if(seen[id])continue;seen[id]=true;if(document.getElementById(id))continue;var el=document.createElement('div');el.id=id;host.appendChild(el);}if(host.childNodes.length)document.body.appendChild(host);}catch(e){}
     })();
   </script>
-  <script src="./app.js?v=20260525b">
+  <script src="./app.js?v=20260709a">
 </script>
   <div class="connIndicator" id="connIndicator">
     <span class="connDot" id="connDot"></span>

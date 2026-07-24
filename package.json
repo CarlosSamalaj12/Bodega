@@ -5,7 +5,10 @@
     "main": "server.js",
     "scripts": {
         "dev": "node server.js",
-        "start": "node server.js"
+        "start": "node server.js",
+        "client": "cd client && npm run dev",
+        "dev:all": "concurrently -n server,client -c blue,magenta \"node server.js\" \"cd client && npm run dev\"",
+        "build:client": "cd client && npm run build"
     },
     "dependencies": {
         "bcryptjs": "^2.4.3",
@@ -19,5 +22,8 @@
     "description": "",
     "keywords": [],
     "author": "",
-    "license": "ISC"
+    "license": "ISC",
+    "devDependencies": {
+        "concurrently": "^10.0.3"
+    }
 }

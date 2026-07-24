@@ -1838,6 +1838,7 @@ const titles = {
   "reglas-subcategorias": "Reglas por subcategoria",
   usuarios: "Usuarios",
   bodegas: "Bodegas",
+  configuracion: "Configuracion",
   "r-entradas": "Reporte de Entradas",
   "r-salidas": "Reporte de Salidas",
   "r-pedidos": "Reporte de Pedidos",
@@ -1877,6 +1878,7 @@ const sectionPermMap = {
   "reglas-subcategorias": "section.view.reglas-subcategorias",
   usuarios: "section.view.usuarios",
   bodegas: "section.view.bodegas",
+  configuracion: "section.view.configuracion",
   "r-existencias": "section.view.r-existencias",
   "r-corte-diario": "section.view.r-corte-diario",
   "r-cuadres-caja": "section.view.cuadre-caja",
@@ -2338,6 +2340,7 @@ async function initHomeDashboard() {
 document.querySelectorAll(".menuBtn[data-section]").forEach((b) => {
   b.onclick = async () => {
     const key = b.dataset.section;
+    console.log('=== VIEW SWITCH === clicked:', key);
     const secPerm = sectionPermMap[key];
     if (!hasPerm(secPerm)) {
       showEntToast("No tienes acceso a este modulo.", "bad");
@@ -2352,15 +2355,31 @@ document.querySelectorAll(".menuBtn[data-section]").forEach((b) => {
       return;
     }
     if (currentSection === "pedidos" && pedList.length && key !== "pedidos") {
-      if (!(await uiConfirm("Tienes productos en el carro. Salir sin guardar el pedido?", "Salir sin guardar"))) return;
+      if (!(await uiConfirm("Tienes productos en el carro. Guardo o vacia la lista antes de salir.", "Salir sin guardar"))) return;
     }
     if ($("#stageTitle")) $("#stageTitle").textContent = titles[key] || "Seccion";
-    document.querySelectorAll(".view").forEach((v) => v.classList.add("hidden"));
+    const views = document.querySelectorAll(".view");
+    console.log('HIDING all .view elements, count:', views.length);
+    views.forEach((v) => console.log('  BEFORE:', v.id, 'hidden?', v.classList.contains('hidden'), 'display:', getComputedStyle(v).display));
+    views.forEach((v) => v.classList.add("hidden"));
+    views.forEach((v) => console.log('  AFTER add hidden:', v.id, 'hidden?', v.classList.contains('hidden'), 'display:', getComputedStyle(v).display));
     const view = $("#view-" + key);
+    console.log('SHOWING target:', '#view-' + key, 'FOUND:', !!view);
     if (view) {
       view.classList.remove("hidden");
       view.classList.add("animate");
       setTimeout(() => view.classList.remove("animate"), 400);
+    }
+    const cv = document.getElementById('view-configuracion');
+    console.log('FINAL view-configuracion: hidden?', cv?.classList.contains('hidden'), 'display:', getComputedStyle(cv).display);
+    if (view) {
+      console.log('FINAL target:', view.id, 'hidden?', view.classList.contains('hidden'), 'display:', getComputedStyle(view).display);
+      const first = view.firstElementChild;
+      console.log('  firstChild:', first?.className, 'display:', getComputedStyle(first)?.display, 'offsetHeight:', first?.offsetHeight);
+      const stageBody = view.parentElement;
+      console.log('  stageBody:', stageBody?.className, 'display:', getComputedStyle(stageBody)?.display, 'offsetHeight:', stageBody?.offsetHeight);
+      const stage = stageBody?.parentElement;
+      console.log('  stage:', stage?.className, 'display:', getComputedStyle(stage)?.display, 'offsetHeight:', stage?.offsetHeight);
     }
     currentSection = key;
     if (currentSection === "pedidos" || currentSection === "home") {
@@ -2504,6 +2523,236 @@ document.querySelectorAll(".menuBtn[data-section]").forEach((b) => {
     closeMobileNav();
   };
 });
+
+/* Settings Center navigation */
+function initSettingsCenter() {
+  const navBtns = document.querySelectorAll("#settingsNav .settingsNavBtn");
+  const cards = document.querySelectorAll("#settingsGrid .settingsCard");
+  const searchInput = document.getElementById("settingsSearchInput");
+  const contents = document.querySelectorAll("#view-configuracion .settingsContent");
+
+  function showSettingsModule(moduleKey) {
+    if (moduleKey !== "overview") {
+      const secPerm = sectionPermMap[moduleKey];
+      if (!hasPerm(secPerm)) {
+        showEntToast("No tienes acceso a este modulo.", "bad");
+        return;
+      }
+    }
+
+    contents.forEach((c) => c.classList.remove("active"));
+    const target = document.querySelector(`[data-settings-content="${moduleKey}"]`);
+    if (target) target.classList.add("active");
+
+    navBtns.forEach((b) => b.classList.remove("active"));
+    const activeBtn = document.querySelector(`[data-settings-module="${moduleKey}"]`);
+    if (activeBtn) activeBtn.classList.add("active");
+
+    if (moduleKey !== "overview") {
+      /* Reset edit bars when switching modules */
+      document.querySelectorAll('[id$="EditBar"]').forEach((bar) => {
+        bar.classList.add('hidden');
+      });
+      safeRebuildAddViewSections();
+      switch (moduleKey) {
+        case "categorias": loadCategoriasManage(); break;
+        case "subcategorias":
+          subcatCatalogosLoaded = false;
+          loadSubcatCatalogos();
+          loadSubcategoriasManage();
+          break;
+        case "motivos-movimiento": loadMotivosManage(); break;
+        case "proveedores": loadProveedoresManage(); break;
+        case "productos":
+          initProductosCollapsibles();
+          prdCatalogosLoaded = false;
+          loadCatalogosProductos();
+          loadProductoWarehouseOptions();
+          loadMotivosEntrada();
+          loadProductosManage();
+          break;
+        case "limites":
+          limCatalogosLoaded = false;
+          loadLimCatalogos();
+          loadLimitesList();
+          break;
+        case "reglas-subcategorias":
+          regCatalogosLoaded = false;
+          loadRegCatalogos();
+          loadReglasList();
+          break;
+        case "usuarios":
+          initUserAccordions();
+          usrRolesLoaded = false;
+          usrBodegasLoaded = false;
+          usrResetUsersLoaded = false;
+          usrPermUsersLoaded = false;
+          usrWhAccessUsersLoaded = false;
+          loadRolesUsuario();
+          loadBodegasUsuarioForm();
+          loadUsuariosResetForm();
+          loadUsuariosPermForm();
+          loadUsuariosWarehouseAccessForm();
+          loadUsuariosManage();
+          break;
+        case "bodegas":
+          initBodegasCollapsibles();
+          ensureStaticSelectCatalogs();
+          loadBodegasManage();
+          break;
+      }
+    }
+  }
+
+  navBtns.forEach((btn) => {
+    btn.onclick = () => {
+      const module = btn.dataset.settingsModule;
+      showSettingsModule(module);
+    };
+  });
+
+  cards.forEach((card) => {
+    card.onclick = () => {
+      const module = card.dataset.settingsModule;
+      showSettingsModule(module);
+    };
+  });
+
+  if (searchInput) {
+    searchInput.addEventListener("input", () => {
+      const q = searchInput.value.toLowerCase().trim();
+      navBtns.forEach((btn) => {
+        if (btn.dataset.settingsModule === "overview") return;
+        const label = btn.textContent.toLowerCase();
+        btn.classList.toggle("hidden-nav", q && !label.includes(q));
+      });
+    });
+  }
+
+  /* Override openAdminCollapseSection to show inline edit bars */
+  const origOpenAdmin = window.openAdminCollapseSection;
+  const editViewPrefixMap = {
+    'view-categorias': 'cat',
+    'view-subcategorias': 'subCat',
+    'view-proveedores': 'prov',
+    'view-productos': 'prd',
+    'view-limites': 'lim',
+    'view-reglas-subcategorias': 'reg',
+    'view-usuarios': 'usr',
+    'view-bodegas': 'bod',
+  };
+  window.openAdminCollapseSection = function(viewId, title) {
+    const prefix = editViewPrefixMap[viewId];
+    if (prefix) {
+      const editBar = document.getElementById(prefix + 'EditBar');
+      const editId = document.getElementById(prefix + 'EditId');
+      const editIdDisplay = document.getElementById(prefix + 'EditIdDisplay');
+      if (editBar) {
+        if (editId && editIdDisplay && editId.value) {
+          editIdDisplay.textContent = editId.value;
+        }
+        editBar.classList.remove('hidden');
+        editBar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+      return;
+    }
+    if (origOpenAdmin) origOpenAdmin(viewId, title);
+  };
+
+  /* Hide edit bar after save without clearing individual fields */
+  function clearEditForm(prefix) {
+    const bar = document.getElementById(prefix + 'EditBar');
+    if (bar) bar.classList.add('hidden');
+  }
+  function wrapSaveBtn(btnId, prefix) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    const orig = btn.onclick;
+    btn.onclick = async function(e) {
+      if (orig) await orig.call(this, e);
+      clearEditForm(prefix);
+    };
+  }
+  wrapSaveBtn('catEditSave', 'cat');
+  wrapSaveBtn('subCatEditSave', 'subCat');
+  wrapSaveBtn('catSave', 'cat');
+  wrapSaveBtn('subCatSave', 'subCat');
+  wrapSaveBtn('provEditSave', 'prov');
+  wrapSaveBtn('limEditSave', 'lim');
+  wrapSaveBtn('regEditSave', 'reg');
+  wrapSaveBtn('prdEditSave', 'prd');
+  wrapSaveBtn('usrEditSave', 'usr');
+  wrapSaveBtn('bodEditSave', 'bod');
+
+  /* "Go to Categorias" button in subcategorias view */
+  function setupGoToCatBtn(id) {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.onclick = () => {
+        const catBtn = document.querySelector('#settingsNav [data-settings-module="categorias"]');
+        if (catBtn) catBtn.click();
+      };
+    }
+  }
+  setupGoToCatBtn('gotoCategoriasBtn');
+  setupGoToCatBtn('gotoCategoriasFromSubBtn');
+
+  /* Cancel edit buttons for all modules */
+  const cancelConfig = [
+    { btn: 'catEditCancel', prefix: 'cat' },
+    { btn: 'subCatEditCancel', prefix: 'subCat' },
+    { btn: 'provEditCancel', prefix: 'prov' },
+    { btn: 'limEditCancel', prefix: 'lim' },
+    { btn: 'regEditCancel', prefix: 'reg' },
+    { btn: 'prdEditCancel', prefix: 'prd' },
+    { btn: 'usrEditCancel', prefix: 'usr' },
+    { btn: 'bodEditCancel', prefix: 'bod' },
+  ];
+  cancelConfig.forEach(({ btn: btnId, prefix }) => {
+    const btn = document.getElementById(btnId);
+    if (btn) {
+      btn.onclick = () => { clearEditForm(prefix); };
+    }
+  });
+
+  /* Also wire existing menuBtn clicks for config sections to use settings nav */
+  document.querySelectorAll('.menuBtn[data-section="categorias"], .menuBtn[data-section="subcategorias"], .menuBtn[data-section="motivos-movimiento"], .menuBtn[data-section="proveedores"], .menuBtn[data-section="productos"], .menuBtn[data-section="limites"], .menuBtn[data-section="reglas-subcategorias"], .menuBtn[data-section="usuarios"], .menuBtn[data-section="bodegas"]').forEach((btn) => {
+    const orig = btn.onclick;
+    btn.onclick = async (e) => {
+      const key = btn.dataset.section;
+      const secPerm = sectionPermMap[key];
+      if (!hasPerm(secPerm)) {
+        showEntToast("No tienes acceso a este modulo.", "bad");
+        return;
+      }
+      /* Navigate to configuracion first, then show module */
+      const configBtn = document.querySelector('.menuBtn[data-section="configuracion"]');
+      if (configBtn && currentSection !== "configuracion") {
+        configBtn.click();
+        /* Defer module show after config renders */
+        setTimeout(() => {
+          const navBtn = document.querySelector(`#settingsNav [data-settings-module="${key}"]`);
+          if (navBtn) navBtn.click();
+        }, 50);
+      } else {
+        const navBtn = document.querySelector(`#settingsNav [data-settings-module="${key}"]`);
+        if (navBtn) navBtn.click();
+      }
+    };
+  });
+}
+
+/* Init settings center when DOM is ready */
+function tryInitSettingsCenter() {
+  if (document.getElementById("view-configuracion")) {
+    initSettingsCenter();
+  }
+}
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", tryInitSettingsCenter);
+} else {
+  tryInitSettingsCenter();
+}
 
 if ($("#logout")) {
   $("#logout").onclick = () => {
@@ -9162,11 +9411,7 @@ async function loadBodegasManage() {
         if ($("#bodEditDireccion")) $("#bodEditDireccion").value = b.direccion_contacto || "";
         updateWarehouseEditSummary(b);
         loadBodegaLogoEditor(b.id_bodega, true);
-        const editSection = Array.from(document.querySelectorAll("#view-bodegas [data-bod-collapse]")).find(
-          (sec) => sec.querySelector(".panelTitle")?.textContent?.trim() === "Editar bodega"
-        );
-        syncBodegasCollapseState(editSection, true);
-        editSection?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+        openAdminCollapseSection('view-bodegas', 'Editar bodega');
       };
     });
   } catch {
@@ -12934,10 +13179,7 @@ async function loadUsuariosManage() {
           $("#usrWhAccessUser").value = String(u.id_user);
           loadSelectedUsuarioWarehouseAccess();
         }
-        const editSection = Array.from(document.querySelectorAll("#view-usuarios .userSection")).find(
-          (sec) => sec.querySelector(".cardTitle")?.textContent?.trim() === "Editar usuario"
-        );
-        syncUserAccordionState(editSection, true);
+        openAdminCollapseSection('view-usuarios', 'Editar usuario');
       };
     });
 
@@ -13735,8 +13977,8 @@ if ($("#pedNotesDrawer")) {
 
 function resetPedidoTab() {
   closePedCartDrawer();
-  const pv = document.getElementById(iew-pedidos);
-  if (pv) pv.classList.remove(step-products);
+  const pv = document.getElementById('view-pedidos');
+  if (pv) pv.classList.remove('step-products');
 }
 
 
@@ -15415,6 +15657,29 @@ if ($("#cuadreDetailList")) {
 }
 initCuadreCajaDraft();
 
+/* CSS diagnostic - runs once */
+setTimeout(function cssDiag() {
+  try {
+    const cv = document.getElementById('view-configuracion');
+    if (!cv) return;
+    console.log('=== CSS DIAG ===');
+    const sheets = document.styleSheets;
+    for (let i = 0; i < sheets.length; i++) {
+      const s = sheets[i];
+      try {
+        const rules = s.cssRules || s.rules;
+        if (!rules) continue;
+        for (let j = 0; j < rules.length; j++) {
+          const r = rules[j];
+          if (r.selectorText && (r.selectorText.includes('view-configuracion') || r.selectorText.includes('.view.hidden') || (r.selectorText.includes('.view') && r.style?.display))) {
+            console.log('RULE:', r.selectorText, '{', r.style.cssText, '}', 'sheet', s.href || 'inline');
+          }
+        }
+      } catch(e) { console.log('Sheet error:', e.message); }
+    }
+    console.log('=== END CSS DIAG ===');
+  } catch(e) { console.log('CSS diag error:', e); }
+}, 200);
 
 
 

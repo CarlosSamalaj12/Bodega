@@ -1,0 +1,178 @@
+@use '../abstracts' as *;
+
+// =============================================================
+// Modal
+// =============================================================
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  z-index: $z-modal-backdrop;
+  animation: fadeIn $transition-base;
+
+  @media (max-width: $bp-md) {
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+}
+
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: $z-modal;
+  background: var(--color-bg-elevated);
+  border: 1px solid $color-stroke;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-lg;
+  width: min(540px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  animation: modalIn $transition-base;
+  box-sizing: border-box;
+
+  &--lg {
+    width: min(800px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+  }
+
+  &--xl {
+    width: min(1100px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+  }
+
+  // ---------- Móvil / tablet portrait: bottom sheet full-width ----------
+  // Usamos bp-md (768px) en vez de 640px para que las tablets portrait
+  // también entren en modo bottom sheet, evitando el espacio oscuro lateral.
+  @media (max-width: $bp-md) {
+    // Posicionamiento anclado a los bordes inferior/izq/der
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    transform: none;
+    // Full width sin ningún gap lateral
+    width: 100vw;
+    max-width: 100vw;
+    width: 100dvw; // fallback dinámico para evitar problema con scrollbar
+    // Altura tipo bottom sheet
+    max-height: 92vh;
+    max-height: 92dvh;
+    height: auto;
+    min-height: 50vh;
+    // Esquinas redondeadas solo arriba
+    border-radius: $radius-lg $radius-lg 0 0;
+    border-bottom: none;
+    // Sin sombra lateral para que se vea integrado
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.2);
+    animation: modalInBottom $transition-base;
+    // box-sizing para que el padding no cause overflow
+    box-sizing: border-box;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: $space-5;
+    border-bottom: 1px solid $color-stroke;
+    flex-shrink: 0;
+
+    @media (max-width: $bp-md) {
+      padding: $space-4;
+    }
+  }
+
+  &__title {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-semibold;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__close {
+    @include button-base;
+    padding: $space-2;
+    background: transparent;
+    color: $color-text-muted;
+    border-color: transparent;
+    aspect-ratio: 1;
+    flex-shrink: 0;
+
+    &:hover {
+      background: $color-surface-hover;
+      color: $color-text;
+    }
+  }
+
+  &__body {
+    padding: $space-5;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    min-height: 0;
+    box-sizing: border-box;
+
+    @media (max-width: $bp-md) {
+      padding: $space-4;
+    }
+  }
+
+  &__footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: $space-3;
+    padding: $space-4 $space-5;
+    border-top: 1px solid $color-stroke;
+    flex-shrink: 0;
+    background: var(--color-bg-elevated);
+
+    @media (max-width: $bp-md) {
+      padding: $space-3 $space-4;
+      flex-wrap: wrap;
+
+      // En móvil, los botones del footer se acomodan uno sobre otro
+      // en orden inverso (primario al final = más cerca del pulgar)
+      > * {
+        flex: 1 1 auto;
+        min-width: 120px;
+      }
+    }
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes modalInBottom {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

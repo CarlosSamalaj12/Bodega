@@ -1,0 +1,91 @@
+@use '../abstracts' as *;
+
+// =============================================================
+// Botones
+// =============================================================
+
+.btn {
+  @include button-base;
+
+  // Variantes
+  &--primary {
+    background: $color-accent;
+    color: $color-text;
+    border-color: $color-accent;
+
+    &:hover:not(:disabled) {
+      background: $color-accent-hover;
+      border-color: $color-accent-hover;
+    }
+  }
+
+  &--secondary {
+    background: $color-secondary;
+    color: $color-text-inverse;
+    border-color: $color-secondary;
+
+    &:hover:not(:disabled) {
+      background: $color-secondary-hover;
+      border-color: $color-secondary-hover;
+    }
+  }
+
+  &--ghost {
+    background: transparent;
+    color: $color-text;
+    border-color: $color-stroke;
+
+    &:hover:not(:disabled) {
+      background: $color-surface-hover;
+      border-color: $color-stroke-strong;
+    }
+  }
+
+  &--danger {
+    background: $color-danger;
+    color: $color-text;
+    border-color: $color-danger;
+
+    &:hover:not(:disabled) {
+      background: $color-danger-hover;
+      border-color: $color-danger-hover;
+    }
+  }
+
+  &--subtle {
+    background: $color-surface;
+    color: $color-text;
+    border-color: $color-stroke;
+
+    &:hover:not(:disabled) {
+      background: $color-surface-hover;
+    }
+  }
+
+  // Tamaños
+  &--sm {
+    font-size: $font-size-sm;
+    padding: $space-2 $space-3;
+  }
+
+  &--md {
+    font-size: $font-size-base;
+    padding: $space-3 $space-4;
+  }
+
+  &--lg {
+    font-size: $font-size-md;
+    padding: $space-4 $space-5;
+  }
+
+  // Icon-only
+  &--icon {
+    padding: $space-2;
+    aspect-ratio: 1;
+  }
+
+  // Full width
+  &--block {
+    width: 100%;
+  }
+}

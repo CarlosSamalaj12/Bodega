@@ -1,0 +1,65 @@
+@use '../abstracts' as *;
+
+// =============================================================
+// Card — contenedor con glass effect
+// =============================================================
+
+.card {
+  @include card-glass;
+  padding: $space-5;
+  transition: border-color $transition-base, transform $transition-base;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-3;
+    margin-bottom: $space-4;
+    padding-bottom: $space-4;
+    border-bottom: 1px solid $color-stroke;
+  }
+
+  &__title {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-semibold;
+    color: $color-text;
+  }
+
+  &__subtitle {
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+    margin-top: $space-1;
+  }
+
+  &__body {
+    color: $color-text;
+  }
+
+  &__footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: $space-3;
+    margin-top: $space-4;
+    padding-top: $space-4;
+    border-top: 1px solid $color-stroke;
+  }
+
+  // Variantes
+  &--hover {
+    cursor: pointer;
+    &:hover {
+      border-color: $color-stroke-strong;
+      transform: translateY(-2px);
+    }
+  }
+
+  &--compact {
+    padding: $space-4;
+  }
+
+  &--accent {
+    border-color: $color-accent-soft;
+    background: $color-surface;
+  }
+}
