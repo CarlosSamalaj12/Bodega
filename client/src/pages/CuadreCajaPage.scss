@@ -1,0 +1,464 @@
+@use '@/styles/abstracts' as *;
+
+.cuadre-caja {
+  padding: $space-6;
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+
+  &__state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5rem 0;
+    color: $color-text-muted;
+  }
+
+  // ── Filtros (list view) ──
+  &__filters {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+
+    @media (min-width: 768px) {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      align-items: end;
+    }
+  }
+
+  &__filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+    &--action { justify-content: end; @media (min-width: 768px) { align-self: end; } }
+  }
+
+  &__filter-label {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    color: $color-text-muted;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  // ── Tabla (list view) ──
+  &__table-wrapper { overflow-x: auto; @include custom-scrollbar; }
+
+  &__row {
+    background: $color-surface;
+    transition: background $transition-fast;
+    &:hover { background: $color-surface-hover; }
+    td { vertical-align: middle; padding: $space-3 $space-3; }
+  }
+
+  &__date { font-family: $font-mono; font-size: $font-size-sm; }
+  &__responsable { font-weight: $font-weight-medium; color: $color-text; }
+  &__muted { color: $color-text-muted; font-size: $font-size-sm; }
+
+  &__total-row {
+    td { padding: $space-3 $space-3; border-top: 2px solid $color-stroke-strong; font-size: $font-size-sm; }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // FORMULARIO COMPACTO
+  // ═══════════════════════════════════════════════════════════════════
+
+  // ── Contenedor del formulario ──
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+  }
+
+  // ── Barra meta compacta ──
+  &__meta-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-3;
+    padding: $space-3;
+    background: $color-surface;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+  }
+
+  &__meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 140px;
+    flex: 1;
+  }
+
+  &__meta-label {
+    font-size: 10px;
+    font-weight: $font-weight-semibold;
+    color: $color-text-muted;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  // ── Cuerpo: 2 columnas ──
+  &__form-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-3;
+
+    @media (max-width: 900px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__form-col {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+  }
+
+  // ── Secciones ──
+  &__section {
+    background: $color-surface;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+    padding: $space-3;
+  }
+
+  &__section-title {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-bold;
+    color: $color-text;
+    margin: 0 0 $space-2 0;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &__section-header-with-action {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: $space-2;
+
+    h3 { margin-bottom: 0; }
+  }
+
+  &__divider {
+    height: 1px;
+    background: $color-stroke;
+    margin: $space-2 0;
+  }
+
+  // ── Denominaciones ──
+  &__denoms {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+  }
+
+  &__denom-row {
+    display: grid;
+    grid-template-columns: 70px 1fr 80px;
+    gap: $space-2;
+    align-items: center;
+
+    &--total {
+      padding-top: $space-2;
+      margin-top: $space-1;
+      border-top: 1px solid $color-stroke-strong;
+    }
+  }
+
+  &__denom-label {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+    color: $color-text;
+  }
+
+  &__denom-total {
+    font-family: $font-mono;
+    font-size: $font-size-xs;
+    color: $color-text;
+    text-align: right;
+
+    &--grand {
+      font-weight: $font-weight-bold;
+      font-size: $font-size-sm;
+      color: $color-accent;
+    }
+  }
+
+  // ── Pagos / Extras ──
+  &__pagos, &__extras {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+  }
+
+  &__pago-row, &__extra-row {
+    display: grid;
+    grid-template-columns: 1fr 130px;
+    gap: $space-2;
+    align-items: center;
+
+    &--info { color: $color-text-muted; font-size: $font-size-xs; }
+    &--total { padding-top: $space-2; margin-top: $space-1; border-top: 1px solid $color-stroke-strong; }
+  }
+
+  &__pago-label, &__extra-label {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+    color: $color-text;
+  }
+
+  &__pago-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: $space-1;
+  }
+
+  &__pago-currency {
+    font-family: $font-mono;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    min-width: 12px;
+  }
+
+  &__pago-value {
+    font-family: $font-mono;
+    font-size: $font-size-xs;
+    text-align: right;
+
+    &--grand {
+      font-weight: $font-weight-bold;
+      font-size: $font-size-sm;
+      color: $color-accent;
+    }
+  }
+
+  // ── Mini tablas (Ventas / Detalle) ──
+  &__mini-table {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+  }
+
+  &__mini-table-header {
+    display: grid;
+    grid-template-columns: 1fr 100px 20px;
+    gap: $space-2;
+    padding: $space-1 0;
+    border-bottom: 1px solid $color-stroke;
+
+    span {
+      font-size: 10px;
+      font-weight: $font-weight-semibold;
+      color: $color-text-muted;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    &--4col {
+      grid-template-columns: 1fr 1fr 50px 90px 20px;
+    }
+  }
+
+  &__mini-table-row {
+    display: grid;
+    grid-template-columns: 1fr 100px 20px;
+    gap: $space-2;
+    align-items: center;
+
+    &--total {
+      padding-top: $space-2;
+      margin-top: $space-1;
+      border-top: 1px solid $color-stroke-strong;
+
+      span {
+        font-size: $font-size-xs;
+        font-weight: $font-weight-semibold;
+      }
+    }
+
+    &--4col {
+      grid-template-columns: 1fr 1fr 50px 90px 20px;
+    }
+  }
+
+  &__remove-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: $color-text-muted;
+    font-size: 12px;
+    padding: 2px;
+    line-height: 1;
+    border-radius: $radius-sm;
+    transition: all $transition-fast;
+
+    &:hover {
+      color: $color-danger;
+      background: rgba($color-danger, 0.1);
+    }
+  }
+
+  // ── Input numérico ──
+  &__num-input {
+    max-width: 100px;
+    text-align: right;
+    font-family: $font-mono;
+    font-variant-numeric: tabular-nums;
+  }
+
+  // ── Footer con totales ──
+  &__form-footer {
+    position: sticky;
+    bottom: 0;
+    background: $color-bg-2;
+    border: 2px solid $color-accent;
+    border-radius: $radius-md;
+    padding: $space-3 $space-4;
+    z-index: 10;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+  }
+
+  &__footer-totals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-4;
+    align-items: center;
+  }
+
+  &__footer-total-item {
+    font-size: $font-size-xs;
+    color: $color-text;
+
+    strong { font-family: $font-mono; }
+
+    &--grand {
+      font-size: $font-size-base;
+      margin-left: auto;
+
+      strong {
+        font-size: $font-size-lg;
+        color: $color-accent;
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // MODAL DETALLE
+  // ═══════════════════════════════════════════════════════════════════
+  &__modal-state { display: flex; align-items: center; justify-content: center; padding: 3rem 0; }
+
+  &__detail { display: flex; flex-direction: column; gap: $space-5; }
+
+  &__detail-header {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: $space-4;
+    padding-bottom: $space-4;
+    border-bottom: 1px solid $color-stroke;
+  }
+
+  &__detail-field { display: flex; flex-direction: column; gap: $space-1; }
+
+  &__detail-label {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    color: $color-text-muted;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &__detail-value { font-size: $font-size-base; color: $color-text; font-weight: $font-weight-medium; }
+
+  &__detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-4;
+    @media (max-width: 767px) { grid-template-columns: 1fr; }
+  }
+
+  &__detail-section {
+    background: $color-bg-2;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+    padding: $space-4;
+  }
+
+  &__detail-section-title {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: $color-text;
+    margin: 0 0 $space-3 0;
+    padding-bottom: $space-2;
+    border-bottom: 1px solid $color-stroke;
+  }
+
+  &__detail-table {
+    width: 100%;
+    border-collapse: collapse;
+
+    th {
+      font-size: $font-size-xs;
+      font-weight: $font-weight-semibold;
+      color: $color-text-muted;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: $space-2 $space-2;
+      border-bottom: 1px solid $color-stroke;
+      text-align: left;
+    }
+
+    td {
+      font-size: $font-size-sm;
+      color: $color-text;
+      padding: $space-2 $space-2;
+      border-bottom: 1px solid $color-stroke;
+      font-variant-numeric: tabular-nums;
+    }
+
+    tr:last-child td { border-bottom: none; }
+  }
+
+  &__detail-totals {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+    padding: $space-4;
+    background: $color-surface;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+  }
+
+  &__detail-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: $font-size-sm;
+    color: $color-text;
+    padding: $space-1 0;
+
+    &--grand {
+      font-size: $font-size-md;
+      font-weight: $font-weight-bold;
+      color: $color-text;
+      padding-top: $space-2;
+      margin-top: $space-1;
+      border-top: 2px solid $color-stroke-strong;
+    }
+  }
+
+  &__detail-actions { display: flex; justify-content: flex-end; gap: $space-3; }
+
+  &__detail-footer {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    text-align: center;
+    padding-top: $space-2;
+    border-top: 1px solid $color-stroke;
+  }
+
+  @media (max-width: 767px) {
+    padding: $space-4;
+  }
+}

@@ -10,7 +10,16 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import "dotenv/config";
+import webpush from "web-push";
 import { pool } from "./db.js";
+
+// ── Web Push (VAPID) ───────────────────────────────────────────────
+const VAPID_PUBLIC_KEY = String(process.env.VAPID_PUBLIC_KEY || "").trim();
+const VAPID_PRIVATE_KEY = String(process.env.VAPID_PRIVATE_KEY || "").trim();
+const VAPID_SUBJECT = String(process.env.VAPID_SUBJECT || "mailto:admin@bodega.com").trim();
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+}
 
 const app = express();
 const httpServer = createServer(app);
@@ -329,6 +338,41 @@ async function ensureMovimientoDetallePrecioSalidaColumn() {
   }
 }
 
+async function ensureMovimientoAnuladoColumns() {
+  const [rows] = await pool.query(
+    `SELECT COUNT(*) AS c
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA=DATABASE()
+       AND TABLE_NAME='movimiento_encabezado'
+       AND COLUMN_NAME='anulado_por'`
+  );
+  const exists = Number(rows?.[0]?.c || 0) > 0;
+  if (!exists) {
+    await pool.query(
+      `ALTER TABLE movimiento_encabezado
+       ADD COLUMN anulado_por INT NULL`
+    );
+    await pool.query(
+      `ALTER TABLE movimiento_encabezado
+       ADD COLUMN anulado_en DATETIME NULL`
+    );
+  } else {
+    const [rowsEn] = await pool.query(
+      `SELECT COUNT(*) AS c
+       FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA=DATABASE()
+         AND TABLE_NAME='movimiento_encabezado'
+         AND COLUMN_NAME='anulado_en'`
+    );
+    if (Number(rowsEn?.[0]?.c || 0) <= 0) {
+      await pool.query(
+        `ALTER TABLE movimiento_encabezado
+         ADD COLUMN anulado_en DATETIME NULL`
+      );
+    }
+  }
+}
+
 async function ensureMovimientoDashboardColumn() {
   const [rows] = await pool.query(
     `SELECT COUNT(*) AS c
@@ -519,6 +563,48 @@ function emitPedidoChanged(payload) {
   };
   if (reqWh > 0) io.to(`warehouse:${reqWh}`).emit("pedido:changed", envelope);
   if (fromWh > 0) io.to(`warehouse:${fromWh}`).emit("pedido:changed", envelope);
+
+  // Push notification a la bodega que debe despachar
+  const pushWh = fromWh || reqWh;
+  if (pushWh > 0 && String(payload?.action || '').toLowerCase() === 'created') {
+    const pushPayload = {
+      type: 'pedido',
+      title: '🚚 Nuevo pedido para despachar',
+      body: `Pedido #${envelope.id_pedido} recibido (${envelope.status})`,
+      tag: `pedido-${envelope.id_pedido}`,
+      url: '/pedidos-despachar',
+    };
+    sendPushToWarehouse(pushWh, pushPayload).catch(() => {});
+  }
+}
+
+function emitStockChanged(idBodega, payload = {}) {
+  const idWh = Number(idBodega || 0);
+  if (idWh > 0) {
+    io.to(`warehouse:${idWh}`).emit("stock:changed", {
+      action: payload.action || "updated",
+      id_bodega: idWh,
+      nombre_bodega: payload.nombre_bodega || null,
+      id_movimiento: Number(payload.id_movimiento || 0),
+      at: new Date().toISOString(),
+    });
+
+    // Push notification por cambios de stock
+    const action = String(payload.action || '').toLowerCase();
+    if (action === 'entrada' || action === 'salida' || action === 'ajuste') {
+      const emoji = action === 'entrada' ? '📥' : action === 'salida' ? '📤' : '⚖️';
+      const pushPayload = {
+        type: 'stock',
+        title: `${emoji} ${action.charAt(0).toUpperCase() + action.slice(1)} registrada`,
+        body: payload.nombre_bodega
+          ? `Movimiento en ${payload.nombre_bodega}`
+          : `Movimiento #${payload.id_movimiento || ''} registrado`,
+        tag: `stock-${payload.id_movimiento || Date.now()}`,
+        url: action === 'entrada' ? '/entradas' : action === 'salida' ? '/salidas' : '/ajustes',
+      };
+      sendPushToWarehouse(idWh, pushPayload).catch(() => {});
+    }
+  }
 }
 
 function buildTokenizedLikeFilter(rawInput, columns = [], paramPrefix = "qtk") {
@@ -577,6 +663,7 @@ const PERM_CATALOG = [
   { key: "section.view.reglas-subcategorias", label: "Ver modulo Reglas subcategorias", group: "Secciones" },
   { key: "section.view.usuarios", label: "Ver modulo Usuarios", group: "Secciones" },
   { key: "section.view.bodegas", label: "Ver modulo Bodegas", group: "Secciones" },
+  { key: "section.view.conteo-ciclico", label: "Ver modulo Conteo Ciclico", group: "Secciones" },
   { key: "section.view.r-existencias", label: "Ver Reporte Existencias", group: "Reportes" },
   { key: "section.view.r-corte-diario", label: "Ver Reporte Corte Diario", group: "Reportes" },
   { key: "section.view.r-entradas", label: "Ver Reporte Entradas", group: "Reportes" },
@@ -926,6 +1013,25 @@ async function ensureUserAvatarTable() {
   );
 }
 
+async function ensurePushSubscriptionsTable() {
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id_suscripcion INT NOT NULL AUTO_INCREMENT,
+      id_usuario INT NOT NULL,
+      endpoint VARCHAR(500) NOT NULL,
+      auth VARCHAR(100) NOT NULL,
+      p256dh VARCHAR(200) NOT NULL,
+      id_bodega INT NULL,
+      user_agent VARCHAR(255) NULL,
+      creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id_suscripcion),
+      KEY idx_push_user (id_usuario),
+      KEY idx_push_bodega (id_bodega),
+      CONSTRAINT fk_push_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+  );
+}
+
 async function ensureUserOrderPinTable() {
   await pool.query(
     `CREATE TABLE IF NOT EXISTS usuario_pin_pedido (
@@ -1253,6 +1359,9 @@ ensureWarehouseSalidaPriceRequirementColumn().catch((e) => {
 ensureMovimientoDetallePrecioSalidaColumn().catch((e) => {
   console.error("No se pudo crear columna movimiento_detalle.precio_salida:", e);
 });
+ensureMovimientoAnuladoColumns().catch((e) => {
+  console.error("No se pudo crear columnas anulado_por/anulado_en en movimiento_encabezado:", e);
+});
 ensureMovimientoDashboardColumn().catch((e) => {
   console.error("No se pudo crear columna movimiento_encabezado.no_contar_dashboard:", e);
 });
@@ -1274,6 +1383,9 @@ ensureUserOrderPinTable().catch((e) => {
 ensureSupervisorPinTable().catch((e) => {
   console.error("No se pudo crear tabla usuario_pin_supervisor:", e);
 });
+ensurePushSubscriptionsTable().catch((e) => {
+  console.error("No se pudo crear tabla push_subscriptions:", e);
+});
 ensureUsersNoAutoLogoutColumn().catch((e) => {
   console.error("No se pudo crear columna usuarios.no_auto_logout:", e);
 });
@@ -1288,6 +1400,47 @@ ensureSensitiveActionAuditTable().catch((e) => {
 });
 ensureOrderDispatchColumns().catch((e) => {
   console.error("No se pudo actualizar columnas de despacho en pedidos:", e);
+});
+
+async function ensureConteoCiclicoTables() {
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS conteo_ciclico (
+      id_conteo INT NOT NULL AUTO_INCREMENT,
+      id_bodega INT NOT NULL,
+      fecha_conteo DATE NOT NULL,
+      estado ENUM('BORRADOR','EN_PROGRESO','COMPLETADO','AJUSTADO') NOT NULL DEFAULT 'BORRADOR',
+      observaciones VARCHAR(255) NULL,
+      creado_por INT NOT NULL,
+      creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id_conteo),
+      KEY idx_cc_bodega (id_bodega),
+      KEY idx_cc_estado (estado),
+      KEY idx_cc_fecha (fecha_conteo)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+  );
+
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS conteo_ciclico_detalle (
+      id_detalle INT NOT NULL AUTO_INCREMENT,
+      id_conteo INT NOT NULL,
+      id_producto INT NOT NULL,
+      nombre_producto VARCHAR(180) NULL,
+      sku VARCHAR(80) NULL,
+      lote VARCHAR(80) NULL,
+      cantidad_sistema DECIMAL(18,3) NOT NULL DEFAULT 0,
+      cantidad_conteo DECIMAL(18,3) NULL,
+      diferencia DECIMAL(18,3) NULL,
+      comentario VARCHAR(255) NULL,
+      PRIMARY KEY (id_detalle),
+      KEY idx_ccd_conteo (id_conteo),
+      KEY idx_ccd_producto (id_producto),
+      CONSTRAINT fk_ccd_conteo FOREIGN KEY (id_conteo) REFERENCES conteo_ciclico(id_conteo) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+  );
+}
+
+ensureConteoCiclicoTables().catch((e) => {
+  console.error("No se pudo crear tablas de conteo ciclico:", e);
 });
 
 
@@ -3695,9 +3848,15 @@ app.get("/api/bodegas/:id", auth, async (req, res) => {
   const [rows] = await pool.query(
     `SELECT b.id_bodega,
             b.nombre_bodega,
+            b.tipo_bodega,
             b.telefono_contacto,
             b.direccion_contacto,
-            cb.requiere_precio_salida
+            cb.maneja_stock,
+            cb.permite_salida_conteo_final,
+            cb.requiere_precio_salida,
+            cb.puede_despachar,
+            cb.puede_recibir,
+            cb.modo_despacho_auto
      FROM bodegas b
      LEFT JOIN configuracion_bodega cb ON cb.id_bodega=b.id_bodega
      WHERE b.id_bodega=:id_bodega
@@ -3889,6 +4048,11 @@ app.post("/api/entradas", auth, requirePermission("action.create_update", "regis
       detail: { id_motivo: Number(id_motivo || 0), lineas: Number(lines.length || 0) },
     });
     res.json({ ok: true, id_movimiento, sensitive_approval: toSensitiveApprovalPayload(sensitiveApproval) });
+    emitStockChanged(id_bodega_destino, {
+      action: "entrada",
+      id_movimiento,
+      nombre_bodega: "",
+    });
   } catch (e) {
     await conn.rollback();
     res.status(500).json({ error: String(e.message || e) });
@@ -4472,6 +4636,7 @@ app.get("/api/reportes/existencias", auth, async (req, res) => {
   const to_date = String(req.query.to || "").trim() || null;
   const id_categoria = Number(req.query.categoria || 0) || null;
   const id_subcategoria = Number(req.query.subcategoria || 0) || null;
+  const show_zero = String(req.query.show_zero || "").trim() === "1";
   const limit = Math.max(1, Math.min(2000, Number(req.query.limit || 500)));
 
   const [rows] = await pool.query(
@@ -4571,7 +4736,7 @@ app.get("/api/reportes/existencias", auth, async (req, res) => {
          AND e.id_producto=v.id_producto
          AND (e.lote <=> v.lote)
          AND (e.fecha_vencimiento <=> v.fecha_vencimiento)
-     WHERE v.stock > 0
+     WHERE ${show_zero ? "v.stock >= 0" : "v.stock > 0"}
        AND ${accessFilter ? `v.id_bodega IN (${accessFilter.sql})` : "1=1"}
        AND (:id_bodega IS NULL OR v.id_bodega=:id_bodega)
        AND ${qf.clause}
@@ -4607,6 +4772,7 @@ app.get("/api/reportes/existencias/alertas", auth, async (req, res) => {
   const to_date = String(req.query.to || "").trim() || null;
   const id_categoria = Number(req.query.categoria || 0) || null;
   const id_subcategoria = Number(req.query.subcategoria || 0) || null;
+  const show_zero = String(req.query.show_zero || "").trim() === "1";
   const days = Math.max(1, Math.min(365, Number(req.query.days || 15)));
   const limit = Math.max(1, Math.min(2000, Number(req.query.limit || 500)));
 
@@ -4647,7 +4813,7 @@ app.get("/api/reportes/existencias/alertas", auth, async (req, res) => {
          AND e.id_producto=v.id_producto
          AND (e.lote <=> v.lote)
          AND (e.fecha_vencimiento <=> v.fecha_vencimiento)
-     WHERE v.stock > 0
+     WHERE ${show_zero ? "v.stock >= 0" : "v.stock > 0"}
        AND (
          (v.fecha_vencimiento IS NOT NULL AND DATEDIFF(v.fecha_vencimiento, CURDATE()) <= :days)
          OR (
@@ -4668,6 +4834,66 @@ app.get("/api/reportes/existencias/alertas", auth, async (req, res) => {
     { id_bodega, from_date, to_date, days, id_categoria, id_subcategoria, ...(accessFilter?.params || {}), ...qf.params }
   );
   res.json(rows);
+});
+
+// ── Alertas de stock mínimo (productos por debajo del mínimo configurado) ──
+app.get("/api/reportes/existencias/stock-minimo", auth, async (req, res) => {
+  const scope = await resolveStockScope(req.user);
+  if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
+  if (!scope.can_view_existencias) return res.json([]);
+
+  const warehouseScope = getScopedWarehouseFilter(scope, req.query.warehouse);
+  if (warehouseScope.denied) return res.json([]);
+  let id_bodega = warehouseScope.selected;
+  if (!scope.can_all_bodegas) id_bodega = scope.id_bodega;
+  const accessFilter =
+    warehouseScope.restrictedIds.length && !id_bodega
+      ? buildNamedInClause(warehouseScope.restrictedIds, "mins")
+      : null;
+
+  const qRaw = String(req.query.q || "").trim();
+  const qf = buildTokenizedLikeFilter(qRaw, ["p.nombre_producto", "p.sku"], "minsq");
+  const id_categoria = Number(req.query.categoria || 0) || null;
+  const id_subcategoria = Number(req.query.subcategoria || 0) || null;
+  const limit = Math.max(1, Math.min(2000, Number(req.query.limit || 500)));
+
+  try {
+    const [rows] = await pool.query(
+      `SELECT v.id_bodega,
+              b.nombre_bodega,
+              v.id_producto,
+              p.nombre_producto,
+              p.sku,
+              v.stock,
+              l.minimo,
+              l.maximo,
+              (l.minimo - v.stock) AS diferencia_minimo
+       FROM v_stock_resumen v
+       JOIN bodegas b ON b.id_bodega=v.id_bodega
+       JOIN productos p ON p.id_producto=v.id_producto
+       JOIN limites_producto_bodega l ON l.id_bodega=v.id_bodega AND l.id_producto=v.id_producto
+       WHERE l.activo=1
+         AND l.minimo > 0
+         AND v.stock < l.minimo
+         AND ${accessFilter ? `v.id_bodega IN (${accessFilter.sql})` : "1=1"}
+         AND (:id_bodega IS NULL OR v.id_bodega=:id_bodega)
+         AND ${qf.clause}
+         AND (:id_categoria IS NULL OR p.id_categoria=:id_categoria)
+         AND (:id_subcategoria IS NULL OR p.id_subcategoria=:id_subcategoria)
+       ORDER BY (l.minimo - v.stock) DESC, b.nombre_bodega ASC, p.nombre_producto ASC
+       LIMIT ${limit}`,
+      {
+        id_bodega,
+        id_categoria,
+        id_subcategoria,
+        ...(accessFilter?.params || {}),
+        ...qf.params,
+      }
+    );
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
 });
 
 app.get("/api/reportes/corte-diario", auth, async (req, res) => {
@@ -5146,25 +5372,28 @@ app.all("/api/print/cuadre-caja", auth, requirePermission("section.view.cuadre-c
         body {
           width: auto;
           margin: 0;
-          padding: 0 2.8mm 0 0.8mm;
+          padding: 0 3mm 0 3mm;
           font-family: "DejaVu Sans Mono", "Consolas", "Lucida Console", monospace;
-          font-size: 12px;
+          font-size: 11px;
           font-weight: 700;
-          line-height: 1.3;
-          color: #111;
+          line-height: 1.25;
+          color: #000;
           -webkit-font-smoothing: none;
-          text-rendering: optimizeLegibility;
-          box-sizing: border-box;
+          text-rendering: geometricPrecision;
         }
-        h1 { font-size: 15px; margin: 4px 0 5px; text-align: center; letter-spacing: .2px; }
-        .meta { text-align: center; font-size: 11px; margin-bottom: 7px; line-height: 1.3; }
-        table { width: 100%; border-collapse: collapse; margin-top: 6px; table-layout: fixed; }
-        th, td { border-bottom: 1px dashed #bbb; padding: 3px 3px 3px 4px; vertical-align: top; }
-        th { text-align: left; font-size: 11px; }
-        td.n { text-align: right; white-space: nowrap; padding-right: 1px; }
-        .section { margin-top: 8px; font-weight: bold; border-top: 1px solid #000; padding: 4px 0 0 1px; }
-        .tot { font-weight: bold; border-top: 1px solid #000; }
-        .logo { display:block; margin:0 auto 4px; max-width:48mm; max-height:18mm; }
+        h1 { font-size: 14px; margin: 2px 0 3px; text-align: center; text-transform: uppercase; letter-spacing: .5px; }
+        .meta { text-align: center; font-size: 10px; margin-bottom: 4px; line-height: 1.2; }
+        .line { width: 100%; border: none; border-top: 1px solid #333; margin: 4px 0; }
+        .line-dash { width: 100%; border: none; border-top: 1px dashed #888; margin: 3px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 3px 0; }
+        td { padding: 1px 1px 1px 2px; vertical-align: bottom; }
+        td.n { text-align: right; white-space: nowrap; padding-right: 1px; width: 30%; }
+        td.v { text-align: right; white-space: nowrap; width: 28%; }
+        .sect { font-weight: 700; font-size: 11px; margin: 5px 0 1px; padding: 2px 0 1px 0; border-top: 1px solid #000; border-bottom: 1px solid #000; text-transform: uppercase; letter-spacing: .3px; }
+        .tot { font-weight: 700; border-top: 1px solid #000; }
+        .tot td { padding-top: 2px; }
+        .sub { font-size: 10px; color: #333; }
+        .logo { display:block; margin:0 auto 2px; max-width:42mm; max-height:14mm; }
       `
       : `
         @page { size: A4 portrait; margin: 10mm; }
@@ -5180,7 +5409,105 @@ app.all("/api/print/cuadre-caja", auth, requirePermission("section.view.cuadre-c
         .logo { display:block; margin:0 auto 8px; max-width:130px; max-height:56px; }
       `;
 
-    const html = `
+    const hasDetalle = detalle.length > 0;
+    const html = format === 'pos'
+      ? `
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Cuadre de caja</title>
+  <style>${baseCss}</style>
+</head>
+<body>
+  <img class="logo" src="${logoSrc}" alt="Logo" />
+  <h1>Cuadre de Caja</h1>
+  <div class="meta">${esc(p.sede || bod?.nombre_bodega || "-")}<br/>${esc(dmy(fecha))} · ${esc(p.responsable || "-")}</div>
+
+  <hr class="line"/>
+
+  <div class="sect">Efectivo</div>
+  <table>    ${CUADRE_DENOMINACIONES
+        .filter((d) => Number(monedas[String(d)] || 0) > 0)
+        .map((d) => {
+          const qty = Number(monedas[String(d)]);
+          return `<tr><td>Q ${fmtMoney(d)} x ${fmtQty(qty)}</td><td class="n">Q ${fmtMoney(qty * d)}</td></tr>`;
+        }).join("")}
+    ${(() => {
+      const dc = Number(pagos.dolares_cantidad || 0);
+      if (!dc) return '';
+      return `<tr><td>$${fmtQty(dc)} Dolares (TC ${fmtMoney(CUADRE_DOLAR_TIPO_CAMBIO)})</td><td class="n">Q ${fmtMoney(dc * CUADRE_DOLAR_TIPO_CAMBIO)}</td></tr>`;
+    })()}
+    <tr class="tot"><td>Total Efectivo</td><td class="n">Q ${fmtMoney(normalized.total_efectivo)}</td></tr>
+  </table>
+
+  <hr class="line-dash"/>
+
+  <div class="sect">Pagos</div>
+  <table>
+    ${(() => {
+      const pLines = [];
+      if (Number(pagos.visa || 0)) pLines.push(`<tr><td>Visa</td><td class="n">Q ${fmtMoney(pagos.visa)}</td></tr>`);
+      if (Number(pagos.bancos || 0)) pLines.push(`<tr><td>Bancos</td><td class="n">Q ${fmtMoney(pagos.bancos)}</td></tr>`);
+      if (Number(pagos.cxc_trabajadores || 0)) pLines.push(`<tr><td>CxC Trabajadores</td><td class="n">Q ${fmtMoney(pagos.cxc_trabajadores)}</td></tr>`);
+      if (Number(pagos.cxc_habitaciones || 0)) pLines.push(`<tr><td>CxC Habitaciones</td><td class="n">Q ${fmtMoney(pagos.cxc_habitaciones)}</td></tr>`);
+      if (Number(pagos.pase_consumible || 0)) pLines.push(`<tr><td>Pase Consumible</td><td class="n">Q ${fmtMoney(pagos.pase_consumible)}</td></tr>`);
+      if (!pLines.length) pLines.push('<tr><td class="sub">Sin movimientos</td><td></td></tr>');
+      return pLines.join('');
+    })()}
+    <tr class="tot"><td>Total Cobro</td><td class="n">Q ${fmtMoney(normalized.total_cobro)}</td></tr>
+  </table>
+
+  <hr class="line-dash"/>
+
+  <div class="sect">Ventas por Ambiente</div>
+  <table>
+    ${ventasRows
+      .filter((r) => Number(r.monto || 0) > 0)
+      .map((r) => `<tr><td>${esc(r.ambiente || "")}</td><td class="n">Q ${fmtMoney(r.monto || 0)}</td></tr>`)
+      .join("")}
+    <tr class="tot"><td>Total Ventas</td><td class="n">Q ${fmtMoney(normalized.total_venta_ambiente)}</td></tr>
+  </table>
+
+  <hr class="line-dash"/>
+
+  <div class="sect">Extras</div>
+  <table>
+    ${(() => {
+      const eLines = [];
+      if (Number(extras.pedidos_nilas || 0)) eLines.push(`<tr><td>Pedidos Nilas</td><td class="n">Q ${fmtMoney(extras.pedidos_nilas)}</td></tr>`);
+      if (Number(extras.cortesias || 0)) eLines.push(`<tr><td>Cortesias</td><td class="n">Q ${fmtMoney(extras.cortesias)}</td></tr>`);
+      if (!eLines.length) eLines.push('<tr><td class="sub">Sin extras</td><td></td></tr>');
+      return eLines.join('');
+    })()}
+  </table>
+
+  ${hasDetalle ? `
+  <hr class="line-dash"/>
+  <div class="sect">Detalle</div>
+  <table>
+    ${detalle
+      .filter((r) => Number(r.monto || 0) > 0)
+      .map((r) => `<tr><td>${esc(r.descripcion || "")}${r.nombre ? ' - '+esc(r.nombre) : ''}${r.check_no ? ' #'+esc(r.check_no) : ''}</td><td class="n">Q ${fmtMoney(r.monto || 0)}</td></tr>`)
+      .join("")}
+  </table>
+  ` : ''}
+
+  <hr class="line"/>
+
+  <table>
+    <tr class="tot"><td>GRAN TOTAL</td><td class="n">Q ${fmtMoney(normalized.gran_total_reporte)}</td></tr>
+  </table>
+
+  <hr class="line"/>
+
+  <div class="meta sub" style="margin-top:3px">${esc(payloadOverride ? 'Vista previa' : (row?.actualizado_en ? 'Actualizado: '+String(row.actualizado_en).slice(0,16).replace('T',' ') : ''))}</div>
+  <div class="meta sub">Sistema de Inventario</div>
+  <script>window.print()</script>
+</body>
+</html>`
+      : `
 <!doctype html>
 <html lang="es">
 <head>
@@ -5501,8 +5828,8 @@ app.get("/api/print/corte-diario", auth, async (req, res) => {
 app.get("/api/cierre-dia/estado", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
-    if (!scope.is_bodeguero) {
-      return res.status(403).json({ error: "Solo el rol bodeguero puede consultar el cierre de dia." });
+    if (!scope.is_bodeguero && !scope.is_admin_role) {
+      return res.status(403).json({ error: "Solo el rol bodeguero o admin puede consultar el cierre de dia." });
     }
     const id_bodega = Number(scope.id_bodega || 0);
     if (!id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
@@ -6149,6 +6476,10 @@ app.get("/api/reportes/entradas", auth, async (req, res) => {
     const [rows] = await pool.query(
       `SELECT me.id_movimiento,
               me.tipo_movimiento AS tipo_entrada,
+              me.estado,
+              me.anulado_por,
+              me.anulado_en,
+              u_anul.nombre_completo AS anulado_por_usuario,
               DATE(me.creado_en) AS fecha,
               TIME(me.creado_en) AS hora,
               me.creado_en,
@@ -6183,6 +6514,7 @@ app.get("/api/reportes/entradas", auth, async (req, res) => {
        LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
        LEFT JOIN motivos_movimiento m ON m.id_motivo=me.id_motivo
        LEFT JOIN usuarios u ON u.id_usuario=me.creado_por
+       LEFT JOIN usuarios u_anul ON u_anul.id_usuario=me.anulado_por
        WHERE me.tipo_movimiento IN ('ENTRADA', 'TRANSFERENCIA')
          AND me.estado<>'ANULADO'
          AND ${accessFilter ? `me.id_bodega_destino IN (${accessFilter.sql})` : "1=1"}
@@ -6303,6 +6635,10 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
     const [rows] = await pool.query(
       `SELECT me.id_movimiento,
               me.tipo_movimiento AS tipo_salida,
+              me.estado,
+              me.anulado_por,
+              me.anulado_en,
+              u_anul.nombre_completo AS anulado_por_usuario,
               DATE(me.creado_en) AS fecha,
               TIME(me.creado_en) AS hora,
               me.creado_en,
@@ -6348,6 +6684,7 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
        LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
        LEFT JOIN motivos_movimiento m ON m.id_motivo=me.id_motivo
        LEFT JOIN usuarios u ON u.id_usuario=me.creado_por
+       LEFT JOIN usuarios u_anul ON u_anul.id_usuario=me.anulado_por
        WHERE me.tipo_movimiento IN ('SALIDA', 'TRANSFERENCIA')
          AND me.estado<>'ANULADO'
          AND ${accessFilter ? `me.id_bodega_origen IN (${accessFilter.sql})` : "1=1"}
@@ -6381,6 +6718,61 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
     );
 
     res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+app.get("/api/reportes/transferencias", auth, async (req, res) => {
+  try {
+    const scope = await resolveStockScope(req.user);
+    if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
+    if (!scope.can_view_existencias) return res.json([]);
+
+    const from_date = String(req.query.from || "").trim() || null;
+    const to_date = String(req.query.to || "").trim() || null;
+    const limit = Math.max(1, Math.min(5000, Number(req.query.limit || 1000)));
+
+    const [rows] = await pool.query(
+      `SELECT me.id_movimiento,
+              me.tipo_movimiento,
+              DATE(me.creado_en) AS fecha,
+              TIME(me.creado_en) AS hora,
+              me.creado_en,
+              me.no_documento,
+              me.observaciones,
+              bo.id_bodega AS id_bodega_origen,
+              bo.nombre_bodega AS bodega_origen,
+              bd.id_bodega AS id_bodega_destino,
+              bd.nombre_bodega AS bodega_destino,
+              u.nombre_completo AS usuario_creador,
+              md.id_detalle,
+              md.id_producto,
+              p.nombre_producto,
+              p.sku,
+              md.lote,
+              md.fecha_vencimiento,
+              md.cantidad,
+              md.costo_unitario,
+              (md.cantidad * md.costo_unitario) AS total_linea
+       FROM movimiento_encabezado me
+       JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
+       LEFT JOIN bodegas bo ON bo.id_bodega=me.id_bodega_origen
+       LEFT JOIN bodegas bd ON bd.id_bodega=me.id_bodega_destino
+       JOIN productos p ON p.id_producto=md.id_producto
+       LEFT JOIN usuarios u ON u.id_usuario=me.creado_por
+       WHERE me.tipo_movimiento='TRANSFERENCIA'
+         AND me.estado<>'ANULADO'
+         AND (:from_date IS NULL OR DATE(me.creado_en) >= :from_date)
+         AND (:to_date IS NULL OR DATE(me.creado_en) <= :to_date)
+       ORDER BY me.creado_en DESC
+       LIMIT ${limit}`,
+      {
+        from_date,
+        to_date,
+      }
+    );
+    res.json(rows || []);
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }
@@ -9274,7 +9666,1075 @@ app.post("/api/ops/backup/recovery-test", auth, requirePermission("action.manage
   }
 });
 
+// ---------- Transferencia manual entre bodegas ----------
+app.post("/api/transferencias", auth, requirePermission("action.create_update", "crear transferencias"), enforceDailyCloseBeforeMutations, async (req, res) => {
+  const { id_bodega_origen = null, id_bodega_destino = null, observaciones = null, lines = [] } = req.body || {};
+
+  if (!id_bodega_origen || !id_bodega_destino) {
+    return res.status(400).json({ error: "Faltan bodegas origen y/o destino" });
+  }
+  if (Number(id_bodega_origen) === Number(id_bodega_destino)) {
+    return res.status(400).json({ error: "La bodega origen y destino deben ser diferentes" });
+  }
+  if (!Array.isArray(lines) || !lines.length) {
+    return res.status(400).json({ error: "Sin lineas de producto" });
+  }
+  if (!beginIdempotentRequest(req, res, { pathKey: "/api/transferencias" })) {
+    return res.status(409).json({ error: "Solicitud duplicada detectada. Espera unos segundos e intenta de nuevo." });
+  }
+
+  const id_origen = Number(id_bodega_origen);
+  const id_destino = Number(id_bodega_destino);
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Validar bodega origen
+    const [[origenRow]] = await conn.query(
+      `SELECT b.id_bodega, b.activo, cb.maneja_stock
+       FROM bodegas b
+       LEFT JOIN configuracion_bodega cb ON cb.id_bodega=b.id_bodega
+       WHERE b.id_bodega=:id_bodega
+       LIMIT 1`,
+      { id_bodega: id_origen }
+    );
+    if (!origenRow || Number(origenRow.activo || 0) !== 1) {
+      await conn.rollback();
+      return res.status(400).json({ error: "Bodega origen no disponible" });
+    }
+
+    // Validar bodega destino
+    const [[destRow]] = await conn.query(
+      `SELECT b.id_bodega, b.activo, cb.maneja_stock, cb.puede_recibir
+       FROM bodegas b
+       LEFT JOIN configuracion_bodega cb ON cb.id_bodega=b.id_bodega
+       WHERE b.id_bodega=:id_bodega
+       LIMIT 1`,
+      { id_bodega: id_destino }
+    );
+    if (!destRow || Number(destRow.activo || 0) !== 1) {
+      await conn.rollback();
+      return res.status(400).json({ error: "Bodega destino no disponible" });
+    }
+    if (Number(destRow.maneja_stock || 0) !== 1) {
+      await conn.rollback();
+      return res.status(400).json({ error: "La bodega destino no maneja stock" });
+    }
+
+    // Buscar motivo TRANSFERENCIA
+    const [[mot]] = await conn.query(
+      `SELECT id_motivo, nombre_motivo
+       FROM motivos_movimiento
+       WHERE tipo_movimiento='TRANSFERENCIA' AND activo=1
+       ORDER BY (nombre_motivo='Transferencia') DESC, id_motivo ASC
+       LIMIT 1`
+    );
+    if (!mot) {
+      await conn.rollback();
+      return res.status(400).json({ error: "No existe motivo de tipo TRANSFERENCIA" });
+    }
+
+    // Crear movimiento_encabezado
+    const [mhRes] = await conn.query(
+      `INSERT INTO movimiento_encabezado
+       (tipo_movimiento, id_motivo, id_bodega_origen, id_bodega_destino, observaciones, creado_por, confirmado_en, estado)
+       VALUES ('TRANSFERENCIA', :id_motivo, :id_bodega_origen, :id_bodega_destino, :observaciones, :creado_por, NOW(), 'CONFIRMADO')`,
+      {
+        id_motivo: mot.id_motivo,
+        id_bodega_origen: id_origen,
+        id_bodega_destino: id_destino,
+        observaciones: String(observaciones || "").trim() || null,
+        creado_por: req.user.id_user,
+      }
+    );
+    const id_movimiento = mhRes.insertId;
+
+    // Procesar líneas
+    let totalLineas = 0;
+    for (const line of lines) {
+      const id_producto = Number(line.id_producto || 0);
+      const cantidad = Number(line.cantidad || 0);
+      const lote = String(line.lote || "").trim() || null;
+      const precio = Number(line.precio || 0) || 0;
+
+      if (!id_producto || cantidad <= 0) continue;
+
+      // Validar producto
+      const [[prod]] = await conn.query(
+        `SELECT id_producto FROM productos WHERE id_producto=:id_producto LIMIT 1`,
+        { id_producto }
+      );
+      if (!prod) {
+        await conn.rollback();
+        return res.status(400).json({ error: `Producto #${id_producto} no existe` });
+      }
+
+      // Validar stock disponible en origen
+      const [[stockRow]] = await conn.query(
+        `SELECT COALESCE(SUM(delta_cantidad), 0) AS disponible
+         FROM kardex
+         WHERE id_bodega=:id_bodega AND id_producto=:id_producto`,
+        { id_bodega: id_origen, id_producto }
+      );
+      const disponible = Number(stockRow?.disponible || 0);
+      if (disponible < cantidad) {
+        await conn.rollback();
+        return res.status(400).json({
+          error: `Stock insuficiente en origen para producto #${id_producto}: disponible ${disponible}, solicitado ${cantidad}`,
+        });
+      }
+
+      // Determinar costo unitario
+      const cost = precio > 0 ? precio : await getLastUnitCost(id_origen, id_producto, lote);
+
+      // Insertar movimiento_detalle
+      await conn.query(
+        `INSERT INTO movimiento_detalle (id_movimiento, id_producto, lote, cantidad, costo_unitario)
+         VALUES (:id_movimiento, :id_producto, :lote, :cantidad, :costo_unitario)`,
+        {
+          id_movimiento,
+          id_producto,
+          lote,
+          cantidad,
+          costo_unitario: cost,
+        }
+      );
+
+      // Kardex: salida de origen
+      await conn.query(
+        `INSERT INTO kardex (id_bodega, id_producto, id_movimiento, lote, delta_cantidad, delta_costo, tipo, referencia)
+         VALUES (:id_bodega, :id_producto, :id_movimiento, :lote, :delta_cantidad, :delta_costo, 'SALIDA', :referencia)`,
+        {
+          id_bodega: id_origen,
+          id_producto,
+          id_movimiento,
+          lote,
+          delta_cantidad: -cantidad,
+          delta_costo: -(cantidad * cost),
+          referencia: `Transferencia #${id_movimiento} a bodega #${id_destino}`,
+        }
+      );
+
+      // Kardex: entrada en destino
+      await conn.query(
+        `INSERT INTO kardex (id_bodega, id_producto, id_movimiento, lote, delta_cantidad, delta_costo, tipo, referencia)
+         VALUES (:id_bodega, :id_producto, :id_movimiento, :lote, :delta_cantidad, :delta_costo, 'ENTRADA', :referencia)`,
+        {
+          id_bodega: id_destino,
+          id_producto,
+          id_movimiento,
+          lote,
+          delta_cantidad: cantidad,
+          delta_costo: cantidad * cost,
+          referencia: `Transferencia #${id_movimiento} desde bodega #${id_origen}`,
+        }
+      );
+
+      totalLineas++;
+    }
+
+    if (totalLineas === 0) {
+      await conn.rollback();
+      return res.status(400).json({ error: "Ninguna linea valida para transferir" });
+    }
+
+    await conn.commit();
+    res.json({ ok: true, id_movimiento, total_lineas: totalLineas });
+  } catch (e) {
+    await conn.rollback().catch(() => {});
+    console.error("Error en POST /api/transferencias:", e);
+    res.status(500).json({ error: String(e.message || e) });
+  } finally {
+    conn.release();
+  }
+});
+
+// ---------- Revertir una transferencia ----------
+// ── Revertir cualquier movimiento (entrada, salida, ajuste) ──
+app.post("/api/movimientos/:id/revert", auth, requirePermission("action.create_update", "revertir movimientos"), enforceDailyCloseBeforeMutations, async (req, res) => {
+  const id_movimiento = Number(req.params.id);
+  if (!id_movimiento) return res.status(400).json({ error: "ID de movimiento invalido" });
+  if (!beginIdempotentRequest(req, res, { pathKey: `/api/movimientos/${id_movimiento}/revert` })) {
+    return res.status(409).json({ error: "Solicitud duplicada. Espera unos segundos." });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // 1. Verificar que el movimiento existe y es reversible
+    const [[mov]] = await conn.query(
+      `SELECT id_movimiento, tipo_movimiento, id_bodega_origen, id_bodega_destino,
+              id_motivo, no_documento, observaciones, estado, creado_en, creado_por
+       FROM movimiento_encabezado
+       WHERE id_movimiento=:id
+       LIMIT 1`,
+      { id: id_movimiento }
+    );
+
+    if (!mov) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Movimiento no encontrado" });
+    }
+
+    if (String(mov.estado || "").toUpperCase() === "ANULADO") {
+      await conn.rollback();
+      return res.status(400).json({ error: "El movimiento ya fue anulado previamente" });
+    }
+
+    const tipo = String(mov.tipo_movimiento || "").toUpperCase();
+    if (!["ENTRADA", "SALIDA", "AJUSTE"].includes(tipo)) {
+      await conn.rollback();
+      return res.status(400).json({ error: `No se puede revertir un movimiento de tipo ${tipo}` });
+    }
+
+    // 2. Verificar que el movimiento no haya sido revertido antes
+    const [[rev]] = await conn.query(
+      `SELECT id_movimiento
+       FROM movimiento_encabezado
+       WHERE observaciones LIKE :pat
+       LIMIT 1`,
+      { pat: `%REVERSIÓN de #${id_movimiento}%` }
+    );
+    if (rev) {
+      await conn.rollback();
+      return res.status(400).json({ error: `El movimiento #${id_movimiento} ya fue revertido (movimiento #${rev.id_movimiento})` });
+    }
+
+    // 3. Obtener las líneas originales del movimiento
+    const [lines] = await conn.query(
+      `SELECT id_detalle, id_producto, lote, fecha_vencimiento, cantidad, costo_unitario
+       FROM movimiento_detalle
+       WHERE id_movimiento=:id_movimiento`,
+      { id_movimiento }
+    );
+
+    if (!lines.length) {
+      await conn.rollback();
+      return res.status(400).json({ error: "El movimiento no tiene líneas para revertir" });
+    }
+
+    // 4. Determinar bodega para la reversión
+    const id_bodega =
+      tipo === "ENTRADA"
+        ? Number(mov.id_bodega_destino || 0)
+        : Number(mov.id_bodega_origen || 0);
+
+    if (!id_bodega) {
+      await conn.rollback();
+      return res.status(400).json({ error: "El movimiento no tiene bodega asociada" });
+    }
+
+    // 5. Crear movimiento inverso (delta_cantidad negativa para entradas, positiva para salidas)
+    const obsReversion = `REVERSIÓN de #${id_movimiento}. Motivo original: ${mov.no_documento || 'N/D'}. ${mov.observaciones || ''}`.trim();
+
+    const [mhRes] = await conn.query(
+      `INSERT INTO movimiento_encabezado
+       (tipo_movimiento, id_motivo, id_bodega_origen, id_bodega_destino, no_documento, observaciones, creado_por, estado)
+       VALUES (:tipo, :id_motivo, :id_bodega_origen, :id_bodega_destino, :no_documento, :observaciones, :creado_por, 'CONFIRMADO')`,
+      {
+        tipo: tipo === "ENTRADA" ? "AJUSTE" : tipo,
+        id_motivo: mov.id_motivo,
+        id_bodega_origen: tipo === "ENTRADA" ? id_bodega : null,
+        id_bodega_destino: tipo === "ENTRADA" ? null : id_bodega,
+        no_documento: `REV-${id_movimiento}`,
+        observaciones: obsReversion.slice(0, 255),
+        creado_por: req.user?.id_user || 0,
+      }
+    );
+    const id_reversion = Number(mhRes.insertId || 0);
+
+    // 6. Insertar líneas inversas en kardex (cantidad negativa para entradas, positiva para salidas)
+    const isEntrada = tipo === "ENTRADA";
+    let totalLineas = 0;
+
+    for (const ln of lines) {
+      const cantidadInversa = isEntrada
+        ? -Math.abs(Number(ln.cantidad || 0))
+        : Math.abs(Number(ln.cantidad || 0));
+
+      if (cantidadInversa === 0) continue;
+
+      const [d] = await conn.query(
+        `INSERT INTO movimiento_detalle
+         (id_movimiento, id_producto, lote, fecha_vencimiento, cantidad, costo_unitario, observacion_linea)
+         VALUES (:id_movimiento, :id_producto, :lote, :fecha_vencimiento, :cantidad, :costo_unitario, :observacion_linea)`,
+        {
+          id_movimiento: id_reversion,
+          id_producto: ln.id_producto,
+          lote: ln.lote || null,
+          fecha_vencimiento: ln.fecha_vencimiento || null,
+          cantidad: Math.abs(Number(ln.cantidad || 0)),
+          costo_unitario: ln.costo_unitario || 0,
+          observacion_linea: `REVERSIÓN #${id_movimiento}`,
+        }
+      );
+
+      await conn.query(
+        `INSERT INTO kardex
+         (id_movimiento, id_detalle, id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, costo_unitario)
+         VALUES (:id_movimiento, :id_detalle, :id_bodega, :id_producto, :lote, :fecha_vencimiento, :delta_cantidad, :costo_unitario)`,
+        {
+          id_movimiento: id_reversion,
+          id_detalle: Number(d.insertId || 0),
+          id_bodega: id_bodega,
+          id_producto: ln.id_producto,
+          lote: ln.lote || null,
+          fecha_vencimiento: ln.fecha_vencimiento || null,
+          delta_cantidad: cantidadInversa,
+          costo_unitario: ln.costo_unitario || 0,
+        }
+      );
+
+      totalLineas++;
+    }
+
+    // 7. Marcar movimiento original como ANULADO
+    await conn.query(
+      `UPDATE movimiento_encabezado
+SET estado='ANULADO', anulado_por=:anulado_por, anulado_en=NOW()
+WHERE id_movimiento=:id_movimiento`,
+      { id_movimiento, anulado_por: Number(req.user?.id_user || 0) }
+    );
+
+    await conn.commit();
+
+    // 8. Notificar en tiempo real
+    emitStockChanged(id_bodega, {
+      action: tipo === "ENTRADA" ? "reversion_entrada" : "reversion_salida",
+      id_movimiento: id_reversion,
+      nombre_bodega: "",
+    });
+
+    res.json({
+      ok: true,
+      id_movimiento: id_reversion,
+      mensaje: `Movimiento #${id_movimiento} revertido. Se creó el movimiento #${id_reversion}.`,
+    });
+  } catch (e) {
+    await conn.rollback();
+    res.status(500).json({ error: String(e.message || e) });
+  } finally {
+    conn.release();
+  }
+});
+
+app.post("/api/transferencias/:id/revert", auth, requirePermission("action.create_update", "revertir transferencias"), enforceDailyCloseBeforeMutations, async (req, res) => {
+  const id_movimiento_original = Number(req.params.id || 0);
+  if (!id_movimiento_original) {
+    return res.status(400).json({ error: "ID de movimiento invalido" });
+  }
+  if (!beginIdempotentRequest(req, res, { pathKey: "/api/transferencias/:id/revert" })) {
+    return res.status(409).json({ error: "Solicitud duplicada detectada." });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Leer encabezado original
+    const [[original]] = await conn.query(
+      `SELECT id_movimiento, tipo_movimiento, id_bodega_origen, id_bodega_destino, creado_en
+       FROM movimiento_encabezado
+       WHERE id_movimiento=:id_movimiento
+       LIMIT 1`,
+      { id_movimiento: id_movimiento_original }
+    );
+    if (!original) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Movimiento no encontrado" });
+    }
+    if (String(original.tipo_movimiento || "").toUpperCase() !== "TRANSFERENCIA") {
+      await conn.rollback();
+      return res.status(400).json({ error: "El movimiento no es una transferencia" });
+    }
+
+    // Verificar que no se haya revertido ya (buscar transferencia que referencia a la original)
+    const [[existingRevert]] = await conn.query(
+      `SELECT id_movimiento FROM movimiento_encabezado
+       WHERE observaciones LIKE :ref
+       LIMIT 1`,
+      { ref: `%REVERSIÓN de #${id_movimiento_original}%` }
+    );
+    if (existingRevert) {
+      await conn.rollback();
+      return res.status(400).json({ error: `Esta transferencia ya fue revertida (movimiento #${existingRevert.id_movimiento})` });
+    }
+
+    const id_origen = Number(original.id_bodega_origen);
+    const id_destino = Number(original.id_bodega_destino);
+
+    // Validar que bodegas sigan activas
+    const [[origenCheck]] = await conn.query(
+      `SELECT id_bodega FROM bodegas WHERE id_bodega=:id AND activo=1 LIMIT 1`,
+      { id: id_origen }
+    );
+    const [[destCheck]] = await conn.query(
+      `SELECT id_bodega FROM bodegas WHERE id_bodega=:id AND activo=1 LIMIT 1`,
+      { id: id_destino }
+    );
+    if (!origenCheck || !destCheck) {
+      await conn.rollback();
+      return res.status(400).json({ error: "Una de las bodegas ya no esta activa" });
+    }
+
+    // Leer detalles originales
+    const [detalles] = await conn.query(
+      `SELECT id_producto, lote, cantidad, costo_unitario
+       FROM movimiento_detalle
+       WHERE id_movimiento=:id_movimiento`,
+      { id_movimiento: id_movimiento_original }
+    );
+    if (!detalles || !detalles.length) {
+      await conn.rollback();
+      return res.status(400).json({ error: "La transferencia original no tiene lineas" });
+    }
+
+    // Buscar motivo TRANSFERENCIA
+    const [[mot]] = await conn.query(
+      `SELECT id_motivo
+       FROM motivos_movimiento
+       WHERE tipo_movimiento='TRANSFERENCIA' AND activo=1
+       ORDER BY id_motivo ASC
+       LIMIT 1`
+    );
+    if (!mot) {
+      await conn.rollback();
+      return res.status(400).json({ error: "No existe motivo de tipo TRANSFERENCIA" });
+    }
+
+    // Crear nuevo movimiento con bodegas invertidas
+    const [mhRes] = await conn.query(
+      `INSERT INTO movimiento_encabezado
+       (tipo_movimiento, id_motivo, id_bodega_origen, id_bodega_destino, observaciones, creado_por, confirmado_en, estado)
+       VALUES ('TRANSFERENCIA', :id_motivo, :id_bodega_origen, :id_bodega_destino, :observaciones, :creado_por, NOW(), 'CONFIRMADO')`,
+      {
+        id_motivo: mot.id_motivo,
+        id_bodega_origen: id_destino,
+        id_bodega_destino: id_origen,
+        observaciones: `REVERSIÓN de #${id_movimiento_original}`,
+        creado_por: req.user.id_user,
+      }
+    );
+    const id_movimiento_nuevo = mhRes.insertId;
+
+    // Reinsertar detalles y kardex (swap origen/destino)
+    let totalLineas = 0;
+    for (const det of detalles) {
+      const id_producto = Number(det.id_producto || 0);
+      const cantidad = Number(det.cantidad || 0);
+      const lote = String(det.lote || "").trim() || null;
+      const cost = Number(det.costo_unitario || 0);
+
+      if (!id_producto || cantidad <= 0) continue;
+
+      // Verificar stock en la bodega destino (ahora origen de la reversión)
+      const [[stockRow]] = await conn.query(
+        `SELECT COALESCE(SUM(delta_cantidad), 0) AS disponible
+         FROM kardex
+         WHERE id_bodega=:id_bodega AND id_producto=:id_producto`,
+        { id_bodega: id_destino, id_producto }
+      );
+      const disponible = Number(stockRow?.disponible || 0);
+      if (disponible < cantidad) {
+        await conn.rollback();
+        return res.status(400).json({
+          error: `Stock insuficiente en bodega destino para revertir producto #${id_producto}: disponible ${disponible}, requerido ${cantidad}`,
+        });
+      }
+
+      // Insertar detalle
+      await conn.query(
+        `INSERT INTO movimiento_detalle (id_movimiento, id_producto, lote, cantidad, costo_unitario)
+         VALUES (:id_movimiento, :id_producto, :lote, :cantidad, :costo_unitario)`,
+        {
+          id_movimiento: id_movimiento_nuevo,
+          id_producto,
+          lote,
+          cantidad,
+          costo_unitario: cost,
+        }
+      );
+
+      // Kardex: salida de destino (ahora origen en reversión)
+      await conn.query(
+        `INSERT INTO kardex (id_bodega, id_producto, id_movimiento, lote, delta_cantidad, delta_costo, tipo, referencia)
+         VALUES (:id_bodega, :id_producto, :id_movimiento, :lote, :delta_cantidad, :delta_costo, 'SALIDA', :referencia)`,
+        {
+          id_bodega: id_destino,
+          id_producto,
+          id_movimiento: id_movimiento_nuevo,
+          lote,
+          delta_cantidad: -cantidad,
+          delta_costo: -(cantidad * cost),
+          referencia: `Reversión de transferencia #${id_movimiento_original} a bodega #${id_origen}`,
+        }
+      );
+
+      // Kardex: entrada en origen (ahora destino en reversión)
+      await conn.query(
+        `INSERT INTO kardex (id_bodega, id_producto, id_movimiento, lote, delta_cantidad, delta_costo, tipo, referencia)
+         VALUES (:id_bodega, :id_producto, :id_movimiento, :lote, :delta_cantidad, :delta_costo, 'ENTRADA', :referencia)`,
+        {
+          id_bodega: id_origen,
+          id_producto,
+          id_movimiento: id_movimiento_nuevo,
+          lote,
+          delta_cantidad: cantidad,
+          delta_costo: cantidad * cost,
+          referencia: `Reversión de transferencia #${id_movimiento_original} desde bodega #${id_destino}`,
+        }
+      );
+
+      totalLineas++;
+    }
+
+    await conn.commit();
+    res.json({
+      ok: true,
+      id_movimiento: id_movimiento_nuevo,
+      id_movimiento_original,
+      total_lineas: totalLineas,
+    });
+  } catch (e) {
+    await conn.rollback().catch(() => {});
+    console.error("Error en POST /api/transferencias/:id/revert:", e);
+    res.status(500).json({ error: String(e.message || e) });
+  } finally {
+    conn.release();
+  }
+});
+
+// ---------- Conteo Cíclico / Inventario Físico ----------
+
+// Listar conteos
+app.get("/api/conteo-ciclico", auth, async (req, res) => {
+  try {
+    const scope = await resolveStockScope(req.user);
+    const whClause = scope.can_all_bodegas
+      ? { sql: "1=1", params: {} }
+      : buildNamedInClause(scope.allowed_warehouse_ids, "ccwh");
+    const warehouseFilter = scope.can_all_bodegas
+      ? "1=1"
+      : `cc.id_bodega IN (${whClause.sql})`;
+
+    const [rows] = await pool.query(
+      `SELECT cc.id_conteo,
+              cc.id_bodega,
+              b.nombre_bodega,
+              cc.fecha_conteo,
+              cc.estado,
+              cc.observaciones,
+              u.nombre_completo AS creado_por_nombre,
+              cc.creado_en,
+              (SELECT COUNT(*) FROM conteo_ciclico_detalle WHERE id_conteo=cc.id_conteo) AS total_lineas,
+              (SELECT COUNT(*) FROM conteo_ciclico_detalle WHERE id_conteo=cc.id_conteo AND cantidad_conteo IS NOT NULL) AS lineas_contadas
+       FROM conteo_ciclico cc
+       JOIN bodegas b ON b.id_bodega=cc.id_bodega
+       LEFT JOIN usuarios u ON u.id_usuario=cc.creado_por
+       WHERE ${warehouseFilter}
+       ORDER BY cc.creado_en DESC
+       LIMIT 200`,
+      { ...whClause.params }
+    );
+    res.json(rows || []);
+  } catch (e) {
+    console.error("Error GET /api/conteo-ciclico:", e);
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+// Crear nuevo conteo (genera líneas desde el stock actual)
+app.post("/api/conteo-ciclico", auth, requirePermission("action.create_update", "crear conteos"), async (req, res) => {
+  const { id_bodega, observaciones = null } = req.body || {};
+  const id_bodega_num = Number(id_bodega || 0);
+  if (!id_bodega_num) return res.status(400).json({ error: "Falta bodega" });
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [[bodega]] = await conn.query(
+      `SELECT id_bodega, nombre_bodega FROM bodegas WHERE id_bodega=:id AND activo=1 LIMIT 1`,
+      { id: id_bodega_num }
+    );
+    if (!bodega) {
+      await conn.rollback();
+      return res.status(400).json({ error: "Bodega no disponible" });
+    }
+
+    const [mhRes] = await conn.query(
+      `INSERT INTO conteo_ciclico (id_bodega, fecha_conteo, estado, observaciones, creado_por)
+       VALUES (:id_bodega, CURDATE(), 'BORRADOR', :observaciones, :creado_por)`,
+      { id_bodega: id_bodega_num, observaciones: String(observaciones || "").trim() || null, creado_por: req.user.id_user }
+    );
+    const id_conteo = mhRes.insertId;
+
+    // Obtener stock actual desde v_stock_resumen
+    const [stockRows] = await conn.query(
+      `SELECT vs.id_producto, p.nombre_producto, p.sku, vs.stock
+       FROM v_stock_resumen vs
+       JOIN productos p ON p.id_producto=vs.id_producto
+       WHERE vs.id_bodega=:id_bodega
+         AND vs.stock > 0
+       ORDER BY p.nombre_producto ASC`,
+      { id_bodega: id_bodega_num }
+    );
+
+    if (stockRows && stockRows.length > 0) {
+      const values = stockRows.map((r) => [
+        id_conteo,
+        r.id_producto,
+        r.nombre_producto,
+        r.sku || null,
+        Number(r.stock || 0),
+      ]);
+      await conn.query(
+        `INSERT INTO conteo_ciclico_detalle
+         (id_conteo, id_producto, nombre_producto, sku, cantidad_sistema)
+         VALUES ?`,
+        [values]
+      );
+    }
+
+    await conn.commit();
+    res.json({ ok: true, id_conteo, total_lineas: (stockRows || []).length });
+  } catch (e) {
+    await conn.rollback().catch(() => {});
+    console.error("Error POST /api/conteo-ciclico:", e);
+    res.status(500).json({ error: String(e.message || e) });
+  } finally {
+    conn.release();
+  }
+});
+
+// Obtener detalle de un conteo
+app.get("/api/conteo-ciclico/:id", auth, async (req, res) => {
+  try {
+    const id_conteo = Number(req.params.id || 0);
+    if (!id_conteo) return res.status(400).json({ error: "ID invalido" });
+
+    const [[conteo]] = await pool.query(
+      `SELECT cc.*, b.nombre_bodega,
+              u.nombre_completo AS creado_por_nombre
+       FROM conteo_ciclico cc
+       JOIN bodegas b ON b.id_bodega=cc.id_bodega
+       LEFT JOIN usuarios u ON u.id_usuario=cc.creado_por
+       WHERE cc.id_conteo=:id
+       LIMIT 1`,
+      { id: id_conteo }
+    );
+    if (!conteo) return res.status(404).json({ error: "Conteo no encontrado" });
+
+    const [detalles] = await pool.query(
+      `SELECT * FROM conteo_ciclico_detalle
+       WHERE id_conteo=:id_conteo
+       ORDER BY nombre_producto ASC`,
+      { id_conteo }
+    );
+
+    res.json({ conteo, detalles: detalles || [] });
+  } catch (e) {
+    console.error("Error GET /api/conteo-ciclico/:id:", e);
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+// Actualizar cantidad contada de una línea
+app.patch("/api/conteo-ciclico/:id/detalle/:id_detalle", auth, requirePermission("action.create_update", "actualizar conteo"), async (req, res) => {
+  try {
+    const id_conteo = Number(req.params.id || 0);
+    const id_detalle = Number(req.params.id_detalle || 0);
+    const { cantidad_conteo, comentario } = req.body || {};
+
+    if (!id_conteo || !id_detalle) return res.status(400).json({ error: "IDs invalidos" });
+
+    // Verificar que el conteo esté en BORRADOR o EN_PROGRESO
+    const [[conteo]] = await pool.query(
+      `SELECT estado FROM conteo_ciclico WHERE id_conteo=:id LIMIT 1`,
+      { id: id_conteo }
+    );
+    if (!conteo) return res.status(404).json({ error: "Conteo no encontrado" });
+    if (conteo.estado !== 'BORRADOR' && conteo.estado !== 'EN_PROGRESO') {
+      return res.status(400).json({ error: "El conteo no esta en progreso" });
+    }
+
+    // Actualizar estado a EN_PROGRESO si estaba en BORRADOR
+    if (conteo.estado === 'BORRADOR') {
+      await pool.query(
+        `UPDATE conteo_ciclico SET estado='EN_PROGRESO' WHERE id_conteo=:id`,
+        { id: id_conteo }
+      );
+    }
+
+    const c = cantidad_conteo !== null && cantidad_conteo !== undefined && cantidad_conteo !== '' ? Number(cantidad_conteo) : null;
+
+    await pool.query(
+      `UPDATE conteo_ciclico_detalle
+       SET cantidad_conteo=:cantidad_conteo,
+           diferencia=IF(:cantidad_conteo IS NOT NULL, :cantidad_conteo - cantidad_sistema, NULL),
+           comentario=:comentario
+       WHERE id_detalle=:id_detalle AND id_conteo=:id_conteo`,
+      {
+        cantidad_conteo: c,
+        comentario: String(comentario || "").trim() || null,
+        id_detalle,
+        id_conteo,
+      }
+    );
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("Error PATCH /api/conteo-ciclico/:id/detalle/:id_detalle:", e);
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+// Completar conteo (marcar como COMPLETADO)
+app.post("/api/conteo-ciclico/:id/completar", auth, requirePermission("action.create_update", "completar conteos"), async (req, res) => {
+  try {
+    const id_conteo = Number(req.params.id || 0);
+    if (!id_conteo) return res.status(400).json({ error: "ID invalido" });
+
+    const [[conteo]] = await pool.query(
+      `SELECT estado FROM conteo_ciclico WHERE id_conteo=:id LIMIT 1`,
+      { id: id_conteo }
+    );
+    if (!conteo) return res.status(404).json({ error: "Conteo no encontrado" });
+    if (conteo.estado === 'COMPLETADO' || conteo.estado === 'AJUSTADO') {
+      return res.status(400).json({ error: "El conteo ya fue completado o ajustado" });
+    }
+
+    // Si estaba en BORRADOR, pasar a EN_PROGRESO primero
+    await pool.query(
+      `UPDATE conteo_ciclico SET estado='COMPLETADO' WHERE id_conteo=:id`,
+      { id: id_conteo }
+    );
+
+    res.json({ ok: true, id_conteo });
+  } catch (e) {
+    console.error("Error POST /api/conteo-ciclico/:id/completar:", e);
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+// Ajustar inventario desde conteo (crea movimientos de ajuste por diferencias)
+app.post("/api/conteo-ciclico/:id/ajustar", auth, requirePermission("action.create_update", "ajustar inventario desde conteo"), async (req, res) => {
+  try {
+    const id_conteo = Number(req.params.id || 0);
+    if (!id_conteo) return res.status(400).json({ error: "ID invalido" });
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [[conteo]] = await conn.query(
+        `SELECT cc.*, b.nombre_bodega
+         FROM conteo_ciclico cc
+         JOIN bodegas b ON b.id_bodega=cc.id_bodega
+         WHERE cc.id_conteo=:id
+         LIMIT 1`,
+        { id: id_conteo }
+      );
+      if (!conteo) {
+        await conn.rollback();
+        return res.status(404).json({ error: "Conteo no encontrado" });
+      }
+      if (conteo.estado !== 'COMPLETADO') {
+        await conn.rollback();
+        return res.status(400).json({ error: "El conteo debe estar COMPLETADO antes de ajustar" });
+      }
+
+      // Obtener líneas con diferencia
+      const [detalles] = await conn.query(
+        `SELECT * FROM conteo_ciclico_detalle
+         WHERE id_conteo=:id_conteo
+           AND cantidad_conteo IS NOT NULL
+           AND cantidad_conteo <> cantidad_sistema
+         ORDER BY nombre_producto ASC`,
+        { id_conteo }
+      );
+
+      if (!detalles || !detalles.length) {
+        await conn.rollback();
+        return res.status(400).json({ error: "No hay diferencias para ajustar" });
+      }
+
+      // Buscar motivo AJUSTE
+      const [[motivo]] = await conn.query(
+        `SELECT id_motivo FROM motivos_movimiento
+         WHERE tipo_movimiento='AJUSTE' AND activo=1
+         ORDER BY id_motivo ASC LIMIT 1`
+      );
+      if (!motivo) {
+        await conn.rollback();
+        return res.status(400).json({ error: "No existe motivo de tipo AJUSTE" });
+      }
+
+      // Agrupar líneas por dirección (ENTRADA si diferencia > 0, SALIDA si < 0)
+      const entradas = [];
+      const salidas = [];
+      for (const d of detalles) {
+        const dif = Number(d.diferencia || 0);
+        if (dif > 0) entradas.push(d);
+        else if (dif < 0) salidas.push(d);
+      }
+
+      let movimientos = [];
+
+      // Crear ajuste de ENTRADA (sobrantes)
+      if (entradas.length > 0) {
+        const [mhRes] = await conn.query(
+          `INSERT INTO movimiento_encabezado
+           (tipo_movimiento, id_motivo, id_bodega_destino, observaciones, creado_por, confirmado_en, estado, no_contar_dashboard)
+           VALUES ('AJUSTE', :id_motivo, :id_bodega, :observaciones, :creado_por, NOW(), 'CONFIRMADO', 1)`,
+          {
+            id_motivo: motivo.id_motivo,
+            id_bodega: conteo.id_bodega,
+            observaciones: `Ajuste por conteo ciclico #${id_conteo} (sobrantes)`,
+            creado_por: req.user.id_user,
+          }
+        );
+        const id_mov = mhRes.insertId;
+
+        for (const d of entradas) {
+          const dif = Number(d.diferencia || 0);
+          await conn.query(
+            `INSERT INTO movimiento_detalle (id_movimiento, id_producto, lote, cantidad, costo_unitario)
+             VALUES (:id_movimiento, :id_producto, NULL, :cantidad, 0)`,
+            { id_movimiento: id_mov, id_producto: d.id_producto, cantidad: dif }
+          );
+          await conn.query(
+            `INSERT INTO kardex (id_bodega, id_producto, id_movimiento, lote, delta_cantidad, delta_costo, tipo, referencia)
+             VALUES (:id_bodega, :id_producto, :id_movimiento, NULL, :delta_cantidad, 0, 'ENTRADA', :referencia)`,
+            {
+              id_bodega: conteo.id_bodega,
+              id_producto: d.id_producto,
+              id_movimiento: id_mov,
+              delta_cantidad: dif,
+              referencia: `Ajuste conteo #${id_conteo} - ${d.nombre_producto}`,
+            }
+          );
+        }
+        movimientos.push({ tipo: 'ENTRADA', id_movimiento: id_mov, lineas: entradas.length });
+      }
+
+      // Crear ajuste de SALIDA (faltantes)
+      if (salidas.length > 0) {
+        const [mhRes] = await conn.query(
+          `INSERT INTO movimiento_encabezado
+           (tipo_movimiento, id_motivo, id_bodega_origen, observaciones, creado_por, confirmado_en, estado, no_contar_dashboard)
+           VALUES ('AJUSTE', :id_motivo, :id_bodega, :observaciones, :creado_por, NOW(), 'CONFIRMADO', 1)`,
+          {
+            id_motivo: motivo.id_motivo,
+            id_bodega: conteo.id_bodega,
+            observaciones: `Ajuste por conteo ciclico #${id_conteo} (faltantes)`,
+            creado_por: req.user.id_user,
+          }
+        );
+        const id_mov = mhRes.insertId;
+
+        for (const d of salidas) {
+          const dif = Math.abs(Number(d.diferencia || 0));
+          await conn.query(
+            `INSERT INTO movimiento_detalle (id_movimiento, id_producto, lote, cantidad, costo_unitario)
+             VALUES (:id_movimiento, :id_producto, NULL, :cantidad, 0)`,
+            { id_movimiento: id_mov, id_producto: d.id_producto, cantidad: dif }
+          );
+          await conn.query(
+            `INSERT INTO kardex (id_bodega, id_producto, id_movimiento, lote, delta_cantidad, delta_costo, tipo, referencia)
+             VALUES (:id_bodega, :id_producto, :id_movimiento, NULL, :delta_cantidad, 0, 'SALIDA', :referencia)`,
+            {
+              id_bodega: conteo.id_bodega,
+              id_producto: d.id_producto,
+              id_movimiento: id_mov,
+              delta_cantidad: -dif,
+              referencia: `Ajuste conteo #${id_conteo} - ${d.nombre_producto}`,
+            }
+          );
+        }
+        movimientos.push({ tipo: 'SALIDA', id_movimiento: id_mov, lineas: salidas.length });
+      }
+
+      // Marcar conteo como AJUSTADO
+      await conn.query(
+        `UPDATE conteo_ciclico SET estado='AJUSTADO' WHERE id_conteo=:id`,
+        { id: id_conteo }
+      );
+
+      await conn.commit();
+      res.json({ ok: true, id_conteo, movimientos });
+    } catch (e) {
+      await conn.rollback().catch(() => {});
+      throw e;
+    } finally {
+      conn.release();
+    }
+  } catch (e) {
+    console.error("Error POST /api/conteo-ciclico/:id/ajustar:", e);
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+// ── Push Notification helpers ──────────────────────────────────────
+
+/**
+ * Envía una notificación push a todas las suscripciones activas
+ * de una bodega específica (o a todas si idBodega es null).
+ */
+async function sendPushToWarehouse(idBodega, payload) {
+  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) return;
+  try {
+    const params = {};
+    let whereClause = '';
+    if (idBodega != null) {
+      whereClause = 'WHERE s.id_bodega=:id_bodega';
+      params.id_bodega = Number(idBodega);
+    }
+    const [rows] = await pool.query(
+      `SELECT s.endpoint, s.auth, s.p256dh
+       FROM push_subscriptions s
+       ${whereClause}
+       ORDER BY s.id_suscripcion ASC`,
+      params
+    );
+    if (!rows || !rows.length) return;
+
+    const data = JSON.stringify(payload);
+    await Promise.allSettled(
+      rows.map((sub) => {
+        const pushSub = {
+          endpoint: sub.endpoint,
+          keys: { auth: sub.auth, p256dh: sub.p256dh },
+        };
+        return webpush.sendNotification(pushSub, data).catch((err) => {
+          // Solo eliminar si la suscripción expiró (410 Gone)
+          // Otros errores (red, servidor) son temporales
+          if (err.statusCode === 410) {
+            pool.query(
+              `DELETE FROM push_subscriptions
+               WHERE endpoint=:endpoint`,
+              { endpoint: sub.endpoint }
+            ).catch(() => {});
+          }
+        });
+      })
+    );
+  } catch (e) {
+    console.error('[push] Error sending pushes:', e.message || e);
+  }
+}
+
+// ── Push Notification Endpoints ────────────────────────────────────
+
+/** GET /api/push/vapid-key — devuelve la llave pública VAPID */
+app.get("/api/push/vapid-key", (req, res) => {
+  if (!VAPID_PUBLIC_KEY) {
+    return res.status(500).json({ error: "VAPID no configurado" });
+  }
+  res.json({ publicKey: VAPID_PUBLIC_KEY });
+});
+
+/** POST /api/push/subscribe — Guarda una nueva suscripción push */
+app.post("/api/push/subscribe", auth, async (req, res) => {
+  try {
+    const idUsuario = Number(req.user?.id_user || 0);
+    if (!idUsuario) return res.status(401).json({ error: "Usuario invalido" });
+
+    const { endpoint, keys, id_bodega } = req.body || {};
+    if (!endpoint || !keys?.auth || !keys?.p256dh) {
+      return res.status(400).json({ error: "Suscripcion incompleta" });
+    }
+
+    // Evitar duplicados por endpoint
+    await pool.query(
+      `DELETE FROM push_subscriptions WHERE endpoint=:endpoint`,
+      { endpoint }
+    );
+
+    await pool.query(
+      `INSERT INTO push_subscriptions (id_usuario, endpoint, auth, p256dh, id_bodega, user_agent)
+       VALUES (:id_usuario, :endpoint, :auth, :p256dh, :id_bodega, :user_agent)`,
+      {
+        id_usuario: idUsuario,
+        endpoint,
+        auth: keys.auth,
+        p256dh: keys.p256dh,
+        id_bodega: Number(id_bodega || 0) || null,
+        user_agent: String(req.headers['user-agent'] || '').slice(0, 250),
+      }
+    );
+
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[push] subscribe error:', e.message || e);
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+/** POST /api/push/unsubscribe — Elimina una suscripción push */
+app.post("/api/push/unsubscribe", auth, async (req, res) => {
+  try {
+    const { endpoint } = req.body || {};
+    if (!endpoint) return res.status(400).json({ error: "Falta endpoint" });
+
+    await pool.query(
+      `DELETE FROM push_subscriptions WHERE endpoint=:endpoint`,
+      { endpoint }
+    );
+
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+/** POST /api/push/send-alertas — Envía push para alertas de stock detectadas por polling */
+app.post("/api/push/send-alertas", auth, async (req, res) => {
+  try {
+    const { alertas } = req.body || {};
+    if (!Array.isArray(alertas) || !alertas.length) {
+      return res.json({ ok: true });
+    }
+    // Enviar push para hasta 10 alertas (evitar sobrecarga)
+    for (const a of alertas.slice(0, 10)) {
+      const isMinimo = a.minimo != null && Number(a.stock) < Number(a.minimo);
+      const isVencido = a.dias_para_vencer != null && a.dias_para_vencer <= 0;
+      const isProximo = a.dias_para_vencer != null && a.dias_para_vencer <= 3;
+
+      let title, body;
+      if (isMinimo) {
+        title = '📦 Stock por debajo del mínimo';
+        body = `${a.nombre_producto}${a.sku ? ` (${a.sku})` : ''} · Stock: ${Number(a.stock)} / Mín: ${Number(a.minimo)}`;
+      } else if (isVencido) {
+        title = '❌ Producto vencido';
+        body = `${a.nombre_producto}${a.sku ? ` (${a.sku})` : ''} · Vencido hace ${Math.abs(Number(a.dias_para_vencer))} día(s)`;
+      } else if (isProximo) {
+        title = '🔥 Vence pronto';
+        body = `${a.nombre_producto}${a.sku ? ` (${a.sku})` : ''} · Vence en ${a.dias_para_vencer} día(s)`;
+      } else {
+        continue; // Saltar alertas no críticas
+      }
+
+      const pushPayload = {
+        type: 'alerta',
+        title,
+        body,
+        tag: `alerta-${a.id_bodega || 0}-${a.id_producto || 0}-${a.lote || 'nolote'}`,
+        url: '/alertas',
+      };
+      await sendPushToWarehouse(a.id_bodega || null, pushPayload);
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[push] Error sending alertas push:', e.message || e);
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
 app.get("/api/health", async (req, res) => {
+
   try {
     const t0 = Date.now();
     await pool.query("SELECT 1");

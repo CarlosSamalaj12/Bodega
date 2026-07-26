@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { CatalogPage } from '@/components/shared/CatalogPage';
 import api from '@/services/api';
 
-export function SubcategoriasPage() {
+export default function SubcategoriasPage() {
   const [categorias, setCategorias] = useState([]);
 
   useEffect(() => {

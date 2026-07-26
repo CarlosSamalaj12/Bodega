@@ -1,0 +1,223 @@
+@use '@/styles/abstracts' as *;
+
+.corte-diario {
+  padding: $space-6;
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+
+  &__header-actions {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+  }
+
+  // ---- Filtros ----
+  &__filters {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+
+    @media (min-width: 768px) {
+      flex-direction: row;
+      align-items: center;
+    }
+  }
+
+  &__search-box {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__filter-controls {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    flex-shrink: 0;
+  }
+
+  &__toggle {
+    display: flex;
+    align-items: center;
+    gap: $space-1;
+    font-size: $font-size-sm;
+    color: $color-text;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+
+    input[type='checkbox'] {
+      accent-color: $color-accent;
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+    }
+  }
+
+  // ---- Métricas ----
+  &__metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: $space-3;
+
+    @media (min-width: 640px) {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+
+  &__metric-card {
+    text-align: center;
+    padding: $space-4 $space-3;
+
+    &.corte-diario__metric-card--success {
+      border-left: 3px solid $color-success;
+    }
+
+    &.corte-diario__metric-card--danger {
+      border-left: 3px solid $color-danger;
+    }
+
+    &.corte-diario__metric-card--accent {
+      border-left: 3px solid $color-accent;
+    }
+  }
+
+  &__metric-label {
+    display: block;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: $space-1;
+  }
+
+  &__metric-value {
+    display: block;
+    font-size: $font-size-xl;
+    font-weight: $font-weight-bold;
+    color: $color-text;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+  }
+
+  // ---- Producto en tabla ----
+  &__producto {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    flex-wrap: wrap;
+  }
+
+  &__prod-name {
+    font-weight: $font-weight-medium;
+    color: $color-text;
+  }
+
+  &__prod-sku {
+    font-family: $font-mono;
+    font-size: $font-size-xs;
+    color: $color-secondary;
+    background: $color-secondary-soft;
+    padding: 1px $space-1;
+    border-radius: $radius-xs;
+    white-space: nowrap;
+  }
+
+  // ---- Cantidades ----
+  &__qty {
+    font-variant-numeric: tabular-nums;
+    font-family: $font-mono;
+    font-size: $font-size-sm;
+
+    &--pos {
+      color: $color-success;
+    }
+
+    &--neg {
+      color: $color-danger;
+    }
+
+    &--current {
+      font-weight: $font-weight-semibold;
+      color: $color-text;
+    }
+  }
+
+  // ---- Modal de cierre ----
+  &__cierre-modal {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+
+    p {
+      margin: 0;
+      font-size: $font-size-sm;
+      color: $color-text;
+      line-height: $line-height-base;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: $space-5;
+      display: flex;
+      flex-direction: column;
+      gap: $space-1;
+
+      li {
+        font-size: $font-size-sm;
+        color: $color-text-muted;
+        line-height: $line-height-base;
+
+        &::marker {
+          color: $color-warning;
+        }
+      }
+    }
+  }
+
+  &__cierre-resumen {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+    padding: $space-3 $space-4;
+    background: $color-bg-2;
+    border-radius: $radius-md;
+    font-size: $font-size-sm;
+
+    span {
+      color: $color-text;
+    }
+  }
+
+  &__cierre-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: $space-2;
+    padding-top: $space-2;
+    border-top: 1px solid $color-stroke;
+  }
+
+  // ---- Pasos instructivos ----
+  &__steps {
+    padding-left: $space-5;
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+    color: $color-text;
+    font-size: $font-size-sm;
+    line-height: $line-height-base;
+
+    li::marker {
+      color: $color-text-muted;
+    }
+
+    strong {
+      font-weight: $font-weight-semibold;
+    }
+
+    em {
+      font-style: italic;
+      color: $color-text-muted;
+    }
+  }
+}

@@ -1,0 +1,452 @@
+@use '@/styles/abstracts' as *;
+
+.tendencia {
+  padding: $space-4;
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+
+  // ── Filters ──
+  &__filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: $space-4;
+  }
+
+  &__filter-label {
+    display: block;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+    color: $color-text-muted;
+    margin-bottom: $space-1;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  &__filter-group {
+    min-width: 140px;
+    flex: 1;
+
+    &--action {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: flex-end;
+      min-width: auto;
+    }
+  }
+
+  // ── Product search ──
+  &__product-search {
+    flex: 2;
+    min-width: 240px;
+    position: relative;
+  }
+
+  &__search-wrap {
+    position: relative;
+  }
+
+  &__search-spinner {
+    position: absolute;
+    right: $space-3;
+    top: 50%;
+    transform: translateY(-50%);
+    color: $color-text-muted;
+  }
+
+  &__search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: $z-dropdown;
+    background: var(--color-bg-elevated);
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+    box-shadow: $shadow-lg;
+    max-height: 280px;
+    overflow: auto;
+    margin-top: 4px;
+  }
+
+  &__search-option {
+    display: block;
+    width: 100%;
+    padding: $space-3;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid $color-stroke;
+    text-align: left;
+    cursor: pointer;
+    color: $color-text;
+    transition: background $transition-fast;
+
+    &:hover {
+      background: $color-surface-hover;
+    }
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+
+  &__search-option-name {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+  }
+
+  &__search-option-meta {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    margin-top: 2px;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+
+    code {
+      font-family: $font-mono;
+      color: $color-secondary;
+      background: $color-secondary-soft;
+      padding: 1px $space-2;
+      border-radius: $radius-xs;
+    }
+  }
+
+  // ── Product chip ──
+  &__product-chip {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-3;
+    background: $color-surface;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+  }
+
+  &__product-chip-info {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+
+    strong {
+      font-size: $font-size-sm;
+    }
+
+    code {
+      font-family: $font-mono;
+      font-size: $font-size-xs;
+      color: $color-secondary;
+      background: $color-secondary-soft;
+      padding: 1px $space-2;
+      border-radius: $radius-xs;
+    }
+  }
+
+  &__product-chip-remove {
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    color: $color-text-muted;
+    border: none;
+    border-radius: $radius-pill;
+    cursor: pointer;
+    transition: background $transition-fast, color $transition-fast;
+
+    &:hover {
+      background: $color-danger-soft;
+      color: $color-danger;
+    }
+  }
+
+  // ── State (loading / empty) ──
+  &__state {
+    display: flex;
+    justify-content: center;
+    padding: $space-10 0;
+  }
+
+  // ── Resume / Stats ──
+  &__resume {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-6;
+    align-items: flex-start;
+  }
+
+  &__resume-product {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  &__resume-title {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-semibold;
+    color: $color-text;
+    margin: 0 0 $space-2;
+  }
+
+  &__resume-meta {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    flex-wrap: wrap;
+
+    code {
+      font-family: $font-mono;
+      font-size: $font-size-xs;
+      color: $color-text-muted;
+      background: $color-bg-2;
+      padding: 2px $space-2;
+      border-radius: $radius-xs;
+    }
+  }
+
+  &__stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-3;
+  }
+
+  &__stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: $space-3 $space-4;
+    background: $color-bg-2;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+    min-width: 90px;
+  }
+
+  &__stat-value {
+    font-size: $font-size-lg;
+    font-weight: $font-weight-bold;
+    color: $color-text;
+    font-family: $font-mono;
+    line-height: 1.2;
+  }
+
+  &__stat-label {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    text-align: center;
+    margin-top: 2px;
+  }
+
+  // ── Badge ──
+  &__badge {
+    display: inline-block;
+    padding: 2px $space-3;
+    border-radius: $radius-pill;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+
+    &--info {
+      background: $color-bg-2;
+      color: $color-text-muted;
+      border: 1px solid $color-stroke;
+    }
+
+    &--up {
+      background: $color-danger-soft;
+      color: $color-danger;
+      border: 1px solid $color-danger;
+    }
+  }
+
+  // ── Section ──
+  &__section {
+    padding: $space-2 0;
+  }
+
+  &__section-header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: $space-3;
+    margin-bottom: $space-1;
+  }
+
+  &__section-title {
+    font-size: $font-size-md;
+    font-weight: $font-weight-semibold;
+    color: $color-text;
+    margin: 0;
+  }
+
+  // ── Group selector chips ──
+  &__group-selector {
+    display: flex;
+    gap: 2px;
+    flex-wrap: wrap;
+  }
+
+  &__group-chip {
+    padding: 2px $space-3;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+    color: $color-text-muted;
+    background: $color-bg-2;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-pill;
+    cursor: pointer;
+    transition: all $transition-fast;
+    white-space: nowrap;
+
+    &:hover {
+      background: $color-surface-hover;
+      color: $color-text;
+    }
+
+    &--active {
+      background: $color-accent;
+      color: $color-text-inverse;
+      border-color: $color-accent;
+
+      &:hover {
+        background: $color-accent-hover;
+      }
+    }
+  }
+
+  &__section-desc {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    margin-bottom: $space-4;
+  }
+
+  &__subtitle {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: $color-text;
+    margin: 0 0 $space-2;
+  }
+
+  // ── Bar Chart ──
+  &__chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    padding: $space-4 0 $space-8;
+    border-bottom: 1px solid $color-stroke;
+    margin-bottom: $space-4;
+    overflow-x: auto;
+  }
+
+  &__bar-wrap {
+    flex: 1;
+    min-width: 24px;
+    max-width: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    position: relative;
+  }
+
+  &__bar {
+    width: 100%;
+    max-width: 32px;
+    border-radius: 3px 3px 0 0;
+    min-height: 4px;
+    transition: height 0.3s ease;
+    cursor: default;
+
+    &--accent {
+      background-color: $color-accent;
+    }
+
+    &--secondary {
+      background-color: $color-secondary;
+    }
+  }
+
+  &__bar-value {
+    font-size: 9px;
+    font-family: $font-mono;
+    color: $color-text-muted;
+    white-space: nowrap;
+    margin-top: 2px;
+    line-height: 1;
+  }
+
+  &__bar-label {
+    font-size: 9px;
+    color: $color-text-subtle;
+    white-space: nowrap;
+    text-align: center;
+    margin-top: 1px;
+    line-height: 1.1;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__chart-empty {
+    padding: $space-6 0;
+    text-align: center;
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+  }
+
+  // ── Percentage change ──
+  &__pct {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    font-family: $font-mono;
+
+    &--up { color: $color-danger; }
+    &--down { color: $color-success; }
+  }
+
+  // ── Table ──
+  &__table-wrap {
+    overflow-x: auto;
+    margin-top: $space-2;
+  }
+
+  // ── Responsive ──
+  @media (max-width: 768px) {
+    padding: $space-3;
+
+    &__filters {
+      flex-direction: column;
+      gap: $space-3;
+    }
+
+    &__filter-group {
+      min-width: 100%;
+    }
+
+    &__product-search {
+      min-width: 100%;
+    }
+
+    &__resume {
+      flex-direction: column;
+    }
+
+    &__stats {
+      width: 100%;
+      justify-content: center;
+    }
+
+    &__stat {
+      flex: 1;
+      min-width: 70px;
+    }
+
+    &__chart {
+      padding-bottom: $space-6;
+    }
+
+    &__bar-wrap {
+      min-width: 18px;
+    }
+  }
+}

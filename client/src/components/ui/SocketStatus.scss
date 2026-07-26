@@ -1,0 +1,58 @@
+@use '@/styles/abstracts' as *;
+
+.socket-status {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-1;
+  padding: 0 $space-2;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  line-height: 1;
+  cursor: default;
+
+  &__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: $radius-pill;
+    flex-shrink: 0;
+    transition: background $transition-base, box-shadow $transition-base;
+  }
+
+  &__label {
+    color: $color-text-muted;
+    white-space: nowrap;
+  }
+
+  // Estados
+  &--online {
+    .socket-status__dot {
+      background: $color-success;
+      box-shadow: 0 0 6px rgba($color-success, 0.5);
+    }
+  }
+
+  &--connecting {
+    .socket-status__dot {
+      background: $color-warning;
+      animation: socket-pulse 1.2s ease-in-out infinite;
+    }
+  }
+
+  &--offline {
+    .socket-status__dot {
+      background: $color-danger;
+      box-shadow: 0 0 6px rgba($color-danger, 0.4);
+    }
+  }
+}
+
+@keyframes socket-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}

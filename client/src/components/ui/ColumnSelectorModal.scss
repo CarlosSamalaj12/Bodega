@@ -1,0 +1,337 @@
+@use '@/styles/abstracts' as *;
+
+.column-selector {
+  display: flex;
+  flex-direction: column;
+  gap: $space-3;
+  max-height: 60vh;
+
+  &__toolbar {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    padding-bottom: $space-3;
+    border-bottom: 1px solid $color-stroke;
+    flex-shrink: 0;
+  }
+
+  &__hint {
+    margin: 0;
+    font-size: $font-size-xs;
+    color: $color-text-subtle;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  &__toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    font-family: $font-main;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: $color-accent;
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: color $transition-fast;
+
+    &:hover:not(:disabled) {
+      color: $color-accent-hover;
+      text-decoration: underline;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  }
+
+  &__count {
+    margin-left: auto;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    white-space: nowrap;
+  }
+
+  &__search {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  &__search-input {
+    width: 100%;
+    padding: $space-2 $space-8 $space-2 $space-3;
+    font-family: $font-main;
+    font-size: $font-size-sm;
+    color: $color-text;
+    background: $color-bg-2;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-sm;
+    outline: none;
+    transition: border-color $transition-fast, box-shadow $transition-fast;
+
+    &::placeholder {
+      color: $color-text-subtle;
+    }
+
+    &:focus {
+      border-color: $color-accent;
+      box-shadow: $shadow-glow-accent;
+    }
+  }
+
+  &__search-clear {
+    position: absolute;
+    right: $space-2;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    font-size: 12px;
+    color: $color-text-subtle;
+    background: none;
+    border: none;
+    border-radius: $radius-pill;
+    cursor: pointer;
+    transition: color $transition-fast, background $transition-fast;
+
+    &:hover {
+      color: $color-text;
+      background: $color-surface-hover;
+    }
+  }
+
+  &__highlight {
+    background: $color-accent-soft;
+    color: $color-accent;
+    font-weight: $font-weight-semibold;
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+
+  &__empty {
+    padding: $space-6 $space-3;
+    text-align: center;
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+    padding-right: $space-1;
+    flex: 1;
+    min-height: 0;
+
+    // Scrollbar styling
+    &::-webkit-scrollbar {
+      width: 4px;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: $color-stroke;
+      border-radius: $radius-pill;
+    }
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-2 $space-2;
+    border-radius: $radius-sm;
+    cursor: grab;
+    transition: background $transition-fast, opacity $transition-fast, box-shadow $transition-fast;
+    user-select: none;
+    position: relative;
+
+    &:hover {
+      background: $color-surface-hover;
+    }
+
+    &--selected {
+      background: $color-accent-soft;
+    }
+
+    &--dragging {
+      opacity: 0.4;
+      cursor: grabbing;
+    }
+
+    &--drag-over {
+      box-shadow: inset 0 2px 0 0 $color-accent, inset 0 -2px 0 0 transparent;
+    }
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  &__drag-handle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    flex-shrink: 0;
+    font-size: 14px;
+    letter-spacing: -2px;
+    color: $color-text-subtle;
+    cursor: grab;
+    transition: color $transition-fast;
+    line-height: 1;
+
+    .column-selector__item:hover & {
+      color: $color-text-muted;
+    }
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  &__checkbox {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    background: $color-bg-2;
+    border: 1.5px solid $color-stroke-strong;
+    border-radius: $radius-xs;
+    cursor: pointer;
+    transition: background $transition-fast, border-color $transition-fast;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:checked {
+      background: $color-accent;
+      border-color: $color-accent;
+      position: relative;
+
+      &::after {
+        content: '✓';
+        display: block;
+        color: $color-text-inverse;
+        font-size: 12px;
+        font-weight: $font-weight-bold;
+        line-height: 1;
+      }
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: $shadow-glow-accent;
+    }
+  }
+
+  &__label {
+    flex: 1;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: $color-text;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__key {
+    font-family: $font-mono;
+    font-size: $font-size-xs;
+    color: $color-text-subtle;
+    background: $color-bg-2;
+    padding: 0 $space-1;
+    border-radius: $radius-xs;
+    flex-shrink: 0;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__footer {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    width: 100%;
+  }
+
+  &__reset-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: $space-1 $space-2;
+    font-family: $font-main;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+    color: $color-text-muted;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: $radius-sm;
+    cursor: pointer;
+    transition: color $transition-fast, border-color $transition-fast, background $transition-fast;
+    white-space: nowrap;
+
+    &:hover {
+      color: $color-danger;
+      border-color: $color-danger-soft;
+      background: $color-danger-soft;
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: $shadow-glow-accent;
+    }
+  }
+
+  &__format-group {
+    display: flex;
+    background: $color-bg-2;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-sm;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  &__format-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: $space-1 $space-3;
+    min-height: 32px;
+    font-family: $font-mono;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    color: $color-text-muted;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background $transition-fast, color $transition-fast;
+
+    &:hover {
+      background: $color-surface-hover;
+      color: $color-text;
+    }
+
+    &--active {
+      background: $color-accent;
+      color: $color-text-inverse;
+
+      &:hover {
+        background: $color-accent-hover;
+      }
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: $shadow-glow-accent;
+    }
+  }
+}

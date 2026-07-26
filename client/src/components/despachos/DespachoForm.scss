@@ -132,6 +132,51 @@
       color: $color-danger;
       border-color: $color-danger;
     }
+
+    &--undo {
+      &:hover {
+        background: $color-info-soft;
+        color: $color-info;
+        border-color: $color-info;
+      }
+    }
+  }
+
+  &__justificacion-existente {
+    margin-top: $space-1;
+    padding: $space-2 $space-3;
+    background: $color-warning-soft;
+    border-radius: $radius-sm;
+    font-size: $font-size-xs;
+    color: $color-warning;
+  }
+
+  &__totals {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+    text-align: right;
+  }
+
+  &__total-item {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    font-size: $font-size-sm;
+  }
+
+  &__total-label {
+    color: $color-text-muted;
+    font-weight: $font-weight-medium;
+  }
+
+  &__total-value {
+    font-weight: $font-weight-semibold;
+    font-variant-numeric: tabular-nums;
+
+    &--accent {
+      color: $color-accent;
+    }
   }
 
   &__anular-mobile {
@@ -145,6 +190,17 @@
     background: transparent;
     color: $color-danger;
     border-color: $color-danger;
+    font-size: $font-size-sm;
+    padding: $space-2 $space-3;
+    min-height: 40px;
+    justify-content: flex-start;
+  }
+
+  &__rehabilitar-mobile-btn {
+    @include button-base;
+    background: transparent;
+    color: $color-info;
+    border-color: $color-info;
     font-size: $font-size-sm;
     padding: $space-2 $space-3;
     min-height: 40px;

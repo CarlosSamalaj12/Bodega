@@ -1,0 +1,120 @@
+@use '@/styles/abstracts' as *;
+
+.dchart {
+  &__grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: $space-4;
+
+    @include breakpoint(md) {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  // Loading
+  &__loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 140px;
+  }
+
+  // Empty state
+  &__empty {
+    text-align: center;
+    color: $color-text-subtle;
+    font-size: $font-size-sm;
+    padding: $space-8 0;
+  }
+
+  // Tooltip compartido
+  &__tooltip {
+    background: $color-bg-elevated;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-sm;
+    padding: $space-2 $space-3;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: $font-size-xs;
+    box-shadow: $shadow-md;
+
+    strong {
+      color: $color-text;
+      font-weight: $font-weight-semibold;
+      font-size: $font-size-sm;
+    }
+
+    span {
+      color: $color-text-muted;
+    }
+  }
+
+  &__tooltip-pct {
+    color: $color-accent !important;
+    font-weight: $font-weight-semibold;
+  }
+
+  // ---- Donut ----
+  &__donut-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-3;
+  }
+
+  &__donut-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-2 $space-4;
+    justify-content: center;
+  }
+
+  &__legend-item {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+  }
+
+  &__legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: $radius-pill;
+    flex-shrink: 0;
+  }
+
+  &__legend-label {
+    color: $color-text;
+  }
+
+  &__legend-value {
+    font-weight: $font-weight-semibold;
+    color: $color-text;
+    font-family: $font-mono;
+    font-size: $font-size-xs;
+    min-width: 24px;
+    text-align: right;
+  }
+
+  // ---- Bar ----
+  &__bar-wrapper {
+    width: 100%;
+  }
+}
+
+// Responsive
+@media (max-width: 639px) {
+  .dchart {
+    &__grid {
+      grid-template-columns: 1fr;
+    }
+
+    &__donut-legend {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: $space-1;
+    }
+  }
+}

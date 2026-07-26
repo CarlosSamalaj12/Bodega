@@ -32,10 +32,40 @@ export const pedidosService = {
   /**
    * Despachar un pedido (parcial o total).
    * @param id id_pedido
-   * @param payload { lines: [{ id_pedido_detalle, cantidad_surtida }], justificacion }
+   * @param payload { lines: [{ id_pedido_detalle, qty }], justificacion }
    */
   async fulfill(id, payload) {
     const { data } = await api.post(`/api/orders/${id}/fulfill`, payload);
+    return data;
+  },
+
+  /**
+   * Anular una línea de pedido.
+   * @param id id_pedido
+   * @param payload { id_pedido_detalle, justificacion }
+   */
+  async cancelLine(id, payload) {
+    const { data } = await api.post(`/api/orders/${id}/cancel-line`, payload);
+    return data;
+  },
+
+  /**
+   * Revertir TODO el despacho de un pedido (solo movimientos de hoy).
+   * @param id id_pedido
+   * @param payload { supervisor_pin? }
+   */
+  async revert(id, payload = {}) {
+    const { data } = await api.post(`/api/orders/${id}/revert`, payload);
+    return data;
+  },
+
+  /**
+   * Revertir una línea específica de un pedido (solo movimientos de hoy).
+   * @param id id_pedido
+   * @param payload { id_pedido_detalle, supervisor_pin? }
+   */
+  async revertLine(id, payload) {
+    const { data } = await api.post(`/api/orders/${id}/revert-line`, payload);
     return data;
   },
 

@@ -55,4 +55,19 @@
       padding: $space-2 $space-3;
     }
   }
+
+  // Fila anulada (revertida)
+  .table__row--anulado {
+    opacity: 0.5;
+    text-decoration: line-through;
+    background: $color-bg-2;
+
+    &:hover {
+      background: $color-bg-2;
+    }
+
+    td {
+      color: $color-text-muted;
+    }
+  }
 }

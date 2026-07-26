@@ -1,0 +1,125 @@
+@use '@/styles/abstracts' as *;
+
+.revert-panel {
+  background: $color-surface;
+  border: 1px solid $color-stroke;
+  border-radius: $radius-lg;
+  padding: $space-4;
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: $space-3;
+  }
+
+  &__title {
+    font-size: $font-size-md;
+    font-weight: $font-weight-semibold;
+    color: $color-text;
+  }
+
+  &__sub {
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+    margin-top: 2px;
+  }
+
+  &__lines {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+  }
+
+  &__line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-3;
+    padding: $space-3;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+    transition: border-color $transition-fast, background $transition-fast;
+
+    &:hover {
+      background: $color-surface-hover;
+      border-color: $color-stroke-strong;
+    }
+  }
+
+  &__line-info {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  &__line-name {
+    font-size: $font-size-sm;
+    color: $color-text;
+    font-weight: $font-weight-medium;
+    @include truncate;
+    flex: 1 1 auto;
+  }
+
+  @media (max-width: $bp-md) {
+    &__header {
+      flex-direction: column;
+    }
+
+    &__line {
+      flex-wrap: wrap;
+    }
+
+    &__line-info {
+      flex: 1 1 100%;
+    }
+  }
+}
+
+// Estilos para el modal de PIN
+.pin-modal {
+  max-width: 400px;
+
+  &__desc {
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+    margin: 0 0 $space-4;
+    line-height: $line-height-base;
+  }
+
+  &__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: $space-3;
+
+    @media (max-width: $bp-md) {
+      flex-direction: column-reverse;
+      gap: $space-2;
+    }
+  }
+}
+
+.pin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: $z-modal;
+
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: -1;
+  }
+
+  .modal {
+    position: relative;
+    z-index: 1;
+  }
+}

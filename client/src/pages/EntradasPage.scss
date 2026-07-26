@@ -6,6 +6,12 @@
   flex-direction: column;
   gap: $space-4;
 
+  &__header-actions {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+  }
+
   &__steps {
     padding-left: $space-5;
     display: flex;
@@ -22,6 +28,12 @@
     strong {
       font-weight: $font-weight-semibold;
     }
+  }
+
+  &__total {
+    font-weight: $font-weight-semibold;
+    font-variant-numeric: tabular-nums;
+    color: $color-text;
   }
 
   &__bodega {
@@ -87,5 +99,87 @@
     color: $color-text-muted;
     border-radius: $radius-md;
     font-size: $font-size-sm;
+  }
+
+  &__cell-with-obs {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__obs-preview {
+    font-size: $font-size-xs;
+    color: $color-text-subtle;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+    line-height: 1.3;
+    cursor: help;
+
+    &::before { content: '\201C'; }
+    &::after { content: '\201D'; }
+  }
+
+  &__date {
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  &__anulado {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 $space-2;
+    height: 22px;
+    border-radius: $radius-pill;
+    background: $color-bg-2;
+    color: $color-text-muted;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+    text-decoration: line-through;
+    white-space: nowrap;
+  }
+
+  // ---- Search row con chip ----
+  &__search-row {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+
+    > :first-child {
+      flex: 1;
+    }
+  }
+
+  &__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+    height: 32px;
+    padding: 0 $space-3;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-pill;
+    background: $color-surface;
+    color: $color-text-muted;
+    font: inherit;
+    font-size: $font-size-xs;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background $transition-fast, border-color $transition-fast, color $transition-fast;
+
+    &:hover {
+      background: $color-surface-hover;
+      border-color: $color-stroke-strong;
+    }
+
+    &--active {
+      background: $color-accent-soft;
+      border-color: $color-accent;
+      color: $color-accent;
+    }
   }
 }

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import './LoginPage.scss';
 
-export function LoginPage() {
+export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);

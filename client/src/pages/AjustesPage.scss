@@ -1,0 +1,142 @@
+@use '@/styles/abstracts' as *;
+
+.ajustes-page {
+  padding: $space-6;
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+
+  &__state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5rem 0;
+    color: $color-text-muted;
+  }
+
+  &__no-warehouse {
+    text-align: center;
+    padding: $space-8;
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    margin: 0;
+  }
+
+  &__section-title {
+    margin: 0;
+    font-size: $font-size-md;
+    font-weight: $font-weight-semibold;
+    color: $color-text;
+  }
+
+  // ---- Formulario ----
+  &__form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-4;
+
+    @media (max-width: 639px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+  }
+
+  &__label {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: $color-text;
+  }
+
+  // ---- Toggles ----
+  &__toggles {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+  }
+
+  &__toggle {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-4;
+    border-radius: $radius-md;
+    cursor: pointer;
+    transition: background $transition-fast;
+
+    &:hover {
+      background: $color-surface-hover;
+    }
+  }
+
+  &__checkbox {
+    width: 18px;
+    height: 18px;
+    accent-color: $color-accent;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  &__toggle-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__toggle-title {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: $color-text;
+  }
+
+  &__toggle-desc {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+  }
+
+  // ---- Acciones ----
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  // ---- Logo ----
+  &__logo-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-6;
+
+    @media (max-width: 639px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__logo-field {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+  }
+
+  &__logo-preview {
+    width: 200px;
+    height: 80px;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+    overflow: hidden;
+    background: $color-bg-2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: $space-2;
+
+    img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+  }
+}

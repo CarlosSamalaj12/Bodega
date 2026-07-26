@@ -1,0 +1,105 @@
+@use '@/styles/abstracts' as *;
+
+.conteo-ciclico-page {
+  padding: $space-6;
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+
+  &__state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5rem 0;
+    color: $color-text-muted;
+  }
+
+  &__table-wrapper { overflow-x: auto; @include custom-scrollbar; }
+
+  &__row {
+    background: $color-surface;
+    transition: background $transition-fast;
+    &:hover { background: $color-surface-hover; }
+    td { vertical-align: middle; padding: $space-3 $space-3; }
+  }
+
+  &__user { color: $color-text-muted; font-size: $font-size-sm; }
+
+  // Formulario
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+  }
+
+  // Detalle
+  &__detail {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+  }
+
+  &__detail-header {
+    display: flex;
+    align-items: center;
+    gap: $space-4;
+  }
+
+  &__detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $space-3;
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+  }
+
+  &__detail-obs {
+    font-style: italic;
+    color: $color-text-muted;
+  }
+
+  &__det-row {
+    transition: background $transition-fast;
+
+    &--diff {
+      background: $color-warning-soft;
+
+      &:hover { background: $color-warning-soft; }
+    }
+
+    td { vertical-align: middle; padding: $space-2 $space-3; }
+  }
+
+  &__num-input {
+    width: 100px;
+    text-align: right;
+    font-family: $font-mono;
+    font-size: $font-size-sm;
+    padding: $space-1 $space-2;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-xs;
+    background: $color-surface;
+    color: $color-text;
+    transition: border-color $transition-fast;
+
+    &:focus {
+      outline: none;
+      border-color: $color-accent;
+      box-shadow: 0 0 0 2px $color-accent-soft;
+    }
+
+    &::placeholder { color: $color-text-muted; }
+  }
+
+  &__diff-pos { color: $color-success; font-weight: $font-weight-semibold; }
+  &__diff-neg { color: $color-danger; font-weight: $font-weight-semibold; }
+  &__diff-pend { color: $color-text-muted; }
+
+  &__footer-info {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    display: flex;
+    align-items: center;
+  }
+}

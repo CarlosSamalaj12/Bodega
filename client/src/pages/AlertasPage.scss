@@ -1,0 +1,344 @@
+@use '@/styles/abstracts' as *;
+
+.alertas-page {
+  padding: $space-6;
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+
+  &__header-actions {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+  }
+
+  // ---- Tabs ----
+  &__tabs {
+    display: flex;
+    gap: $space-2;
+  }
+
+  &__tab {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-2 $space-4;
+    min-height: 36px;
+    font-family: $font-main;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: $color-text-muted;
+    background: $color-bg-2;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+    cursor: pointer;
+    transition: background $transition-fast, color $transition-fast, border-color $transition-fast;
+
+    &:hover {
+      background: $color-surface-hover;
+      color: $color-text;
+      border-color: $color-stroke-strong;
+    }
+
+    &--active {
+      background: $color-accent;
+      color: $color-text-inverse;
+      border-color: $color-accent;
+
+      &:hover {
+        background: $color-accent-hover;
+      }
+    }
+  }
+
+  &__tab-icon {
+    font-size: $font-size-base;
+  }
+
+  // ---- Filtros ----
+  &__filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $space-3;
+  }
+
+  &__search {
+    flex: 0 1 260px;
+    min-width: 140px;
+  }
+
+  &__dias-group {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    flex-wrap: wrap;
+  }
+
+  &__dias-label {
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+    white-space: nowrap;
+  }
+
+  &__dias-chips {
+    display: flex;
+    gap: 4px;
+  }
+
+  &__chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: $space-1 $space-2;
+    min-height: 30px;
+    font-family: $font-main;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+    color: $color-text-muted;
+    background: $color-bg-2;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-pill;
+    cursor: pointer;
+    transition: background $transition-fast, color $transition-fast, border-color $transition-fast;
+    white-space: nowrap;
+
+    &:hover {
+      background: $color-surface-hover;
+      color: $color-text;
+      border-color: $color-stroke-strong;
+    }
+
+    &--active {
+      background: $color-accent;
+      color: $color-text-inverse;
+      border-color: $color-accent;
+
+      &:hover {
+        background: $color-accent-hover;
+      }
+    }
+  }
+
+  // ---- Cards de resumen ----
+  &__cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: $space-3;
+  }
+
+  &__card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-1;
+    padding: $space-4;
+    border-radius: $radius-md;
+    background: $color-bg-2;
+    border: 1px solid $color-stroke;
+
+    &--danger {
+      border-color: $color-danger-soft;
+      background: $color-danger-soft;
+    }
+
+    &--warning {
+      border-color: $color-warning-soft;
+      background: $color-warning-soft;
+    }
+
+    &--info {
+      border-color: $color-info-soft;
+      background: $color-info-soft;
+    }
+  }
+
+  &__card-count {
+    font-size: $font-size-xl;
+    font-weight: $font-weight-bold;
+    font-family: $font-mono;
+    color: $color-text;
+    line-height: 1;
+  }
+
+  &__card-label {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  // ---- Columnas ----
+  &__producto {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+  }
+
+  &__prod-name {
+    font-weight: $font-weight-medium;
+    color: $color-text;
+    @include truncate(1);
+  }
+
+  &__prod-sku {
+    font-family: $font-mono;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    background: $color-bg-2;
+    padding: 0 $space-1;
+    border-radius: $radius-xs;
+    flex-shrink: 0;
+  }
+
+  &__stock {
+    font-family: $font-mono;
+    font-weight: $font-weight-semibold;
+    font-size: $font-size-sm;
+
+    &--critico {
+      color: $color-danger;
+    }
+  }
+
+  &__minimo {
+    font-family: $font-mono;
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: $color-warning;
+  }
+
+  &__diferencia {
+    font-family: $font-mono;
+    font-size: $font-size-sm;
+    color: $color-warning;
+
+    &--critico {
+      color: $color-danger;
+      font-weight: $font-weight-semibold;
+    }
+  }
+
+  &__vencimiento {
+    font-family: $font-mono;
+    font-size: $font-size-sm;
+
+    &--critico {
+      color: $color-danger;
+      font-weight: $font-weight-semibold;
+    }
+  }
+
+  &__dias {
+    font-family: $font-mono;
+    font-size: $font-size-sm;
+
+    &--vencido {
+      color: $color-danger;
+      font-weight: $font-weight-semibold;
+    }
+  }
+
+  &__row-hint {
+    margin: 0;
+    font-size: $font-size-xs;
+    color: $color-text-subtle;
+    text-align: center;
+    padding: $space-2;
+  }
+
+  // ---- Cascada subcategoría ----
+  &__cascade {
+    opacity: 0;
+    transform: translateX(-8px) scaleX(0.95);
+    pointer-events: none;
+    transition:
+      opacity $transition-base,
+      transform $transition-base,
+      margin $transition-base;
+    margin-right: 0;
+
+    &--visible {
+      opacity: 1;
+      transform: translateX(0) scaleX(1);
+      pointer-events: auto;
+      margin-right: $space-2;
+    }
+
+    &--cleaning {
+      opacity: 0;
+      transform: translateX(-8px) scaleX(0.95);
+      pointer-events: none;
+      margin-right: 0;
+    }
+
+    select {
+      min-width: 160px;
+      max-width: 300px;
+    }
+  }
+
+  // ---- Checkbox ----
+  &__checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: color $transition-fast;
+
+    &:hover {
+      color: $color-text;
+    }
+  }
+
+  &__checkbox {
+    width: 16px;
+    height: 16px;
+    accent-color: $color-accent;
+    cursor: pointer;
+  }
+
+  &__muted {
+    color: $color-text-subtle;
+    font-size: $font-size-xs;
+  }
+
+  // ---- Responsive ----
+  @media (max-width: 639px) {
+    padding: $space-4;
+
+    &__tabs {
+      flex-direction: column;
+    }
+
+    &__tab {
+      justify-content: center;
+    }
+
+    &__filters {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    &__dias-group {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    &__dias-chips {
+      flex-wrap: wrap;
+    }
+
+    &__search {
+      min-width: 0;
+    }
+
+    &__cards {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+}

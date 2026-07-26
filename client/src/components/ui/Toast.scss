@@ -33,8 +33,33 @@
   &--info    { border-left: 3px solid $color-info; }
   &--default { border-left: 3px solid $color-accent; }
 
+  &--clickable {
+    cursor: pointer;
+    transition: background $transition-fast, box-shadow $transition-fast;
+
+    &:hover {
+      background: $color-surface-hover;
+      box-shadow: $shadow-lg;
+    }
+
+    &:active {
+      transform: scale(0.99);
+    }
+  }
+
   &__message {
     flex: 1;
+  }
+
+  &__action {
+    flex-shrink: 0;
+    padding: $space-1 $space-3;
+    border-radius: $radius-pill;
+    background: $color-accent-soft;
+    color: $color-accent;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    pointer-events: none;
   }
 
   &__close {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -33,6 +33,7 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
           stock: Number(l.stock || 0),
           estado: l.estado_linea,
           cantidad: Number(l.pendiente || 0),
+          anulada: false,
         }))
       );
     }
@@ -40,58 +41,83 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
 
   const totales = useMemo(() => {
     let surtir = 0;
-    let saltar = 0;
+    let anuladas = 0;
     for (const l of lines) {
       surtir += Number(l.cantidad) || 0;
-      saltar += l.estado === 'ANULADO' ? l.pendiente : 0;
+      if (l.anulada) anuladas += Number(l.pendiente) || 0;
     }
-    return { surtir, saltar };
+    const pendienteTotal = lines.reduce((a, l) => a + (Number(l.pendiente) || 0), 0);
+    const esParcial = surtir < pendienteTotal || anuladas > 0;
+    return { surtir, anuladas, esParcial };
   }, [lines]);
 
-  const parcial = totales.saltar > 0;
-  const canSubmit = !submitting && (totales.surtir > 0 || totales.saltar > 0);
+  const canSubmit = !submitting && (totales.surtir > 0 || totales.anuladas > 0);
 
-  const setLine = (idx, patch) =>
-    setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
+  const setLine = useCallback((idx, patch) =>
+    setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l))),
+  []);
 
-  const setCantidad = (idx, value) => {
+  const setCantidad = useCallback((idx, value) => {
     const v = String(value).replace(/[^\d]/g, '');
     const num = v === '' ? 0 : Math.min(parseInt(v, 10) || 0, lines[idx].pendiente);
     setLine(idx, { cantidad: num });
-  };
+  }, [lines, setLine]);
 
-  const anularLinea = (idx) => {
+  const anularLinea = useCallback((idx) => {
     setLine(idx, { cantidad: 0, anulada: true });
-  };
+  }, [setLine]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitError(null);
 
-    if (parcial && !justificacion.trim()) {
-      setSubmitError('Si anulas o no surtiras todo, debes escribir una justificación.');
+    if (totales.esParcial && !justificacion.trim()) {
+      setSubmitError('Si anulas o no surtirás todo, debes escribir una justificación.');
       return;
     }
 
-    const payload = {
-      justificacion: justificacion.trim() || null,
-      lines: lines
-        .filter((l) => l.cantidad > 0)
-        .map((l) => ({
-          id_pedido_detalle: l.id_pedido_detalle,
-          cantidad_surtida: l.cantidad,
-        })),
-    };
+    const linesAFulfill = lines.filter((l) => l.cantidad > 0 && !l.anulada);
+    const linesAnuladas = lines.filter((l) => l.anulada);
 
-    if (payload.lines.length === 0 && !parcial) {
-      setSubmitError('Surti al menos una línea o anula alguna para justificar.');
+    if (linesAFulfill.length === 0 && linesAnuladas.length === 0) {
+      setSubmitError('Surtí al menos una línea o anula alguna para justificar.');
       return;
     }
 
     onSubmittingChange?.(true);
     try {
-      await pedidosService.fulfill(pedido.id_pedido, payload);
-      toast.success('Despacho registrado');
+      // 1. Enviar las líneas a surtir
+      if (linesAFulfill.length > 0) {
+        await pedidosService.fulfill(pedido.id_pedido, {
+          justificacion: justificacion.trim() || null,
+          lines: linesAFulfill.map((l) => ({
+            id_pedido_detalle: l.id_pedido_detalle,
+            qty: l.cantidad,
+          })),
+        });
+      }
+
+      // 2. Anular las líneas marcadas como anuladas (una por una)
+      const cancelErrors = [];
+      for (const l of linesAnuladas) {
+        try {
+          await pedidosService.cancelLine(pedido.id_pedido, {
+            id_pedido_detalle: l.id_pedido_detalle,
+            justificacion: justificacion.trim() || 'Anulado manualmente',
+          });
+        } catch (err) {
+          cancelErrors.push(`${l.nombre_producto}: ${err?.response?.data?.error || err.message}`);
+        }
+      }
+
+      if (cancelErrors.length > 0) {
+        toast.warn(
+          `Despacho registrado, pero algunas líneas no se pudieron anular:\n${cancelErrors.join('\n')}`
+        );
+      } else {
+        toast.success('Despacho registrado');
+      }
+
       onDone?.();
     } catch (e) {
       setSubmitError(e?.response?.data?.error || 'No se pudo despachar');
@@ -147,6 +173,9 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
       align: 'right',
       mobileFullWidth: true,
       render: (l, idx) => {
+        if (l.anulada) {
+          return <span className="despacho-form__pill despacho-form__pill--void">Anulada</span>;
+        }
         const overStock = l.cantidad > l.stock;
         return (
           <div className="despacho-form__cantidad-cell">
@@ -159,7 +188,7 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
               max={l.pendiente}
               value={l.cantidad}
               onChange={(e) => setCantidad(idx, e.target.value)}
-              disabled={l.pendiente === 0}
+              disabled={l.pendiente === 0 || l.anulada}
             />
             {overStock && (
               <div className="despacho-form__warn">Sin stock suficiente</div>
@@ -173,6 +202,9 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
       label: 'Estado',
       width: 100,
       render: (l) => {
+        if (l.anulada) {
+          return <span className="despacho-form__pill despacho-form__pill--void">Anulada</span>;
+        }
         const cfg = STATUS_LABELS[l.estado] || { label: l.estado, variant: 'pending' };
         return <span className={`despacho-form__pill despacho-form__pill--${cfg.variant}`}>{cfg.label}</span>;
       },
@@ -183,7 +215,7 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
       width: 40,
       hideOnMobile: true,
       render: (l, idx) =>
-        l.pendiente > 0 ? (
+        l.pendiente > 0 && !l.anulada ? (
           <button
             type="button"
             className="despacho-form__anular"
@@ -192,6 +224,16 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
             aria-label="Anular línea"
           >
             ✕
+          </button>
+        ) : l.anulada ? (
+          <button
+            type="button"
+            className="despacho-form__anular despacho-form__anular--undo"
+            onClick={() => setLine(idx, { anulada: false, cantidad: Number(l.pendiente) || 0 })}
+            title="Rehabilitar línea"
+            aria-label="Rehabilitar línea"
+          >
+            ↺
           </button>
         ) : null,
     },
@@ -206,6 +248,21 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
           <div className="despacho-form__label">Pedido #{pedido.id_pedido}</div>
           <div className="despacho-form__sub">Solicitante: {pedido.requester_name || '—'}</div>
           <div className="despacho-form__sub">Bodega: {pedido.from_warehouse || '—'}</div>
+          {pedido.justificacion_despacho && (
+            <div className="despacho-form__sub despacho-form__justificacion-existente">
+              Justificación anterior: {pedido.justificacion_despacho}
+            </div>
+          )}
+        </div>
+        <div className="despacho-form__totals">
+          <div className="despacho-form__total-item">
+            <span className="despacho-form__total-label">Pendiente:</span>
+            <span className="despacho-form__total-value">{lines.reduce((a, l) => a + (Number(l.pendiente) || 0), 0)}</span>
+          </div>
+          <div className="despacho-form__total-item">
+            <span className="despacho-form__total-label">A surtir:</span>
+            <span className="despacho-form__total-value despacho-form__total-value--accent">{totales.surtir}</span>
+          </div>
         </div>
       </div>
 
@@ -220,22 +277,31 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
       {/* En móvil, anulación rápida por línea */}
       <div className="despacho-form__anular-mobile">
         {lines.map((l, idx) =>
-          l.pendiente > 0 ? (
+          l.pendiente > 0 && !l.anulada ? (
             <button
               key={l.id_pedido_detalle}
               type="button"
               className="despacho-form__anular-mobile-btn"
               onClick={() => anularLinea(idx)}
             >
-              Anular línea: {l.nombre_producto}
+              Anular: {l.nombre_producto}
+            </button>
+          ) : l.anulada ? (
+            <button
+              key={l.id_pedido_detalle}
+              type="button"
+              className="despacho-form__rehabilitar-mobile-btn"
+              onClick={() => setLine(idx, { anulada: false, cantidad: Number(l.pendiente) || 0 })}
+            >
+              Rehabilitar: {l.nombre_producto}
             </button>
           ) : null
         )}
       </div>
 
-      {parcial && (
+      {totales.esParcial && (
         <Input
-          label="Justificación (requerida para despacho parcial)"
+          label="Justificación (requerida para despacho parcial o con anulaciones)"
           value={justificacion}
           onChange={(e) => setJustificacion(e.target.value)}
           placeholder="Ej. Sin stock de 2 productos, se coordina para mañana"
@@ -248,7 +314,11 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
           Cancelar
         </Button>
         <Button type="submit" variant="primary" disabled={!canSubmit}>
-          {submitting ? <Spinner size={14} /> : `Confirmar despacho (${totales.surtir} u.)`}
+          {submitting ? (
+            <Spinner size={14} />
+          ) : (
+            `Confirmar despacho${totales.surtir > 0 ? ` (${totales.surtir} u.)` : ''}${totales.anuladas > 0 ? ` + ${totales.anuladas} anulada(s)` : ''}`
+          )}
         </Button>
       </div>
     </form>

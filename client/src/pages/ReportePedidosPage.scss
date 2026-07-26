@@ -1,0 +1,224 @@
+@use '@/styles/abstracts' as *;
+
+.reporte-pedidos {
+  padding: $space-6;
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+
+  &__state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5rem 0;
+    color: $color-text-muted;
+  }
+
+  // ---- Filtros ----
+  &__filters {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+
+    @media (min-width: 768px) {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    > * {
+      min-width: 0;
+    }
+  }
+
+  &__fecha-group {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+  }
+
+  &__rango {
+    display: flex;
+    gap: 2px;
+    background: $color-bg-2;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+    padding: 2px;
+
+    @media (min-width: 768px) {
+      justify-content: center;
+    }
+  }
+
+  &__date-input {
+    flex: 1;
+    min-width: 0;
+    padding: $space-2 $space-3;
+    font-size: $font-size-sm;
+  }
+
+  &__fecha-sep {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+  }
+
+  &__rango-btn {
+    padding: $space-2 $space-3;
+    border: none;
+    background: transparent;
+    color: $color-text-muted;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+    border-radius: $radius-sm;
+    cursor: pointer;
+    transition: background $transition-fast, color $transition-fast;
+    white-space: nowrap;
+
+    &:hover {
+      color: $color-text;
+      background: $color-surface-hover;
+    }
+
+    &--active {
+      background: $color-accent;
+      color: $color-text-inverse;
+
+      &:hover {
+        background: $color-accent;
+        color: $color-text-inverse;
+      }
+    }
+  }
+
+  // ---- Tabla ----
+  &__table-wrapper {
+    overflow-x: auto;
+    @include custom-scrollbar;
+  }
+
+  &__ped-row {
+    background: $color-surface;
+    transition: background $transition-fast;
+
+    &:hover {
+      background: $color-surface-hover;
+    }
+
+    td {
+      vertical-align: middle;
+      padding: $space-3 $space-3;
+    }
+  }
+
+  &__expand-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: $color-text-muted;
+    cursor: pointer;
+    border-radius: $radius-xs;
+    transition: color $transition-fast;
+
+    &:hover {
+      color: $color-accent;
+    }
+  }
+
+  &__chevron {
+    display: inline-block;
+    transition: transform $transition-base;
+    font-size: $font-size-xs;
+
+    &--open {
+      transform: rotate(90deg);
+    }
+  }
+
+  &__date {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__time {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+  }
+
+  &__user {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+  }
+
+  // ---- Detalle expandido ----
+  &__det-row {
+    td {
+      padding: 0;
+      background: $color-bg-2;
+    }
+  }
+
+  &__detalle {
+    padding: $space-4 $space-4 $space-4 $space-7;
+  }
+
+  &__det-table {
+    width: 100%;
+    border-collapse: collapse;
+
+    th {
+      font-size: $font-size-xs;
+      font-weight: $font-weight-semibold;
+      color: $color-text-muted;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: $space-2 $space-2;
+      border-bottom: 1px solid $color-stroke;
+      text-align: left;
+    }
+
+    td {
+      font-size: $font-size-sm;
+      color: $color-text;
+      padding: $space-2 $space-2;
+      border-bottom: 1px solid $color-stroke;
+      vertical-align: middle;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    code {
+      font-family: $font-mono;
+      font-size: $font-size-xs;
+      color: $color-secondary;
+      background: $color-secondary-soft;
+      padding: 1px $space-1;
+      border-radius: $radius-xs;
+    }
+  }
+
+  &__obs {
+    margin-top: $space-3;
+    padding: $space-3;
+    background: $color-surface;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-sm;
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+  }
+
+  // ---- Totales ----
+  &__total-row {
+    td {
+      padding: $space-3 $space-3;
+      border-top: 2px solid $color-stroke-strong;
+      font-size: $font-size-sm;
+    }
+  }
+}

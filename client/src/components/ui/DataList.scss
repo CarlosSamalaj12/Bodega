@@ -130,6 +130,18 @@
       padding-bottom: $space-2;
     }
   }
+
+  // Card anulada (revertida) — mobile
+  .data-list__card.table__row--anulado {
+    opacity: 0.5;
+    text-decoration: line-through;
+    background: $color-bg-2;
+
+    .data-list__card-primary,
+    .data-list__value {
+      color: $color-text-muted;
+    }
+  }
 }
 
 // Clickable row cursor (desktop)

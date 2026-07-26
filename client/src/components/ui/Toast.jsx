@@ -36,19 +36,40 @@ export function ToastContainer() {
   useEffect(() => { setMounted(true); }, []);
   if (!mounted) return null;
 
+  const handleClick = (t) => {
+    if (t.onClick) {
+      t.onClick();
+      dismiss(t.id);
+    }
+  };
+
   return createPortal(
     <div className="toast-container" aria-live="polite" aria-atomic="true">
-      {toasts.map((t) => (
-        <div key={t.id} className={`toast toast--${t.variant}`} role="status">
-          <span className="toast__message">{t.message}</span>
-          <button
-            type="button"
-            className="toast__close"
-            aria-label="Cerrar"
-            onClick={() => dismiss(t.id)}
-          >✕</button>
-        </div>
-      ))}
+      {toasts.map((t) => {
+        const clickable = typeof t.onClick === 'function';
+        return (
+          <div
+            key={t.id}
+            className={`toast toast--${t.variant} ${clickable ? 'toast--clickable' : ''}`}
+            role="status"
+            onClick={clickable ? () => handleClick(t) : undefined}
+          >
+            <span className="toast__message">{t.message}</span>
+            {t.actionLabel && clickable && (
+              <span className="toast__action">{t.actionLabel}</span>
+            )}
+            <button
+              type="button"
+              className="toast__close"
+              aria-label="Cerrar"
+              onClick={(e) => {
+                e.stopPropagation();
+                dismiss(t.id);
+              }}
+            >✕</button>
+          </div>
+        );
+      })}
     </div>,
     document.body
   );

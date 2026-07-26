@@ -1,0 +1,814 @@
+/**
+ * printPedidoPos80mm — Abre una ventana de impresión con formato
+ * para impresora térmica POS de 80mm.
+ *
+ * @param {object} pedido - Datos del pedido (al menos: id_pedido, creado_en, estado, lines, etc.)
+ * @param {object} [opts]
+ * @param {string} [opts.title='Pedido'] - Título del documento
+ * @param {boolean} [opts.autoPrint=true] - Disparar print() automáticamente
+ */
+export function printPedidoPos80mm(pedido, opts = {}) {
+  const {
+    title = 'Pedido',
+    autoPrint = true,
+  } = opts;
+
+  if (!pedido) return;
+
+  const lines = Array.isArray(pedido.lines) ? pedido.lines : [];
+
+  const formatoFecha = (val) => {
+    if (!val) return '—';
+    const d = new Date(val);
+    return d.toLocaleDateString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  // Construir HTML del ticket
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>${title} #${pedido.id_pedido}</title>
+  <style>
+    @page {
+      size: 80mm auto;
+      margin: 0;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 80mm;
+      max-width: 80mm;
+      padding: 4mm 4mm 8mm;
+      font-family: 'Courier New', 'Lucida Console', monospace;
+      font-size: 12px;
+      font-weight: bold;
+      line-height: 1.4;
+      color: #000;
+      background: #fff;
+    }
+
+    .ticket {
+      width: 100%;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 4mm;
+      padding-bottom: 3mm;
+      border-bottom: 2px dashed #000;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 1mm;
+    }
+
+    .header .sub {
+      font-size: 11px;
+    }
+
+    .info-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 3mm;
+      font-size: 12px;
+    }
+
+    .info-table td {
+      padding: 0.5mm 0;
+      vertical-align: top;
+    }
+
+    .info-table .label {
+      font-weight: bold;
+      width: 30mm;
+    }
+
+
+
+    .separator {
+      border-top: 1px dashed #000;
+      margin: 2mm 0;
+    }
+
+    .lines-title {
+      font-weight: bold;
+      font-size: 13px;
+      margin-bottom: 1mm;
+    }
+
+    .lines-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    .lines-table th {
+      text-align: left;
+      font-weight: bold;
+      font-size: 11px;
+      padding: 0.5mm 1mm;
+      border-bottom: 1px solid #000;
+      white-space: nowrap;
+    }
+
+    .lines-table th.right {
+      text-align: right;
+    }
+
+    .lines-table td {
+      padding: 0.5mm 1mm;
+      vertical-align: top;
+    }
+
+    .lines-table td.right {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .lines-table .product-name {
+      max-width: 42mm;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 4mm;
+      padding-top: 3mm;
+      border-top: 2px dashed #000;
+      font-size: 11px;
+    }
+
+    .estado-badge {
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+
+    @media print {
+      body { margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="ticket">
+    <div class="header">
+      <h1>Pedido #${pedido.id_pedido}</h1>
+      <div class="sub">${formatoFecha(pedido.creado_en)}</div>
+    </div>
+
+    <table class="info-table">
+      <tr>
+        <td class="label">Estado:</td>
+        <td class="value"><span class="estado-badge">${pedido.estado || '—'}</span></td>
+      </tr>
+      <tr>
+        <td class="label">Solicitante:</td>
+        <td class="value">${pedido.requester_name || '—'}</td>
+      </tr>
+      <tr>
+        <td class="label">Bodega solicita:</td>
+        <td class="value">${pedido.requester_warehouse || '—'}</td>
+      </tr>
+      <tr>
+        <td class="label">Bodega surtidor:</td>
+        <td class="value">${pedido.from_warehouse || pedido.nombre_bodega_surtidor || '—'}</td>
+      </tr>
+      ${pedido.observaciones ? `
+      <tr>
+        <td class="label">Observaciones:</td>
+        <td class="value">${pedido.observaciones}</td>
+      </tr>` : ''}
+    </table>
+
+    ${lines.length > 0 ? `
+    <div class="separator"></div>
+    <div class="lines-title">Líneas del pedido</div>
+    <table class="lines-table">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th class="right">Solic.</th>
+          <th class="right">Despachado</th>
+          <th class="right">Pend.</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${lines.map(l => `
+        <tr>
+          <td class="product-name">${l.nombre_producto || '—'}</td>
+          <td class="right">${Number(l.cantidad_solicitada || 0)}</td>
+          <td class="right">${Number(l.cantidad_surtida || 0) || ''}</td>
+          <td class="right">${Number(l.pendiente || 0)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>` : ''}
+
+    ${lines.length > 0 ? `
+    <div class="separator"></div>
+    <div style="margin-top: 1mm; font-size: 12px;">
+      <div style="display:flex; justify-content:space-between;">
+        <span>Total líneas:</span>
+        <span>${lines.length}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span>Total solicitado:</span>
+        <span>${lines.reduce((a, l) => a + Number(l.cantidad_solicitada || 0), 0)}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span>Total despachado:</span>
+        <span>${lines.reduce((a, l) => a + Number(l.cantidad_surtida || 0), 0)}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span>Pendiente:</span>
+        <span>${lines.reduce((a, l) => a + Number(l.pendiente || 0), 0)}</span>
+      </div>
+    </div>` : ''}
+
+    <div class="footer">
+      <p>Bodega · Sistema de Inventario</p>
+      <p style="margin-top: 1mm; font-size: 10px;">Impreso: ${new Date().toLocaleString('es-GT')}</p>
+    </div>
+  </div>
+
+  <script>
+    ${autoPrint ? `
+    window.onload = function() {
+      setTimeout(function() {
+        window.print();
+      }, 300);
+    };
+    window.onafterprint = function() {
+      window.close();
+    };
+    ` : ''}
+  </script>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank', 'width=400,height=600,menubar=no,toolbar=no,location=no,status=no');
+  if (!win) {
+    // Fallback si el popup fue bloqueado
+    const fallback = document.createElement('a');
+    fallback.href = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
+    fallback.download = `pedido_${pedido.id_pedido}.html`;
+    fallback.click();
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+}
+
+/**
+ * printPedidoLetterSize — Abre una ventana de impresión con formato
+ * tamaño CARTA vertical, con logo, datos del pedido, tabla de líneas
+ * y espacios para firmas (quién despacha, quién entrega, quién solicita).
+ *
+ * @param {object} pedido - Datos completos del pedido (incluyendo lines)
+ * @param {object} [opts]
+ * @param {string} [opts.logoApp=''] - Logo en base64 para mostrar en el encabezado
+ * @param {string} [opts.title='Vale de Entrega'] - Título del documento
+ * @param {string} [opts.dispatcherName=''] - Nombre de quien despacha
+ * @param {string} [opts.dispatcherRole=''] - Cargo de quien despacha
+ * @param {string} [opts.warehouseName=''] - Nombre de la bodega (ej. Bodega Principal)
+ * @param {boolean} [opts.autoPrint=true] - Disparar print() automáticamente
+ */
+export function printPedidoLetterSize(pedido, opts = {}) {
+  const {
+    logoApp = '',
+    title = 'Vale de Entrega',
+    dispatcherName = '',
+    dispatcherRole = '',
+    warehouseName = '',
+    autoPrint = true,
+  } = opts;
+
+  if (!pedido) return;
+
+  const lines = Array.isArray(pedido.lines) ? pedido.lines : [];
+
+  const formatearFecha = (val) => {
+    if (!val) return '_______________';
+    const d = new Date(val);
+    return d.toLocaleDateString('es-GT', {
+      day: '2-digit', month: 'long', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  };
+
+  const today = new Date().toLocaleDateString('es-GT', {
+    day: '2-digit', month: 'long', year: 'numeric',
+  });
+
+  const totalSolicitado = lines.reduce((a, l) => a + Number(l.cantidad_solicitada || 0), 0);
+  const totalSurtido = lines.reduce((a, l) => a + Number(l.cantidad_surtida || 0), 0);
+  const totalPendiente = lines.reduce((a, l) => a + Number(l.pendiente || 0), 0);
+
+  const logoHtml = logoApp
+    ? `<img src="${logoApp}" alt="Logo" class="logo" />`
+    : '<div class="logo-placeholder">B</div>';
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>${title} - Pedido #${pedido.id_pedido}</title>
+  <style>
+    @page {
+      size: letter;
+      margin: 10mm 12mm 12mm;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      font-size: 9pt;
+      line-height: 1.35;
+      color: #1a1a1a;
+      background: #fff;
+    }
+
+    .page {
+      max-width: 100%;
+    }
+
+    /* ===== Encabezado compacto ===== */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8pt;
+      padding-bottom: 6pt;
+      border-bottom: 2px solid #1a1a1a;
+      margin-bottom: 8pt;
+    }
+
+    .logo {
+      width: 40pt;
+      height: 40pt;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    .logo-placeholder {
+      width: 40pt;
+      height: 40pt;
+      background: #1a1a1a;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18pt;
+      font-weight: bold;
+      flex-shrink: 0;
+      border-radius: 3pt;
+    }
+
+    .header-text {
+      flex: 1;
+    }
+
+    .header-text h1 {
+      font-size: 13pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5pt;
+      margin-bottom: 1pt;
+    }
+
+    .header-text .subtitle {
+      font-size: 7.5pt;
+      color: #666;
+    }
+
+    .header-right {
+      text-align: right;
+      font-size: 7.5pt;
+      color: #666;
+      white-space: nowrap;
+      line-height: 1.4;
+    }
+
+    .header-right strong {
+      color: #1a1a1a;
+    }
+
+    /* ===== Info ===== */
+    .info-section {
+      margin-bottom: 6pt;
+    }
+
+    .info-section h2 {
+      font-size: 8pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4pt;
+      color: #1a1a1a;
+      margin-bottom: 3pt;
+      padding-bottom: 2pt;
+      border-bottom: 1px solid #ccc;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 2pt 8pt;
+      font-size: 8.5pt;
+    }
+
+    .info-grid .label {
+      font-weight: 600;
+      color: #555;
+      white-space: nowrap;
+    }
+
+    .info-grid .value {
+      color: #1a1a1a;
+    }
+
+    /* ===== Tabla ===== */
+    table.items {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 6pt;
+      font-size: 8pt;
+    }
+
+    table.items thead th {
+      background: #1a1a1a;
+      color: #fff;
+      padding: 3pt 4pt;
+      text-align: left;
+      font-size: 7pt;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3pt;
+    }
+
+    table.items thead th.r {
+      text-align: right;
+    }
+
+    table.items tbody td {
+      padding: 2.5pt 4pt;
+      border-bottom: 1px solid #ddd;
+      vertical-align: top;
+    }
+
+    table.items tbody td.r {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    table.items tfoot td {
+      padding: 3pt 4pt;
+      font-weight: 700;
+      border-top: 2px solid #1a1a1a;
+      font-size: 8pt;
+    }
+
+    table.items tfoot td.r {
+      text-align: right;
+    }
+
+    .obs-text {
+      font-size: 8pt;
+      color: #555;
+      margin-bottom: 6pt;
+      padding: 4pt 6pt;
+      background: #f5f5f5;
+      border-left: 3px solid #1a1a1a;
+      border-radius: 2pt;
+    }
+
+    /* ===== Firmas ===== */
+    .signatures {
+      margin-top: 10pt;
+      padding-top: 5pt;
+      border-top: 2px solid #1a1a1a;
+    }
+
+    .signatures h2 {
+      font-size: 8pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      text-align: center;
+      margin-bottom: 8pt;
+      letter-spacing: 0.5pt;
+    }
+
+    .signatures-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8pt;
+    }
+
+    .signature-block {
+      text-align: center;
+    }
+
+    .signature-block .sig-title {
+      font-size: 7.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4pt;
+      margin-bottom: 3pt;
+      padding-bottom: 2pt;
+      border-bottom: 1px solid #ccc;
+    }
+
+    .signature-block .sig-line {
+      margin: 30pt auto 3pt;
+      width: 85%;
+      border-top: 1px solid #1a1a1a;
+    }
+
+    .signature-block .sig-label {
+      font-size: 7pt;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5pt;
+    }
+
+    .signature-block .sig-name {
+      font-size: 8pt;
+      font-weight: 600;
+      margin-top: 2pt;
+    }
+
+    .signature-block .sig-role {
+      font-size: 7.5pt;
+      color: #555;
+      margin-top: 1pt;
+    }
+
+    .signature-block .sig-date {
+      font-size: 7pt;
+      color: #888;
+      margin-top: 2pt;
+    }
+
+    /* ===== Footer ===== */
+    .footer {
+      text-align: center;
+      margin-top: 8pt;
+      padding-top: 4pt;
+      border-top: 1px solid #ccc;
+      font-size: 7pt;
+      color: #888;
+    }
+
+    @media print {
+      body { margin: 0; }
+      .no-print { display: none; }
+    }
+
+    .no-print {
+      text-align: center;
+      margin-bottom: 6pt;
+    }
+
+    .no-print button {
+      padding: 4pt 14pt;
+      font-size: 9pt;
+      cursor: pointer;
+      background: #1a1a1a;
+      color: #fff;
+      border: none;
+      border-radius: 3pt;
+    }
+
+    .no-print button:hover {
+      background: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print">
+    <button onclick="window.print()">🖨 Imprimir</button>
+    <button onclick="window.close()" style="background:#888;margin-left:4pt;">✕ Cerrar</button>
+  </div>
+
+  <div class="page">
+    <!-- ===== Encabezado compacto ===== -->
+    <div class="header">
+      ${logoHtml}
+      <div class="header-text">
+        <h1>${title}</h1>
+        <div class="subtitle">Sistema de Inventario · ${warehouseName || 'Bodega'}</div>
+      </div>
+      <div class="header-right">
+        <strong>Pedido #${pedido.id_pedido}</strong><br />
+        ${formatearFecha(pedido.creado_en)}<br />
+        Estado: <strong>${pedido.estado || '—'}</strong>
+      </div>
+    </div>
+
+    <!-- ===== Información ===== -->
+    <div class="info-section">
+      <h2>Datos del Pedido</h2>
+      <div class="info-grid">
+        <span class="label">Solicitante:</span>
+        <span class="value">${pedido.requester_name || '—'}</span>
+        <span class="label">Bodega solicita:</span>
+        <span class="value">${pedido.requester_warehouse || '—'}</span>
+        <span class="label">Bodega despacha:</span>
+        <span class="value">${pedido.from_warehouse || pedido.nombre_bodega_surtidor || '—'}</span>
+        <span class="label">Impreso:</span>
+        <span class="value">${today}</span>
+      </div>
+    </div>
+
+    ${pedido.observaciones ? `
+    <div class="obs-text">
+      <strong>Obs.:</strong> ${pedido.observaciones}
+    </div>` : ''}
+
+    <!-- ===== Tabla de productos ===== -->
+    <div class="info-section">
+      <h2>Productos · ${lines.length} línea${lines.length !== 1 ? 's' : ''}</h2>
+      <table class="items">
+        <thead>
+          <tr>
+            <th style="width:30pt;">#</th>
+            <th>Producto</th>
+            <th class="r" style="width:42pt;">Solicitado</th>
+            <th class="r" style="width:42pt;">Despachado</th>
+            <th class="r" style="width:42pt;">Pendiente</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${lines.map((l, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${l.nombre_producto || '—'}</td>
+            <td class="r">${Number(l.cantidad_solicitada || 0)}</td>
+            <td class="r">${Number(l.cantidad_surtida || 0) || ''}</td>
+            <td class="r">${Number(l.pendiente || 0) || ''}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2">Totales</td>
+            <td class="r">${totalSolicitado}</td>
+            <td class="r">${totalSurtido}</td>
+            <td class="r">${totalPendiente}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ===== Firmas ===== -->
+    <div class="signatures">
+      <h2>Firmas</h2>
+      <div class="signatures-grid">
+        <div class="signature-block">
+          <div class="sig-title">Quién Despacha / Entrega</div>
+          <div class="sig-line"></div>
+          <div class="sig-label">Firma</div>
+          <div class="sig-name">${dispatcherName || '______________________'}</div>
+          <div class="sig-role">${dispatcherRole || '______________________'}</div>
+          <div class="sig-date">Fecha: ${today}</div>
+        </div>
+        <div class="signature-block">
+          <div class="sig-title">Quién Solicita</div>
+          <div class="sig-line"></div>
+          <div class="sig-label">Firma</div>
+          <div class="sig-name">${pedido.requester_name || '______________________'}</div>
+          <div class="sig-role">${pedido.requester_warehouse || '______________________'}</div>
+          <div class="sig-date">Fecha: ______________</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      Bodega · Sistema de Inventario — ${today}
+    </div>
+  </div>
+
+  <script>
+    ${autoPrint ? `
+    window.onload = function() {
+      setTimeout(function() { window.print(); }, 500);
+      window.onafterprint = function() { window.close(); };
+    };
+    ` : ''}
+  </script>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank', 'width=900,height=700,scrollbars=yes');
+  if (!win) {
+    const a = document.createElement('a');
+    a.href = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
+    a.download = `vale_entrega_${pedido.id_pedido}.html`;
+    a.click();
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+}
+
+/**
+ * printOrderListPos80mm — Imprime una lista resumen de pedidos
+ * en formato POS 80mm.
+ *
+ * @param {Array} pedidos - Lista de pedidos
+ * @param {object} [opts]
+ * @param {string} [opts.title='Pedidos por despachar']
+ */
+export function printOrderListPos80mm(pedidos = [], opts = {}) {
+  const { title = 'Pedidos por despachar' } = opts;
+
+  if (!pedidos.length) return;
+
+  const formatoFecha = (val) => {
+    if (!val) return '—';
+    const d = new Date(val);
+    return d.toLocaleDateString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>${title}</title>
+  <style>
+    @page { size: 80mm auto; margin: 0; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 80mm; max-width: 80mm;
+      padding: 4mm; font-family: 'Courier New', monospace;
+      font-size: 10px; font-weight: bold; line-height: 1.4; color: #000; background: #fff;
+    }
+    h1 { text-align: center; font-size: 14px; margin-bottom: 3mm; text-transform: uppercase; }
+    .sep { border-top: 1px dashed #000; margin: 2mm 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 10px; }
+    th { text-align: left; font-weight: bold; border-bottom: 1px solid #000; padding: 0.5mm 1mm; white-space: nowrap; }
+    td { padding: 0.5mm 1mm; vertical-align: top; }
+    .r { text-align: right; }
+    .c { text-align: center; }
+    .footer { text-align: center; margin-top: 3mm; font-size: 9px; }
+  </style>
+</head>
+<body>
+  <h1>${title}</h1>
+  <div style="text-align:center;font-size:9px;margin-bottom:3mm;">${new Date().toLocaleString('es-GT')}</div>
+  <div class="sep"></div>
+  <table>
+    <thead><tr>
+      <th style="width:10mm">#</th>
+      <th>Solicitante</th>
+      <th style="width:10mm" class="r">Líneas</th>
+      <th style="width:18mm">Estado</th>
+    </tr></thead>
+    <tbody>
+      ${pedidos.map(p => `
+      <tr>
+        <td>${p.id_pedido}</td>
+        <td>${p.requester_name || '—'}</td>
+        <td class="r">${p.total_lineas || '—'}</td>
+        <td class="c">${p.estado || '—'}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table>
+  <div class="sep"></div>
+  <div style="display:flex;justify-content:space-between;font-weight:bold;">
+    <span>Total:</span>
+    <span>${pedidos.length} pedido${pedidos.length !== 1 ? 's' : ''}</span>
+  </div>
+  <div class="footer">Bodega · Sistema de Inventario</div>
+  <script>
+    window.onload = function() { setTimeout(function() { window.print(); window.onafterprint = function() { window.close(); }; }, 300); };
+  </script>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank', 'width=400,height=500');
+  if (!win) {
+    const a = document.createElement('a');
+    a.href = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
+    a.download = `${title.toLowerCase().replace(/\\s+/g, '_')}.html`;
+    a.click();
+    return;
+  }
+  win.document.write(html);
+  win.document.close();
+}

@@ -32,6 +32,7 @@ import './DataList.scss';
  * @param {React.ReactNode} [props.emptyIcon]
  * @param {string} [props.className='']
  * @param {'sm'|'md'} [props.density='md']
+ * @param {(row:object, idx:number) => string|undefined} [props.rowClass] - Función que devuelve clase(s) adicional(es) para cada fila
  */
 export function DataList({
   columns,
@@ -47,6 +48,7 @@ export function DataList({
   className = '',
   density = 'md',
   cardActions,
+  rowClass,
 }) {
   const isMobile = !useMediaQuery('(min-width: 768px)');
 
@@ -88,7 +90,7 @@ export function DataList({
             <CardTag
               type={clickable ? 'button' : undefined}
               key={getKey(row, idx)}
-              className={`data-list__card ${clickable ? 'data-list__card--clickable' : ''}`}
+              className={['data-list__card', clickable ? 'data-list__card--clickable' : '', rowClass?.(row, idx) || ''].filter(Boolean).join(' ')}
               onClick={clickable ? () => onRowClick(row) : undefined}
             >
               <div className="data-list__card-head">
@@ -149,7 +151,7 @@ export function DataList({
               <tr
                 key={getKey(row, idx)}
                 onClick={clickable ? () => onRowClick(row) : undefined}
-                className={clickable ? 'table__row--clickable' : undefined}
+                className={['', clickable ? 'table__row--clickable' : '', rowClass?.(row, idx) || ''].filter(Boolean).join(' ') || undefined}
                 style={clickable ? { cursor: 'pointer' } : undefined}
               >
                 {columns.map((col) => (

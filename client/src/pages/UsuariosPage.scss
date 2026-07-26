@@ -1,0 +1,402 @@
+@use '@/styles/abstracts' as *;
+
+.usuarios-page {
+  padding: $space-6;
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+
+  // ---- State (loading / empty) ----
+  &__state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5rem 0;
+    color: $color-text-muted;
+  }
+
+  // ---- Filtros ----
+  &__filters {
+    display: flex;
+    align-items: center;
+    gap: $space-4;
+    flex-wrap: wrap;
+  }
+
+  &__toggle-inactive {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-2;
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+
+    input {
+      accent-color: $color-accent;
+    }
+
+    &:hover {
+      color: $color-text;
+    }
+  }
+
+  // ---- Lista de items ----
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-3 $space-4;
+    background: $color-surface;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-lg;
+    transition: border-color $transition-fast, background $transition-fast, opacity $transition-fast;
+    user-select: none;
+
+    &:hover {
+      border-color: $color-stroke-strong;
+      background: $color-surface-hover;
+    }
+
+    &--dragging {
+      opacity: 0.4;
+      box-shadow: inset 0 0 0 2px $color-accent;
+    }
+  }
+
+  // ---- Drag handle ----
+  &__drag-handle {
+    cursor: grab;
+    color: $color-text-muted;
+    font-size: $font-size-lg;
+    line-height: 1;
+    padding: $space-1;
+    flex-shrink: 0;
+    transition: color $transition-fast;
+
+    &:hover {
+      color: $color-accent;
+    }
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  // ---- Item info ----
+  &__item-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 1;
+    min-width: 0;
+    gap: $space-3;
+  }
+
+  &__item-main {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+    min-width: 0;
+    flex: 1;
+  }
+
+  &__item-name {
+    display: flex;
+    align-items: baseline;
+    gap: $space-3;
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  &__username {
+    font-weight: $font-weight-semibold;
+    font-family: $font-mono;
+    font-size: $font-size-sm;
+    color: $color-text;
+  }
+
+  &__item-fullname {
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__item-meta {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    flex-wrap: wrap;
+  }
+
+  &__muted {
+    color: $color-text-subtle;
+    font-size: $font-size-sm;
+  }
+
+  &__item-badges {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    flex-shrink: 0;
+  }
+
+  &__item-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: $space-1 $space-3;
+    border-radius: 999px;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    white-space: nowrap;
+
+    &--active {
+      background: $color-success-soft;
+      color: $color-success;
+    }
+
+    &--inactive {
+      background: $color-danger-soft;
+      color: $color-danger;
+    }
+  }
+
+  // ---- Item actions ----
+  &__item-actions {
+    flex-shrink: 0;
+  }
+
+  &__item-actions-row {
+    display: flex;
+    gap: $space-1;
+  }
+
+  // ---- Formulario ----
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+  }
+
+  &__form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-4;
+
+    @media (max-width: 639px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+  }
+
+  &__label {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-medium;
+    color: $color-text;
+  }
+
+  &__required {
+    color: $color-danger;
+  }
+
+  &__form-error {
+    background: $color-danger-soft;
+    border: 1px solid $color-danger;
+    border-radius: $radius-sm;
+    padding: $space-3 $space-4;
+    color: $color-danger;
+    font-size: $font-size-sm;
+  }
+
+  &__form-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: $space-3;
+  }
+
+  // ---- Toggles ----
+  &__toggles {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+    padding: $space-4;
+    background: $color-bg-2;
+    border-radius: $radius-md;
+  }
+
+  &__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-3;
+    font-size: $font-size-sm;
+    color: $color-text;
+    cursor: pointer;
+    user-select: none;
+
+    input {
+      accent-color: $color-accent;
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  // ---- Secciones expandibles (permisos, bodegas) ----
+  &__section {
+    border-top: 1px solid $color-stroke;
+    margin-top: $space-4;
+    padding-top: $space-3;
+  }
+
+  &__section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: $space-3 $space-2;
+    background: none;
+    border: none;
+    border-radius: $radius-sm;
+    color: $color-text;
+    font-family: $font-main;
+    font-size: $font-size-base;
+    font-weight: $font-weight-semibold;
+    cursor: pointer;
+    transition: background $transition-fast;
+
+    &:hover {
+      background: $color-surface-hover;
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: $shadow-glow-accent;
+    }
+  }
+
+  &__chevron {
+    transition: transform $transition-base;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+
+    &--open {
+      transform: rotate(180deg);
+    }
+  }
+
+  &__section-body {
+    padding: $space-3 $space-2;
+  }
+
+  &__section-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: $space-6 0;
+  }
+
+  &__section-empty {
+    color: $color-text-subtle;
+    font-size: $font-size-sm;
+    text-align: center;
+    padding: $space-4 0;
+  }
+
+  &__section-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: $space-4;
+    padding-top: $space-3;
+    border-top: 1px solid $color-stroke;
+  }
+
+  // ---- Permisos ----
+  &__perm-group {
+    margin-bottom: $space-4;
+  }
+
+  &__perm-group-title {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    color: $color-text-muted;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: $space-2;
+  }
+
+  &__perm-list {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+  }
+
+  &__perm-item {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-2 $space-2;
+    border-radius: $radius-sm;
+    font-size: $font-size-sm;
+    color: $color-text;
+    cursor: pointer;
+    user-select: none;
+    transition: background $transition-fast;
+
+    &:hover {
+      background: $color-surface-hover;
+    }
+
+    input {
+      accent-color: $color-accent;
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  // ---- Bodegas acceso ----
+  &__bodegas-list {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+  }
+
+  &__bodega-item {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-2 $space-2;
+    border-radius: $radius-sm;
+    font-size: $font-size-sm;
+    color: $color-text;
+    cursor: pointer;
+    user-select: none;
+    transition: background $transition-fast;
+
+    &:hover {
+      background: $color-surface-hover;
+    }
+
+    input {
+      accent-color: $color-accent;
+      width: 16px;
+      height: 16px;
+    }
+  }
+}

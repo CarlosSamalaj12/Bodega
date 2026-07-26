@@ -5,8 +5,10 @@ export const catalogosService = {
     const { data } = await api.get('/api/categorias', { signal });
     return data;
   },
-  async getSubcategorias(signal) {
-    const { data } = await api.get('/api/subcategorias', { signal });
+  async getSubcategorias(signal, categoriaId) {
+    const params = {};
+    if (categoriaId) params.categoria = categoriaId;
+    const { data } = await api.get('/api/subcategorias', { signal, params });
     return data;
   },
   async getMedidas(signal) {

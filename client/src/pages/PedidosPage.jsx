@@ -5,10 +5,15 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
 import { Badge } from '@/components/ui/Badge';
+import { SearchInput } from '@/components/ui/SearchInput';
 import { DataList } from '@/components/ui/DataList';
+import { useDebounce } from '@/hooks/useDebounce';
 import { toast } from '@/components/ui/Toast';
 import { useAuthStore } from '@/stores/auth.store';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
+import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
+import { formatDate } from '@/utils/format';
 import { catalogosService } from '@/services/catalogos.service';
 import { pedidosService } from '@/services/pedidos.service';
 import { PedidoForm } from '@/components/pedidos/PedidoForm';
@@ -23,16 +28,7 @@ const ESTADO_LABELS = {
   CANCELADO: { label: 'Cancelado', variant: 'danger' },
 };
 
-function formatDate(v) {
-  if (!v) return '—';
-  try {
-    return new Date(v).toLocaleString();
-  } catch {
-    return '—';
-  }
-}
-
-export function PedidosPage() {
+export default function PedidosPage() {
   const user = useAuthStore((s) => s.user);
   const permisos = user?.permisos || {};
   const canCreate = permisos['action.create_update'] !== false;
@@ -47,6 +43,9 @@ export function PedidosPage() {
 
   const [pedidos, setPedidos] = useState([]);
   const [loadingPedidos, setLoadingPedidos] = useState(true);
+  const [search, setSearch] = useState('');
+  const [showColumnSelector, setShowColumnSelector] = useState(false);
+  const debouncedSearch = useDebounce(search, 250);
 
   const loadCatalogs = useCallback(async () => {
     setLoadingCatalogs(true);
@@ -84,10 +83,22 @@ export function PedidosPage() {
     loadPedidos();
   };
 
-  const pedidosSorted = useMemo(
-    () => [...pedidos].sort((a, b) => Number(b.id_pedido || 0) - Number(a.id_pedido || 0)),
-    [pedidos]
-  );
+  const pedidosSorted = useMemo(() => {
+    let filtered = [...pedidos].sort((a, b) => Number(b.id_pedido || 0) - Number(a.id_pedido || 0));
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
+      filtered = filtered.filter((p) => {
+        const id = String(p.id_pedido || '');
+        const bodegaDest = String(p.nombre_bodega_surtidor || '').toLowerCase();
+        const bodegaSol = String(p.nombre_bodega_solicita || '').toLowerCase();
+        const estado = String(p.estado || '').toLowerCase();
+        return (
+          id.includes(q) || bodegaDest.includes(q) || bodegaSol.includes(q) || estado.includes(q)
+        );
+      });
+    }
+    return filtered;
+  }, [pedidos, debouncedSearch]);
 
   const columns = useMemo(
     () => [
@@ -144,6 +155,11 @@ export function PedidosPage() {
         subtitle={`${pedidos.length} pedido${pedidos.length === 1 ? '' : 's'} en total`}
         actions={
           <div className="pedidos-page__actions">
+            {pedidosSorted.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
+                Exportar CSV
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={loadPedidos}>
               Refrescar
             </Button>
@@ -170,16 +186,58 @@ export function PedidosPage() {
           </ol>
         </Card>
 
+        <Card compact>
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Buscar por #, bodega, estado…"
+          />
+        </Card>
+
         <DataList
           columns={columns}
           rows={pedidosSorted}
           loading={loadingPedidos}
           keyField="id_pedido"
-          emptyTitle="Sin pedidos"
-          emptyMessage="Cuando crees un pedido aparecerá aquí."
-          emptyAction={canCreate ? <Button onClick={() => setModalOpen(true)}>Crear primer pedido</Button> : null}
+          emptyTitle={search ? 'Sin resultados' : 'Sin pedidos'}
+          emptyMessage={search ? 'Intenta con otros términos.' : 'Cuando crees un pedido aparecerá aquí.'}
+          emptyAction={!search && canCreate ? <Button onClick={() => setModalOpen(true)}>Crear primer pedido</Button> : null}
         />
       </div>
+
+      <ColumnSelectorModal
+        open={showColumnSelector}
+        onClose={() => setShowColumnSelector(false)}
+        columns={[
+          { key: 'id_pedido', label: '#' },
+          { key: 'creado_en', label: 'Fecha' },
+          { key: 'nombre_bodega_surtidor', label: 'Bodega destino' },
+          { key: 'nombre_bodega_solicita', label: 'Tu bodega' },
+          { key: 'total_lineas', label: 'Líneas' },
+          { key: 'estado', label: 'Estado' },
+          { key: 'observaciones', label: 'Observaciones' },
+          { key: 'usuario_creador', label: 'Usuario' },
+        ]}
+        storageKey="export-columns-pedidos"
+        onConfirm={(cols, format) => {
+          const fn = { csv: downloadCSV, xlsx: downloadXLSX, pdf: downloadPDF }[format] || downloadCSV;
+          fn(pedidosSorted, {
+            filename: `pedidos_${new Date().toISOString().slice(0, 10)}`,
+            columns: cols,
+            format: (row, col) => {
+              if (col.key === 'creado_en' && row.creado_en) {
+                return new Date(row.creado_en).toLocaleString();
+              }
+              if (col.key === 'estado') {
+                const est = ESTADO_LABELS[row.estado] || { label: row.estado };
+                return est.label;
+              }
+              return row[col.key];
+            },
+          });
+          setShowColumnSelector(false);
+        }}
+      />
 
       <Modal
         open={modalOpen}

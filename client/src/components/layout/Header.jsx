@@ -3,6 +3,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { Button } from '@/components/ui/Button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { SocketStatus } from '@/components/ui/SocketStatus';
 import './Header.scss';
 
 function getInitials(name) {
@@ -36,6 +37,7 @@ export function Header({ title, subtitle, actions }) {
 
       <div className="header__right">
         {actions && <div className="header__actions">{actions}</div>}
+        <SocketStatus />
         <ThemeToggle />
         <div className="header__user" title={userTitle}>
           <span className="header__avatar" aria-hidden="true">{initials}</span>

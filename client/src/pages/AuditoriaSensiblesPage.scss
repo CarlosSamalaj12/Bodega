@@ -1,0 +1,168 @@
+@use '@/styles/abstracts' as *;
+
+.auditoria-sensibles {
+  padding: $space-6;
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+
+  &__state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5rem 0;
+    color: $color-text-muted;
+  }
+
+  // ---- Filtros ----
+  &__filters {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+
+    @media (min-width: 768px) {
+      display: grid;
+      grid-template-columns: 1fr 2fr auto;
+      align-items: center;
+    }
+  }
+
+  &__fecha-group {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+  }
+
+  &__fecha-sep {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+  }
+
+  // ---- Tabla ----
+  &__table-wrapper {
+    overflow-x: auto;
+    @include custom-scrollbar;
+  }
+
+  &__row {
+    background: $color-surface;
+    transition: background $transition-fast;
+
+    &:hover {
+      background: $color-surface-hover;
+    }
+
+    td {
+      vertical-align: middle;
+      padding: $space-3 $space-3;
+    }
+  }
+
+  &__date {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  &__time {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+  }
+
+  &__actor {
+    font-weight: $font-weight-medium;
+    color: $color-text;
+  }
+
+  &__muted {
+    color: $color-text-muted;
+  }
+
+  &__ref {
+    font-family: $font-mono;
+    font-size: $font-size-xs;
+    color: $color-secondary;
+    background: $color-secondary-soft;
+    padding: 1px $space-1;
+    border-radius: $radius-xs;
+  }
+
+  // ---- Modal detalle ----
+  &__detail {
+    display: flex;
+    flex-direction: column;
+    gap: $space-5;
+  }
+
+  &__detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-4;
+
+    @media (max-width: 767px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__detail-field {
+    display: flex;
+    flex-direction: column;
+    gap: $space-1;
+  }
+
+  &__detail-label {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    color: $color-text-muted;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &__detail-value {
+    font-size: $font-size-base;
+    color: $color-text;
+    font-weight: $font-weight-medium;
+  }
+
+  &__detail-code {
+    font-family: $font-mono;
+    font-size: $font-size-xs;
+    color: $color-secondary;
+    background: $color-secondary-soft;
+    padding: $space-1 $space-2;
+    border-radius: $radius-sm;
+    word-break: break-all;
+  }
+
+  &__detail-section {
+    background: $color-bg-2;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+    padding: $space-4;
+  }
+
+  &__detail-section-title {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: $color-text;
+    margin: 0 0 $space-3 0;
+    padding-bottom: $space-2;
+    border-bottom: 1px solid $color-stroke;
+  }
+
+  &__detail-json {
+    font-family: $font-mono;
+    font-size: $font-size-xs;
+    color: $color-text;
+    background: $color-surface;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-sm;
+    padding: $space-3;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    max-height: 300px;
+    overflow-y: auto;
+    line-height: 1.6;
+    @include custom-scrollbar;
+  }
+}
