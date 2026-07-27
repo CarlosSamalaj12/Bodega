@@ -7,9 +7,10 @@ export const existenciasService = {
    */
   async list(opts = {}) {
     const { data } = await api.get('/api/reportes/existencias', {
-      params: { limit: 2000, ...opts },
+      params: { limit: 100, ...opts },
     });
-    return Array.isArray(data) ? data : [];
+    // Returns { rows, total, page, limit, totalPages } from server
+    return data;
   },
 
   /**

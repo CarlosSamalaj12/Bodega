@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Header } from '@/components/layout/Header';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
+import { Pagination } from '@/components/ui/Pagination';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { toast } from '@/components/ui/Toast';
@@ -60,7 +61,14 @@ export default function ReportePedidosPage() {
 
   // Datos
   const [rows, setRows] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+
+  // Paginación server-side
+  const [page, setPage] = useState(1);
+  const limit = 20;
+  const fetchIdRef = useRef(0);
 
   // Export
   const [showColumnSelector, setShowColumnSelector] = useState(false);
@@ -88,15 +96,17 @@ export default function ReportePedidosPage() {
     setDateTo(to.toISOString().slice(0, 10));
   };
 
-  // Cargar reporte
+  // Cargar reporte (server-side pagination)
   const fetchData = useCallback(async () => {
     setLoading(true);
+    const fetchId = ++fetchIdRef.current;
     try {
       const params = {
         from: dateFrom,
         to: dateTo,
         date_mode: dateMode,
-        limit: 2000,
+        limit,
+        page,
       };
       if (debouncedSearch) params.q = debouncedSearch;
       if (estado) params.estado = estado;
@@ -106,60 +116,38 @@ export default function ReportePedidosPage() {
       if (bodegaDespachoId) params.warehouse_dispatch = bodegaDespachoId;
 
       const { data } = await api.get('/api/reportes/pedidos', { params });
-      setRows(Array.isArray(data) ? data : []);
+      if (fetchId !== fetchIdRef.current) return;
+      if (data && Array.isArray(data.rows)) {
+        setRows(data.rows);
+        setTotal(data.total || 0);
+        setTotalPages(data.totalPages || 1);
+      } else {
+        setRows([]);
+        setTotal(0);
+        setTotalPages(1);
+      }
     } catch (e) {
-      toast.error('Error al cargar el reporte');
-      setRows([]);
+      if (fetchId === fetchIdRef.current) {
+        toast.error('Error al cargar el reporte');
+        setRows([]);
+        setTotal(0);
+        setTotalPages(1);
+      }
     } finally {
-      setLoading(false);
+      if (fetchId === fetchIdRef.current) setLoading(false);
     }
-  }, [dateFrom, dateTo, dateMode, debouncedSearch, estado, categoriaId, subcategoriaId, bodegaSolicitaId, bodegaDespachoId]);
+  }, [dateFrom, dateTo, dateMode, debouncedSearch, estado, categoriaId, subcategoriaId, bodegaSolicitaId, bodegaDespachoId, page, limit]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Agrupar por pedido
-  const grouped = useMemo(() => {
-    const map = new Map();
-    for (const r of rows) {
-      const id = r.id_pedido;
-      if (!map.has(id)) {
-        map.set(id, {
-          id_pedido: r.id_pedido,
-          fecha_pedido: r.fecha_pedido,
-          hora_pedido: r.hora_pedido,
-          estado: r.estado,
-          observaciones: r.observaciones,
-          solicitante: r.solicitante,
-          bodega_solicitante: r.bodega_solicitante,
-          bodega_despacho: r.bodega_despacho,
-          usuario_aprobador: r.usuario_aprobador,
-          fecha_despacho: r.fecha_despacho,
-          hora_despacho: r.hora_despacho,
-          lineas: [],
-        });
-      }
-      const grupo = map.get(id);
-      grupo.lineas.push({
-        id_detalle: r.id_pedido_detalle,
-        id_producto: r.id_producto,
-        nombre_producto: r.nombre_producto,
-        sku: r.sku,
-        nombre_categoria: r.nombre_categoria,
-        nombre_subcategoria: r.nombre_subcategoria,
-        cantidad_solicitada: Number(r.cantidad_solicitada || 0),
-        cantidad_surtida: Number(r.cantidad_surtida || 0),
-        pendiente: Number(r.pendiente || 0),
-        total_linea: Number(r.total_linea || 0),
-      });
-    }
-    return Array.from(map.values());
-  }, [rows]);
+  useEffect(() => { setPage(1); }, [debouncedSearch, estado, categoriaId, subcategoriaId, bodegaSolicitaId, bodegaDespachoId, dateFrom, dateTo, dateMode]);
 
   // Totales
   const totales = useMemo(() => {
     let totalSolicitado = 0, totalSurtido = 0, totalPendiente = 0, totalCosto = 0;
-    for (const g of grouped) {
-      for (const l of g.lineas) {
+    for (const g of rows) {
+      const lineas = g.lineas || [];
+      for (const l of lineas) {
         totalSolicitado += l.cantidad_solicitada;
         totalSurtido += l.cantidad_surtida;
         totalPendiente += l.pendiente;
@@ -167,7 +155,7 @@ export default function ReportePedidosPage() {
       }
     }
     return { totalSolicitado, totalSurtido, totalPendiente, totalCosto };
-  }, [grouped]);
+  }, [rows]);
 
   // Subcategorías filtradas por categoría
   const subcategoriasFiltradas = useMemo(() => {
@@ -198,9 +186,20 @@ export default function ReportePedidosPage() {
     { key: 'observaciones', label: 'Observaciones' },
   ];
 
+  // Aplanar datos agrupados para exportación
+  const flatForExport = useMemo(() => {
+    const flat = [];
+    for (const m of rows) {
+      for (const l of (m.lineas || [])) {
+        flat.push({ ...m, ...l });
+      }
+    }
+    return flat;
+  }, [rows]);
+
   const handleExportWithColumns = (cols, format) => {
     const fn = { csv: downloadCSV, xlsx: downloadXLSX, pdf: downloadPDF }[format] || downloadCSV;
-    fn(rows, {
+    fn(flatForExport, {
       filename: `reporte_pedidos_${new Date().toISOString().slice(0, 10)}`,
       columns: cols,
       format: (row, col) => {
@@ -234,7 +233,7 @@ export default function ReportePedidosPage() {
     <>
       <Header
         title="Reporte de Pedidos"
-        subtitle={`${grouped.length} pedido${grouped.length === 1 ? '' : 's'} · ${rows.length} línea${rows.length === 1 ? '' : 's'}`}
+        subtitle={`${total} pedido${total === 1 ? '' : 's'} · Pág. ${page} de ${totalPages}`}
         actions={
           rows.length > 0 && !loading ? (
             <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -313,7 +312,7 @@ export default function ReportePedidosPage() {
 
         {loading ? (
           <div className="reporte-pedidos__state"><Spinner size={20} label="Cargando reporte…" /></div>
-        ) : grouped.length === 0 ? (
+        ) : rows.length === 0 ? (
           <EmptyState icon="📋" title="Sin datos" message="No hay pedidos en el período seleccionado." />
         ) : (
           <div className="reporte-pedidos__table-wrapper">
@@ -333,7 +332,7 @@ export default function ReportePedidosPage() {
                 </tr>
               </thead>
               <tbody>
-                {grouped.flatMap((g) => {
+                {rows.flatMap((g) => {
                   const isOpen = expandedPeds.has(g.id_pedido);
                   const sumSol = g.lineas.reduce((a, l) => a + l.cantidad_solicitada, 0);
                   const sumSur = g.lineas.reduce((a, l) => a + l.cantidad_surtida, 0);
@@ -417,6 +416,9 @@ export default function ReportePedidosPage() {
               </tfoot>
             </table>
           </div>
+        )}
+        {rows.length > 0 && (
+          <Pagination page={page} totalPages={totalPages} total={total} onChange={setPage} loading={loading} />
         )}
       </div>
 

@@ -117,13 +117,9 @@ function SidebarContent({ onLinkClick, collapsed, onToggle }) {
     socket.on('stock:changed', onChanged);
     socket.on('pedido:changed', onChanged);
 
-    // También refrescar cada 2 minutos como respaldo
-    const interval = setInterval(fetchAlertCount, 120_000);
-
     return () => {
       socket.off('stock:changed', onChanged);
       socket.off('pedido:changed', onChanged);
-      clearInterval(interval);
     };
   }, [fetchAlertCount, user?.id_warehouse]);
 

@@ -1,0 +1,114 @@
+@use '@/styles/abstracts' as *;
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-4;
+  padding: $space-3 $space-4;
+  border-top: 1px solid $color-stroke;
+  background: $color-surface;
+  flex-wrap: wrap;
+
+  @include breakpoint(sm) {
+    flex-direction: column;
+    gap: $space-2;
+  }
+
+  &__info {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+  }
+
+  &__count {
+    font-weight: 500;
+  }
+
+  &__current {
+    color: $color-text-subtle;
+  }
+
+  &__controls {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  &__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+    padding: $space-1 $space-3;
+    font-size: $font-size-sm;
+    font-weight: 500;
+    color: $color-text-muted;
+    background: transparent;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-sm;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover:not(:disabled) {
+      background: $color-surface-hover;
+      color: $color-text;
+      border-color: $color-text-subtle;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  }
+
+  &__page {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 $space-1;
+    font-size: $font-size-sm;
+    font-weight: 500;
+    color: $color-text-muted;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: $radius-sm;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover:not(:disabled) {
+      background: $color-surface-hover;
+      color: $color-text;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+    }
+
+    &--active {
+      background: $color-accent;
+      color: $color-text-inverse;
+      border-color: $color-accent;
+      font-weight: 600;
+
+      &:hover {
+        background: $color-accent;
+        color: $color-text-inverse;
+      }
+    }
+  }
+
+  &__ellipsis {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 32px;
+    font-size: $font-size-sm;
+    color: $color-text-subtle;
+    user-select: none;
+  }
+}

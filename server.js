@@ -1287,6 +1287,36 @@ async function ensureOrderDispatchColumns() {
   }
 }
 
+
+// ── Cache de permisos en memoria (30s TTL) ──
+const permisosCache = new Map();
+const PERMISOS_CACHE_TTL_MS = 30_000;
+
+function clearPermisosCache(idUsuario) {
+  if (idUsuario != null) {
+    permisosCache.delete(Number(idUsuario));
+  } else {
+    permisosCache.clear();
+  }
+}
+
+function getCachedPermisos(idUsuario) {
+  const id = Number(idUsuario || 0);
+  if (!id) return null;
+  const entry = permisosCache.get(id);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > PERMISOS_CACHE_TTL_MS) {
+    permisosCache.delete(id);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCachedPermisos(idUsuario, data) {
+  const id = Number(idUsuario || 0);
+  if (id) permisosCache.set(id, { ts: Date.now(), data });
+}
+
 function permissionDefaults() {
   const map = {};
   PERM_CATALOG.forEach((p) => {
@@ -1296,6 +1326,8 @@ function permissionDefaults() {
 }
 
 async function getUserPermissionsMap(idUsuario) {
+  const cached = getCachedPermisos(idUsuario);
+  if (cached) return cached;
   const base = permissionDefaults();
   const [rows] = await pool.query(
     `SELECT permiso, activo
@@ -1308,6 +1340,7 @@ async function getUserPermissionsMap(idUsuario) {
       base[r.permiso] = Number(r.activo) ? 1 : 0;
     }
   }
+  setCachedPermisos(idUsuario, base);
   return base;
 }
 
@@ -2969,61 +3002,50 @@ app.get("/api/productos/search", auth, async (req, res) => {
 });
 
 app.get("/api/productos", auth, async (req, res) => {
-  const all = String(req.query.all || "") === "1";
-  const qRaw = String(req.query.q || "").trim();
-  const qf = buildTokenizedLikeFilter(qRaw, ["p.nombre_producto", "p.sku"], "pq");
-  const defaultLimit = qRaw ? 5 : 200;
-  const limit = Math.max(1, Math.min(5000, Number(req.query.limit || defaultLimit)));
-  const id_bodega_usuario = Number(req.user?.id_warehouse || 0) || null;
-  const [rows] = await pool.query(
-    `SELECT p.id_producto,
-            p.nombre_producto,
-            p.sku,
-            p.id_medida,
-            p.id_categoria,
-            p.id_subcategoria,
-            p.activo,
-            m.nombre_medida,
-            c.nombre_categoria,
-            s.nombre_subcategoria,
-            COALESCE(pwv.total_bodegas_visibles, 0) AS total_bodegas_visibles,
-            COALESCE(pwv.nombres_bodegas_visibles, '') AS nombres_bodegas_visibles,
-            CASE
-              WHEN :id_bodega_usuario IS NULL THEN 1
-              WHEN NOT EXISTS (
-                SELECT 1
-                FROM producto_bodegas_visibilidad pbv_all
-                WHERE pbv_all.id_producto=p.id_producto
-              ) THEN 1
-              WHEN EXISTS (
-                SELECT 1
-                FROM producto_bodegas_visibilidad pbv_me
-                WHERE pbv_me.id_producto=p.id_producto
-                  AND pbv_me.id_bodega=:id_bodega_usuario
-                  AND pbv_me.visible=1
-              ) THEN 1
-              ELSE 0
-            END AS visible_en_bodega_usuario
-     FROM productos p
-     JOIN medidas m ON m.id_medida=p.id_medida
-     JOIN categorias c ON c.id_categoria=p.id_categoria
-     LEFT JOIN subcategorias s ON s.id_subcategoria=p.id_subcategoria
-     LEFT JOIN (
-       SELECT pbv.id_producto,
-              COUNT(*) AS total_bodegas_visibles,
-              GROUP_CONCAT(b.nombre_bodega ORDER BY b.nombre_bodega ASC SEPARATOR ', ') AS nombres_bodegas_visibles
-       FROM producto_bodegas_visibilidad pbv
-       JOIN bodegas b ON b.id_bodega=pbv.id_bodega
-       WHERE pbv.visible=1
-       GROUP BY pbv.id_producto
-     ) pwv ON pwv.id_producto=p.id_producto
-     WHERE (:all=1 OR p.activo=1)
-       AND ${qf.clause}
-     ORDER BY p.nombre_producto ASC
-     LIMIT ${limit}`,
-    { all: all ? 1 : 0, id_bodega_usuario, ...qf.params }
+  var all = String(req.query.all || "") === "1";
+  var qRaw = String(req.query.q || "").trim();
+  var qf = buildTokenizedLikeFilter(qRaw, ["p.nombre_producto", "p.sku"], "pq");
+  var defaultLimit = qRaw ? 5 : 50;
+  var limit = Math.max(1, Math.min(5000, Number(req.query.limit || defaultLimit)));
+  var page = Math.max(1, Number(req.query.page || 1));
+  var offset = (page - 1) * limit;
+  var id_categoria = Number(req.query.categoria || 0) || null;
+  var id_medida = Number(req.query.medida || 0) || null;
+  var id_bodega_usuario = Number(req.user?.id_warehouse || 0) || null;
+
+  var [[{ total }]] = await pool.query(
+    "SELECT COUNT(*) AS total FROM productos p JOIN medidas m ON m.id_medida=p.id_medida JOIN categorias c ON c.id_categoria=p.id_categoria WHERE (:all=1 OR p.activo=1) AND " + qf.clause + " AND (:id_categoria IS NULL OR p.id_categoria=:id_categoria) AND (:id_medida IS NULL OR p.id_medida=:id_medida)",
+    { all: all ? 1 : 0, id_categoria, id_medida, ...qf.params }
   );
-  res.json(rows);
+
+  var sql = "SELECT p.id_producto,"
+    + " p.nombre_producto, p.sku,"
+    + " p.id_medida, p.id_categoria, p.id_subcategoria, p.activo,"
+    + " m.nombre_medida, c.nombre_categoria, s.nombre_subcategoria,"
+    + " COALESCE(pwv.total_bodegas_visibles, 0) AS total_bodegas_visibles,"
+    + " COALESCE(pwv.nombres_bodegas_visibles, '') AS nombres_bodegas_visibles,"
+    + " CASE WHEN :id_bodega_usuario IS NULL THEN 1 WHEN NOT EXISTS (SELECT 1 FROM producto_bodegas_visibilidad pbv_all WHERE pbv_all.id_producto=p.id_producto) THEN 1 WHEN EXISTS (SELECT 1 FROM producto_bodegas_visibilidad pbv_me WHERE pbv_me.id_producto=p.id_producto AND pbv_me.id_bodega=:id_bodega_usuario AND pbv_me.visible=1) THEN 1 ELSE 0 END AS visible_en_bodega_usuario"
+    + " FROM productos p";
+  sql += " JOIN medidas m ON m.id_medida=p.id_medida";
+  sql += " JOIN categorias c ON c.id_categoria=p.id_categoria";
+  sql += " LEFT JOIN subcategorias s ON s.id_subcategoria=p.id_subcategoria";
+  sql += " LEFT JOIN (SELECT pbv.id_producto, COUNT(*) AS total_bodegas_visibles, GROUP_CONCAT(b.nombre_bodega ORDER BY b.nombre_bodega ASC SEPARATOR ', ') AS nombres_bodegas_visibles FROM producto_bodegas_visibilidad pbv JOIN bodegas b ON b.id_bodega=pbv.id_bodega WHERE pbv.visible=1 GROUP BY pbv.id_producto) pwv ON pwv.id_producto=p.id_producto";
+  sql += " WHERE (:all=1 OR p.activo=1)";
+  sql += " AND " + qf.clause;
+  sql += " AND (:id_categoria IS NULL OR p.id_categoria=:id_categoria)";
+  sql += " AND (:id_medida IS NULL OR p.id_medida=:id_medida)";
+  sql += " ORDER BY p.nombre_producto ASC";
+  sql += " LIMIT " + limit + " OFFSET " + offset;
+
+  var [rows] = await pool.query(sql, { all: all ? 1 : 0, id_bodega_usuario, id_categoria, id_medida, ...qf.params });
+
+  res.json({
+    rows,
+    total: Number(total),
+    page,
+    limit,
+    totalPages: Math.ceil(Number(total) / Math.max(1, limit)),
+  });
 });
 
 app.post("/api/productos", auth, async (req, res) => {
@@ -4638,8 +4660,28 @@ app.get("/api/reportes/existencias", auth, async (req, res) => {
   const id_subcategoria = Number(req.query.subcategoria || 0) || null;
   const show_zero = String(req.query.show_zero || "").trim() === "1";
   const limit = Math.max(1, Math.min(2000, Number(req.query.limit || 500)));
+  const page = Math.max(1, Number(req.query.page || 1));
+  const offset = (page - 1) * limit;
 
-  const [rows] = await pool.query(
+    const [[{ countResult }]] = await pool.query(
+    `SELECT COUNT(*) AS total
+     FROM v_stock_por_lote v
+     JOIN bodegas b ON b.id_bodega=v.id_bodega
+     JOIN productos p ON p.id_producto=v.id_producto
+     LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
+     LEFT JOIN limites_producto_bodega lpb ON lpb.id_producto=v.id_producto AND lpb.id_bodega=v.id_bodega
+     WHERE ${show_zero ? "v.stock >= 0" : "v.stock > 0"}
+       ${accessFilter ? `v.id_bodega IN (${accessFilter.sql})` : "1=1"}
+       AND (:id_bodega IS NULL OR v.id_bodega=:id_bodega)
+       AND ${qf.clause}
+       AND (:from_date IS NULL OR v.fecha_vencimiento IS NULL OR v.fecha_vencimiento >= :from_date)
+       AND (:to_date IS NULL OR v.fecha_vencimiento IS NULL OR v.fecha_vencimiento <= :to_date)
+       AND (:id_categoria IS NULL OR p.id_categoria=:id_categoria)
+       AND (:id_subcategoria IS NULL OR p.id_subcategoria=:id_subcategoria)`,
+    params
+  );
+  const total = Number(countResult?.total || 0);
+const [rows] = await pool.query(
     `SELECT v.id_bodega,
             b.nombre_bodega,
             v.id_producto,
@@ -4745,10 +4787,16 @@ app.get("/api/reportes/existencias", auth, async (req, res) => {
        AND (:id_categoria IS NULL OR p.id_categoria=:id_categoria)
        AND (:id_subcategoria IS NULL OR p.id_subcategoria=:id_subcategoria)
      ORDER BY b.nombre_bodega ASC, p.nombre_producto ASC, (v.fecha_vencimiento IS NULL), v.fecha_vencimiento ASC
-     LIMIT ${limit}`,
+     LIMIT ${limit} OFFSET ${offset} OFFSET ${offset}`,
     { id_bodega, from_date, to_date, id_categoria, id_subcategoria, ...(accessFilter?.params || {}), ...qf.params }
   );
-  res.json(rows);
+    res.json({
+    rows,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / Math.max(1, limit)),
+  });
 });
 
 app.get("/api/reportes/existencias/alertas", auth, async (req, res) => {
@@ -6447,10 +6495,10 @@ app.get("/api/reportes/entradas", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
     if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
-    if (!scope.can_view_existencias) return res.json([]);
+    if (!scope.can_view_existencias) return res.json({ rows: [], total: 0, page: 1, limit: 100, totalPages: 1 });
 
     const warehouseScope = getScopedWarehouseFilter(scope, req.query.warehouse);
-    if (warehouseScope.denied) return res.json([]);
+    if (warehouseScope.denied) return res.json({ rows: [], total: 0, page: 1, limit: 100, totalPages: 1 });
     let id_bodega = warehouseScope.selected;
     if (!scope.can_all_bodegas) id_bodega = scope.id_bodega;
     const accessFilter =
@@ -6471,9 +6519,49 @@ app.get("/api/reportes/entradas", auth, async (req, res) => {
     const motivoRaw = String(req.query.motivo || "").trim().toUpperCase();
     const tipo_movimiento = motivoRaw === "TRANSFERENCIA" ? "TRANSFERENCIA" : null;
     const id_motivo = tipo_movimiento ? null : Number(req.query.motivo || 0) || null;
-    const limit = Math.max(1, Math.min(5000, Number(req.query.limit || 1000)));
+    const limit = Math.max(1, Math.min(100, Number(req.query.limit || 20)));
+    const page = Math.max(1, Number(req.query.page || 1));
+    const offset = (page - 1) * limit;
 
-    const [rows] = await pool.query(
+    const whereClauses = [
+      "me.tipo_movimiento IN ('ENTRADA', 'TRANSFERENCIA')",
+      "me.estado<>'ANULADO'",
+      accessFilter ? `me.id_bodega_destino IN (${accessFilter.sql})` : "1=1",
+      ":id_bodega IS NULL OR me.id_bodega_destino=:id_bodega",
+      qf.clause,
+      ":lote IS NULL OR md.lote LIKE :lote",
+      ":documento IS NULL OR me.no_documento LIKE :documento",
+      ":from_date IS NULL OR DATE(me.creado_en) >= :from_date",
+      ":to_date IS NULL OR DATE(me.creado_en) <= :to_date",
+      ":id_categoria IS NULL OR p.id_categoria=:id_categoria",
+      ":id_subcategoria IS NULL OR p.id_subcategoria=:id_subcategoria",
+      ":tipo_movimiento IS NULL OR me.tipo_movimiento=:tipo_movimiento",
+      ":id_motivo IS NULL OR me.id_motivo=:id_motivo",
+    ];
+    const whereSQL = whereClauses.join("\n         AND ");
+
+    const params = {
+      id_bodega, lote, documento, from_date, to_date,
+      id_categoria, id_subcategoria, tipo_movimiento, id_motivo,
+      ...(accessFilter?.params || {}),
+      ...qf.params,
+    };
+
+    // Count distinct movements
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(DISTINCT me.id_movimiento) AS total
+       FROM movimiento_encabezado me
+       JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
+       JOIN productos p ON p.id_producto=md.id_producto
+       LEFT JOIN categorias c ON c.id_categoria=p.id_categoria
+       LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
+       WHERE ${whereSQL}`,
+      params
+    );
+    const totalMovements = Number(total || 0);
+
+    // Get paginated movement headers
+    const [movements] = await pool.query(
       `SELECT me.id_movimiento,
               me.tipo_movimiento AS tipo_entrada,
               me.estado,
@@ -6491,124 +6579,125 @@ app.get("/api/reportes/entradas", auth, async (req, res) => {
               m.nombre_motivo,
               COALESCE(me.no_contar_dashboard, 0) AS no_contar_dashboard,
               u.id_usuario,
-              u.nombre_completo AS usuario_creador,
-              md.id_detalle,
-              md.id_producto,
-              p.nombre_producto,
-              p.sku,
-              p.id_categoria,
-              c.nombre_categoria,
-              p.id_subcategoria,
-              sc.nombre_subcategoria,
-              md.lote,
-              md.fecha_vencimiento,
-              md.cantidad,
-              md.costo_unitario,
-              md.precio_salida,
-              (md.cantidad * md.costo_unitario) AS total_linea
+              u.nombre_completo AS usuario_creador
        FROM movimiento_encabezado me
-       JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
        LEFT JOIN bodegas b ON b.id_bodega=me.id_bodega_destino
-       JOIN productos p ON p.id_producto=md.id_producto
-       LEFT JOIN categorias c ON c.id_categoria=p.id_categoria
-       LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
        LEFT JOIN motivos_movimiento m ON m.id_motivo=me.id_motivo
        LEFT JOIN usuarios u ON u.id_usuario=me.creado_por
        LEFT JOIN usuarios u_anul ON u_anul.id_usuario=me.anulado_por
-       WHERE me.tipo_movimiento IN ('ENTRADA', 'TRANSFERENCIA')
-         AND me.estado<>'ANULADO'
-         AND ${accessFilter ? `me.id_bodega_destino IN (${accessFilter.sql})` : "1=1"}
-         AND (:id_bodega IS NULL OR me.id_bodega_destino=:id_bodega)
-         AND ${qf.clause}
-         AND (:lote IS NULL OR md.lote LIKE :lote)
-         AND (:documento IS NULL OR me.no_documento LIKE :documento)
-         AND (:from_date IS NULL OR DATE(me.creado_en) >= :from_date)
-         AND (:to_date IS NULL OR DATE(me.creado_en) <= :to_date)
-         AND (:id_categoria IS NULL OR p.id_categoria=:id_categoria)
-         AND (:id_subcategoria IS NULL OR p.id_subcategoria=:id_subcategoria)
-         AND (:tipo_movimiento IS NULL OR me.tipo_movimiento=:tipo_movimiento)
-         AND (:id_motivo IS NULL OR me.id_motivo=:id_motivo)
-       ORDER BY me.creado_en DESC, me.id_movimiento DESC, md.id_detalle DESC
-       LIMIT ${limit}`,
-      {
-        id_bodega,
-        lote,
-        documento,
-        from_date,
-        to_date,
-        id_categoria,
-        id_subcategoria,
-        tipo_movimiento,
-        id_motivo,
-        ...(accessFilter?.params || {}),
-        ...qf.params,
-      }
+       JOIN (
+         SELECT DISTINCT me.id_movimiento
+         FROM movimiento_encabezado me
+         JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
+         JOIN productos p ON p.id_producto=md.id_producto
+         LEFT JOIN categorias c ON c.id_categoria=p.id_categoria
+         LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
+         WHERE ${whereSQL}
+         ORDER BY me.creado_en DESC, me.id_movimiento DESC
+         LIMIT ${limit} OFFSET ${offset}
+       ) filtered ON filtered.id_movimiento=me.id_movimiento
+       ORDER BY me.creado_en DESC, me.id_movimiento DESC`,
+      params
     );
 
-    res.json(rows);
+    // Get detail lines for those movements
+    let rows = [];
+    if (movements.length > 0) {
+      const ids = movements.map(function(m) { return m.id_movimiento; });
+      const inClause = buildNamedInClause(ids, "entd");
+      const [detailRows] = await pool.query(
+        `SELECT me.id_movimiento,
+                md.id_detalle,
+                md.id_producto,
+                p.nombre_producto,
+                p.sku,
+                c.nombre_categoria,
+                sc.nombre_subcategoria,
+                md.lote,
+                md.fecha_vencimiento,
+                md.cantidad,
+                md.costo_unitario,
+                md.precio_salida,
+                (md.cantidad * md.costo_unitario) AS total_linea
+         FROM movimiento_encabezado me
+         JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
+         JOIN productos p ON p.id_producto=md.id_producto
+         LEFT JOIN categorias c ON c.id_categoria=p.id_categoria
+         LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
+         WHERE me.id_movimiento IN (${inClause.sql})
+         ORDER BY me.id_movimiento DESC, md.id_detalle ASC`,
+        inClause.params
+      );
+
+      // Group lines by movement
+      var movMap = new Map();
+      for (var i = 0; i < movements.length; i++) {
+        var m = movements[i];
+        movMap.set(m.id_movimiento, {
+          id_movimiento: m.id_movimiento,
+          tipo_entrada: m.tipo_entrada,
+          estado: m.estado,
+          anulado_por: m.anulado_por,
+          anulado_en: m.anulado_en,
+          anulado_por_usuario: m.anulado_por_usuario,
+          fecha: m.fecha,
+          hora: m.hora,
+          creado_en: m.creado_en,
+          no_documento: m.no_documento,
+          observaciones: m.observaciones,
+          id_bodega: m.id_bodega,
+          nombre_bodega: m.nombre_bodega,
+          id_motivo: m.id_motivo,
+          nombre_motivo: m.nombre_motivo,
+          no_contar_dashboard: m.no_contar_dashboard,
+          id_usuario: m.id_usuario,
+          usuario_creador: m.usuario_creador,
+          lineas: []
+        });
+      }
+      for (var j = 0; j < detailRows.length; j++) {
+        var d = detailRows[j];
+        var grupo = movMap.get(d.id_movimiento);
+        if (grupo) {
+          grupo.lineas.push({
+            id_detalle: d.id_detalle,
+            id_producto: d.id_producto,
+            nombre_producto: d.nombre_producto,
+            sku: d.sku,
+            nombre_categoria: d.nombre_categoria,
+            nombre_subcategoria: d.nombre_subcategoria,
+            lote: d.lote,
+            fecha_vencimiento: d.fecha_vencimiento,
+            cantidad: Number(d.cantidad || 0),
+            costo_unitario: Number(d.costo_unitario || 0),
+            precio_salida: Number(d.precio_salida || 0),
+            total_linea: Number(d.total_linea || 0),
+          });
+        }
+      }
+      rows = Array.from(movMap.values());
+    }
+
+    res.json({
+      rows,
+      total: totalMovements,
+      page,
+      limit,
+      totalPages: Math.ceil(totalMovements / Math.max(1, limit)),
+    });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }
 });
 
-app.post(
-  "/api/entradas/:id_movimiento/dashboard-flag",
-  auth,
-  requirePermission("action.manage_permissions", "administrar exclusion del panel principal en entradas"),
-  async (req, res) => {
-    let conn = null;
-    try {
-      await ensureMovimientoDashboardColumn();
-      await ensureMovimientoPastUpdateTrigger();
-      const id_movimiento = Number(req.params.id_movimiento || 0);
-      if (!id_movimiento) return res.status(400).json({ error: "Movimiento invalido" });
-      const scope = await resolveStockScope(req.user);
-      if (!scope?.is_admin_role) {
-        return res.status(403).json({ error: "Solo un administrador puede excluir entradas antiguas del panel principal." });
-      }
-
-      const no_contar_dashboard = Number(req.body?.no_contar_dashboard) === 1 ? 1 : 0;
-      conn = await pool.getConnection();
-      const [[row]] = await conn.query(
-        `SELECT id_movimiento, tipo_movimiento, id_bodega_destino, id_bodega_origen
-         FROM movimiento_encabezado
-         WHERE id_movimiento=:id_movimiento
-         LIMIT 1`,
-        { id_movimiento }
-      );
-      if (!row) return res.status(404).json({ error: "Movimiento no encontrado" });
-      if (String(row.tipo_movimiento || "").toUpperCase() !== "ENTRADA") {
-        return res.status(400).json({ error: "Solo las entradas pueden excluirse del panel principal." });
-      }
-
-      await conn.query(`SET @allow_dashboard_flag_past_update = 1`);
-      await conn.query(
-        `UPDATE movimiento_encabezado
-         SET no_contar_dashboard=:no_contar_dashboard
-         WHERE id_movimiento=:id_movimiento`,
-        { id_movimiento, no_contar_dashboard }
-      );
-      await conn.query(`SET @allow_dashboard_flag_past_update = 0`);
-
-      await pool.query(`DELETE FROM dashboard_cache_resumen`);
-
-      return res.json({ ok: true, id_movimiento, no_contar_dashboard });
-    } catch (e) {
-      return res.status(500).json({ error: String(e.message || e) });
-    } finally {
-      if (conn) conn.release();
-    }
-  }
-);
-
 app.get("/api/reportes/salidas", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
     if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
-    if (!scope.can_view_existencias) return res.json([]);
+    if (!scope.can_view_existencias) return res.json({ rows: [], total: 0, page: 1, limit: 100, totalPages: 1 });
 
     const warehouseScope = getScopedWarehouseFilter(scope, req.query.warehouse);
-    if (warehouseScope.denied) return res.json([]);
+    if (warehouseScope.denied) return res.json({ rows: [], total: 0, page: 1, limit: 100, totalPages: 1 });
     let id_bodega = warehouseScope.selected;
     if (!scope.can_all_bodegas) id_bodega = scope.id_bodega;
     const accessFilter =
@@ -6630,9 +6719,64 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
     const motivoRaw = String(req.query.motivo || "").trim().toUpperCase();
     const tipo_movimiento = motivoRaw === "TRANSFERENCIA" ? "TRANSFERENCIA" : null;
     const id_motivo = tipo_movimiento ? null : Number(req.query.motivo || 0) || null;
-    const limit = Math.max(1, Math.min(5000, Number(req.query.limit || 1000)));
+    const limit = Math.max(1, Math.min(100, Number(req.query.limit || 20)));
+    const page = Math.max(1, Number(req.query.page || 1));
+    const offset = (page - 1) * limit;
 
-    const [rows] = await pool.query(
+    const whereClauses = [
+      "me.tipo_movimiento IN ('SALIDA', 'TRANSFERENCIA')",
+      "me.estado<>'ANULADO'",
+      accessFilter ? `me.id_bodega_origen IN (${accessFilter.sql})` : "1=1",
+      ":id_bodega IS NULL OR me.id_bodega_origen=:id_bodega",
+      qf.clause,
+      ":lote IS NULL OR md.lote LIKE :lote",
+      ":documento IS NULL OR me.no_documento LIKE :documento",
+      ":from_date IS NULL OR DATE(me.creado_en) >= :from_date",
+      ":to_date IS NULL OR DATE(me.creado_en) <= :to_date",
+      ":id_categoria IS NULL OR p.id_categoria=:id_categoria",
+      ":id_subcategoria IS NULL OR p.id_subcategoria=:id_subcategoria",
+      ":id_bodega_destino IS NULL OR COALESCE(me.id_bodega_destino, pe.id_bodega_solicita)=:id_bodega_destino",
+      ":tipo_movimiento IS NULL OR me.tipo_movimiento=:tipo_movimiento",
+      ":id_motivo IS NULL OR me.id_motivo=:id_motivo",
+    ];
+    const whereSQL = whereClauses.join("\n         AND ");
+
+    const params = {
+      id_bodega, lote, documento, from_date, to_date,
+      id_categoria, id_subcategoria, id_bodega_destino,
+      tipo_movimiento, id_motivo,
+      ...(accessFilter?.params || {}),
+      ...qf.params,
+    };
+
+    // Count distinct movements
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(DISTINCT me.id_movimiento) AS total
+       FROM movimiento_encabezado me
+       JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
+       LEFT JOIN bodegas bo ON bo.id_bodega=me.id_bodega_origen
+       LEFT JOIN bodegas bd ON bd.id_bodega=me.id_bodega_destino
+       LEFT JOIN (
+         SELECT pmv.id_movimiento, MIN(pd.id_pedido) AS id_pedido
+         FROM pedido_movimiento_vinculo pmv
+         JOIN pedido_detalle pd ON pd.id_pedido_detalle=pmv.id_pedido_detalle
+         GROUP BY pmv.id_movimiento
+       ) pm ON pm.id_movimiento=me.id_movimiento
+       LEFT JOIN pedido_encabezado pe ON pe.id_pedido=pm.id_pedido
+       LEFT JOIN bodegas bped ON bped.id_bodega=pe.id_bodega_solicita
+       LEFT JOIN usuarios usol ON usol.id_usuario=pe.id_usuario_solicita
+       JOIN productos p ON p.id_producto=md.id_producto
+       LEFT JOIN categorias c ON c.id_categoria=p.id_categoria
+       LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
+       LEFT JOIN motivos_movimiento m ON m.id_motivo=me.id_motivo
+       LEFT JOIN usuarios u ON u.id_usuario=me.creado_por
+       WHERE ${whereSQL}`,
+      params
+    );
+    const totalMovements = Number(total || 0);
+
+    // Get paginated distinct movement headers
+    const [movements] = await pool.query(
       `SELECT me.id_movimiento,
               me.tipo_movimiento AS tipo_salida,
               me.estado,
@@ -6652,22 +6796,8 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
               m.id_motivo,
               m.nombre_motivo,
               u.id_usuario,
-              u.nombre_completo AS usuario_creador,
-              md.id_detalle,
-              md.id_producto,
-              p.nombre_producto,
-              p.sku,
-              p.id_categoria,
-              c.nombre_categoria,
-              p.id_subcategoria,
-              sc.nombre_subcategoria,
-              md.lote,
-              md.fecha_vencimiento,
-              md.cantidad,
-              md.costo_unitario,
-              (md.cantidad * md.costo_unitario) AS total_linea
+              u.nombre_completo AS usuario_creador
        FROM movimiento_encabezado me
-       JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
        LEFT JOIN bodegas bo ON bo.id_bodega=me.id_bodega_origen
        LEFT JOIN bodegas bd ON bd.id_bodega=me.id_bodega_destino
        LEFT JOIN (
@@ -6679,116 +6809,130 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
        LEFT JOIN pedido_encabezado pe ON pe.id_pedido=pm.id_pedido
        LEFT JOIN bodegas bped ON bped.id_bodega=pe.id_bodega_solicita
        LEFT JOIN usuarios usol ON usol.id_usuario=pe.id_usuario_solicita
-       JOIN productos p ON p.id_producto=md.id_producto
-       LEFT JOIN categorias c ON c.id_categoria=p.id_categoria
-       LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
        LEFT JOIN motivos_movimiento m ON m.id_motivo=me.id_motivo
        LEFT JOIN usuarios u ON u.id_usuario=me.creado_por
        LEFT JOIN usuarios u_anul ON u_anul.id_usuario=me.anulado_por
-       WHERE me.tipo_movimiento IN ('SALIDA', 'TRANSFERENCIA')
-         AND me.estado<>'ANULADO'
-         AND ${accessFilter ? `me.id_bodega_origen IN (${accessFilter.sql})` : "1=1"}
-         AND (:id_bodega IS NULL OR me.id_bodega_origen=:id_bodega)
-         AND ${qf.clause}
-         AND (:lote IS NULL OR md.lote LIKE :lote)
-         AND (:documento IS NULL OR me.no_documento LIKE :documento)
-         AND (:from_date IS NULL OR DATE(me.creado_en) >= :from_date)
-         AND (:to_date IS NULL OR DATE(me.creado_en) <= :to_date)
-         AND (:id_categoria IS NULL OR p.id_categoria=:id_categoria)
-         AND (:id_subcategoria IS NULL OR p.id_subcategoria=:id_subcategoria)
-         AND (:id_bodega_destino IS NULL OR COALESCE(me.id_bodega_destino, pe.id_bodega_solicita)=:id_bodega_destino)
-         AND (:tipo_movimiento IS NULL OR me.tipo_movimiento=:tipo_movimiento)
-         AND (:id_motivo IS NULL OR me.id_motivo=:id_motivo)
-       ORDER BY me.creado_en DESC, me.id_movimiento DESC, md.id_detalle DESC
-       LIMIT ${limit}`,
-      {
-        id_bodega,
-        lote,
-        documento,
-        from_date,
-        to_date,
-        id_categoria,
-        id_subcategoria,
-        id_bodega_destino,
-        tipo_movimiento,
-        id_motivo,
-        ...(accessFilter?.params || {}),
-        ...qf.params,
-      }
+       JOIN (
+         SELECT DISTINCT me.id_movimiento
+         FROM movimiento_encabezado me
+         JOIN movimiento_detalle md2 ON md.id_movimiento=me.id_movimiento
+         JOIN productos p2 ON p.id_producto=md.id_producto
+         LEFT JOIN (
+           SELECT pmv2.id_movimiento, MIN(pd.id_pedido) AS id_pedido
+           FROM pedido_movimiento_vinculo pmv
+           JOIN pedido_detalle pd ON pd.id_pedido_detalle=pmv2.id_pedido_detalle
+           GROUP BY pmv.id_movimiento
+         ) pm2 ON pm.id_movimiento=me.id_movimiento
+         LEFT JOIN pedido_encabezado pe2 ON pe.id_pedido=pm.id_pedido
+         LEFT JOIN bodegas bped2 ON bped.id_bodega=pe.id_bodega_solicita
+         WHERE ${whereSQL}
+         ORDER BY me.creado_en DESC, me.id_movimiento DESC
+         LIMIT ${limit} OFFSET ${offset}
+       ) filtered ON filtered.id_movimiento=me.id_movimiento
+       ORDER BY me.creado_en DESC, me.id_movimiento DESC`,
+      params
     );
 
-    res.json(rows);
+    // Get detail lines for those movements
+    let rows = [];
+    if (movements.length > 0) {
+      const ids = movements.map(function(m) { return m.id_movimiento; });
+      const inClause = buildNamedInClause(ids, "sald");
+      const [detailRows] = await pool.query(
+        `SELECT me.id_movimiento,
+                md.id_detalle,
+                md.id_producto,
+                p.nombre_producto,
+                p.sku,
+                c.nombre_categoria,
+                sc.nombre_subcategoria,
+                md.lote,
+                md.cantidad,
+                md.costo_unitario,
+                (md.cantidad * md.costo_unitario) AS total_linea
+         FROM movimiento_encabezado me
+         JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
+         LEFT JOIN productos p ON p.id_producto=md.id_producto
+         LEFT JOIN categorias c ON c.id_categoria=p.id_categoria
+         LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
+         WHERE me.id_movimiento IN (${inClause.sql})
+         ORDER BY me.id_movimiento DESC, md.id_detalle ASC`,
+        inClause.params
+      );
+
+      // Group lines by movement
+      var movMap = new Map();
+      for (var i = 0; i < movements.length; i++) {
+        var m = movements[i];
+        movMap.set(m.id_movimiento, {
+          id_movimiento: m.id_movimiento,
+          tipo_salida: m.tipo_salida,
+          estado: m.estado,
+          anulado_por: m.anulado_por,
+          anulado_en: m.anulado_en,
+          anulado_por_usuario: m.anulado_por_usuario,
+          fecha: m.fecha,
+          hora: m.hora,
+          creado_en: m.creado_en,
+          no_documento: m.no_documento,
+          observaciones: m.observaciones,
+          id_bodega_origen: m.id_bodega_origen,
+          nombre_bodega_origen: m.nombre_bodega_origen,
+          id_bodega_destino: m.id_bodega_destino,
+          nombre_bodega_destino: m.nombre_bodega_destino,
+          solicitante_pedido: m.solicitante_pedido,
+          id_motivo: m.id_motivo,
+          nombre_motivo: m.nombre_motivo,
+          id_usuario: m.id_usuario,
+          usuario_creador: m.usuario_creador,
+          lineas: []
+        });
+      }
+      for (var j = 0; j < detailRows.length; j++) {
+        var d = detailRows[j];
+        var grupo = movMap.get(d.id_movimiento);
+        if (grupo) {
+          grupo.lineas.push({
+            id_detalle: d.id_detalle,
+            id_producto: d.id_producto,
+            nombre_producto: d.nombre_producto,
+            sku: d.sku,
+            nombre_categoria: d.nombre_categoria,
+            nombre_subcategoria: d.nombre_subcategoria,
+            lote: d.lote,
+            cantidad: Number(d.cantidad || 0),
+            costo_unitario: Number(d.costo_unitario || 0),
+            total_linea: Number(d.total_linea || 0),
+          });
+        }
+      }
+      rows = Array.from(movMap.values());
+    }
+
+    res.json({
+      rows,
+      total: totalMovements,
+      page,
+      limit,
+      totalPages: Math.ceil(totalMovements / Math.max(1, limit)),
+    });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }
 });
 
-app.get("/api/reportes/transferencias", auth, async (req, res) => {
-  try {
-    const scope = await resolveStockScope(req.user);
-    if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
-    if (!scope.can_view_existencias) return res.json([]);
-
-    const from_date = String(req.query.from || "").trim() || null;
-    const to_date = String(req.query.to || "").trim() || null;
-    const limit = Math.max(1, Math.min(5000, Number(req.query.limit || 1000)));
-
-    const [rows] = await pool.query(
-      `SELECT me.id_movimiento,
-              me.tipo_movimiento,
-              DATE(me.creado_en) AS fecha,
-              TIME(me.creado_en) AS hora,
-              me.creado_en,
-              me.no_documento,
-              me.observaciones,
-              bo.id_bodega AS id_bodega_origen,
-              bo.nombre_bodega AS bodega_origen,
-              bd.id_bodega AS id_bodega_destino,
-              bd.nombre_bodega AS bodega_destino,
-              u.nombre_completo AS usuario_creador,
-              md.id_detalle,
-              md.id_producto,
-              p.nombre_producto,
-              p.sku,
-              md.lote,
-              md.fecha_vencimiento,
-              md.cantidad,
-              md.costo_unitario,
-              (md.cantidad * md.costo_unitario) AS total_linea
-       FROM movimiento_encabezado me
-       JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
-       LEFT JOIN bodegas bo ON bo.id_bodega=me.id_bodega_origen
-       LEFT JOIN bodegas bd ON bd.id_bodega=me.id_bodega_destino
-       JOIN productos p ON p.id_producto=md.id_producto
-       LEFT JOIN usuarios u ON u.id_usuario=me.creado_por
-       WHERE me.tipo_movimiento='TRANSFERENCIA'
-         AND me.estado<>'ANULADO'
-         AND (:from_date IS NULL OR DATE(me.creado_en) >= :from_date)
-         AND (:to_date IS NULL OR DATE(me.creado_en) <= :to_date)
-       ORDER BY me.creado_en DESC
-       LIMIT ${limit}`,
-      {
-        from_date,
-        to_date,
-      }
-    );
-    res.json(rows || []);
-  } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
-  }
-});
 
 app.get("/api/reportes/pedidos", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
     if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
-    if (!scope.can_view_existencias) return res.json([]);
+    if (!scope.can_view_existencias) return res.json({ rows: [], total: 0, page: 1, limit: 100, totalPages: 1 });
 
     const requesterScope = getScopedWarehouseFilter(scope, req.query.warehouse_requester);
-    if (requesterScope.denied) return res.json([]);
+    if (requesterScope.denied) return res.json({ rows: [], total: 0, page: 1, limit: 100, totalPages: 1 });
     let id_bodega_solicita = requesterScope.selected;
     const dispatchScope = getScopedWarehouseFilter(scope, req.query.warehouse_dispatch);
-    if (dispatchScope.denied) return res.json([]);
+    if (dispatchScope.denied) return res.json({ rows: [], total: 0, page: 1, limit: 100, totalPages: 1 });
     let id_bodega_surtidor = dispatchScope.selected;
     const localWarehouseId = !scope.can_all_bodegas ? Number(scope.id_bodega || 0) || null : null;
     if (!scope.can_all_bodegas) {
@@ -6812,9 +6956,44 @@ app.get("/api/reportes/pedidos", auth, async (req, res) => {
     const estado = String(req.query.estado || "").trim() || null;
     const id_usuario_solicita = Number(req.query.requester_user || 0) || null;
     const id_usuario_despacha = Number(req.query.dispatch_user || 0) || null;
-    const limit = Math.max(1, Math.min(5000, Number(req.query.limit || 1000)));
+    const limit = Math.max(1, Math.min(100, Number(req.query.limit || 20)));
+    const page = Math.max(1, Number(req.query.page || 1));
+    const offset = (page - 1) * limit;
 
-    const [rows] = await pool.query(
+    const where = "(:id_pedido IS NULL OR p.id_pedido=:id_pedido)\n         AND (:estado IS NULL OR p.estado=:estado)\n         AND " 
+      + (requesterAccessFilter ? `p.id_bodega_solicita IN (${requesterAccessFilter.sql})` : "1=1")
+      + "\n         AND (:id_bodega_solicita IS NULL OR p.id_bodega_solicita=:id_bodega_solicita)\n         AND (:id_bodega_surtidor IS NULL OR p.id_bodega_surtidor=:id_bodega_surtidor)\n         AND (:local_warehouse_id IS NULL OR p.id_bodega_solicita=:local_warehouse_id OR p.id_bodega_surtidor=:local_warehouse_id)\n         AND (:id_usuario_solicita IS NULL OR p.id_usuario_solicita=:id_usuario_solicita)\n         AND (:id_usuario_despacha IS NULL OR p.aprobado_por=:id_usuario_despacha OR EXISTS (SELECT 1 FROM pedido_movimiento_vinculo pmv3 JOIN movimiento_encabezado me3 ON me3.id_movimiento=pmv3.id_movimiento WHERE pmv3.id_pedido_detalle=d.id_pedido_detalle AND me3.creado_por=:id_usuario_despacha))\n         AND ((:date_mode=\'DESPACHO\' AND (:from_date IS NULL OR DATE(p.aprobado_en) >= :from_date) AND (:to_date IS NULL OR DATE(p.aprobado_en) <= :to_date)) OR (:date_mode<>\'DESPACHO\' AND (:from_date IS NULL OR DATE(p.creado_en) >= :from_date) AND (:to_date IS NULL OR DATE(p.creado_en) <= :to_date)))\n         AND (:id_categoria IS NULL OR pr.id_categoria=:id_categoria)\n         AND (:id_subcategoria IS NULL OR pr.id_subcategoria=:id_subcategoria)\n         AND "
+      + qf.clause
+      + "\n         AND (:lote IS NULL OR EXISTS (SELECT 1 FROM pedido_movimiento_vinculo pmv JOIN movimiento_detalle md2 ON md.id_detalle=pmv2.id_detalle WHERE pmv2.id_pedido_detalle=d.id_pedido_detalle AND md.lote LIKE :lote))";
+
+    const params = {
+      id_pedido, estado, id_bodega_solicita, id_bodega_surtidor,
+      local_warehouse_id: localWarehouseId, id_usuario_solicita,
+      id_usuario_despacha, date_mode, from_date, to_date,
+      id_categoria, id_subcategoria, lote,
+      ...(requesterAccessFilter?.params || {}),
+      ...qf.params,
+    };
+
+    // Count distinct pedidos
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(DISTINCT p.id_pedido) AS total
+       FROM pedido_encabezado p
+       JOIN pedido_detalle d ON d.id_pedido=p.id_pedido
+       JOIN productos pr ON pr.id_producto=d.id_producto
+       LEFT JOIN categorias c ON c.id_categoria=pr.id_categoria
+       LEFT JOIN subcategorias sc ON sc.id_subcategoria=pr.id_subcategoria
+       JOIN usuarios us ON us.id_usuario=p.id_usuario_solicita
+       LEFT JOIN usuarios ua ON ua.id_usuario=p.aprobado_por
+       JOIN bodegas bs ON bs.id_bodega=p.id_bodega_solicita
+       JOIN bodegas bd ON bd.id_bodega=p.id_bodega_surtidor
+       WHERE ${where}`,
+      params
+    );
+    const totalMovements = Number(total || 0);
+
+    // Get paginated pedido headers (uses SAME aliases as outer query)
+    const [pedidos] = await pool.query(
       `SELECT p.id_pedido,
               DATE(p.creado_en) AS fecha_pedido,
               TIME(p.creado_en) AS hora_pedido,
@@ -6831,254 +7010,221 @@ app.get("/api/reportes/pedidos", auth, async (req, res) => {
               ua.nombre_completo AS usuario_aprobador,
               p.aprobado_en,
               DATE(p.aprobado_en) AS fecha_despacho,
-              TIME(p.aprobado_en) AS hora_despacho,
-              d.id_pedido_detalle,
-              d.id_producto,
-              pr.nombre_producto,
-              pr.sku,
-              pr.id_categoria,
-              c.nombre_categoria,
-              pr.id_subcategoria,
-              sc.nombre_subcategoria,
-              d.cantidad_solicitada,
-              d.cantidad_surtida,
-              (d.cantidad_solicitada - d.cantidad_surtida) AS pendiente,
-              COALESCE(mv.lotes_despachados, '') AS lotes_despachados,
-              mv.ultima_salida_en,
-              DATE(mv.ultima_salida_en) AS fecha_ultima_salida,
-              TIME(mv.ultima_salida_en) AS hora_ultima_salida,
-              COALESCE(mv.usuarios_despacho, '') AS usuarios_despacho,
-              COALESCE(mv.tipos_movimiento, '') AS tipos_salida,
-              COALESCE(mv.total_linea, 0) AS total_linea
+              TIME(p.aprobado_en) AS hora_despacho
        FROM pedido_encabezado p
-       JOIN pedido_detalle d ON d.id_pedido=p.id_pedido
-       JOIN productos pr ON pr.id_producto=d.id_producto
-       LEFT JOIN categorias c ON c.id_categoria=pr.id_categoria
-       LEFT JOIN subcategorias sc ON sc.id_subcategoria=pr.id_subcategoria
        JOIN usuarios us ON us.id_usuario=p.id_usuario_solicita
        LEFT JOIN usuarios ua ON ua.id_usuario=p.aprobado_por
        JOIN bodegas bs ON bs.id_bodega=p.id_bodega_solicita
        JOIN bodegas bd ON bd.id_bodega=p.id_bodega_surtidor
-       LEFT JOIN (
-         SELECT pmv.id_pedido_detalle,
-                GROUP_CONCAT(DISTINCT COALESCE(md.lote,'(sin lote)') ORDER BY md.lote SEPARATOR ', ') AS lotes_despachados,
-                MAX(me.creado_en) AS ultima_salida_en,
-                GROUP_CONCAT(DISTINCT COALESCE(ud.nombre_completo,'') ORDER BY ud.nombre_completo SEPARATOR ', ') AS usuarios_despacho,
-                GROUP_CONCAT(DISTINCT me.tipo_movimiento ORDER BY me.tipo_movimiento SEPARATOR ', ') AS tipos_movimiento,
-                SUM(md.cantidad * md.costo_unitario) AS total_linea
-         FROM pedido_movimiento_vinculo pmv
-         JOIN movimiento_detalle md ON md.id_detalle=pmv.id_detalle
-         JOIN movimiento_encabezado me ON me.id_movimiento=pmv.id_movimiento
-         LEFT JOIN usuarios ud ON ud.id_usuario=me.creado_por
-         GROUP BY pmv.id_pedido_detalle
-       ) mv ON mv.id_pedido_detalle=d.id_pedido_detalle
-       WHERE (:id_pedido IS NULL OR p.id_pedido=:id_pedido)
-         AND (:estado IS NULL OR p.estado=:estado)
-         AND ${requesterAccessFilter ? `p.id_bodega_solicita IN (${requesterAccessFilter.sql})` : "1=1"}
-         AND (:id_bodega_solicita IS NULL OR p.id_bodega_solicita=:id_bodega_solicita)
-         AND (:id_bodega_surtidor IS NULL OR p.id_bodega_surtidor=:id_bodega_surtidor)
-         AND (
-           :local_warehouse_id IS NULL
-           OR p.id_bodega_solicita=:local_warehouse_id
-           OR p.id_bodega_surtidor=:local_warehouse_id
-         )
-         AND (:id_usuario_solicita IS NULL OR p.id_usuario_solicita=:id_usuario_solicita)
-         AND (
-           :id_usuario_despacha IS NULL
-           OR p.aprobado_por=:id_usuario_despacha
-           OR EXISTS (
-             SELECT 1
-             FROM pedido_movimiento_vinculo pmv3
-             JOIN movimiento_encabezado me3 ON me3.id_movimiento=pmv3.id_movimiento
-             WHERE pmv3.id_pedido_detalle=d.id_pedido_detalle
-               AND me3.creado_por=:id_usuario_despacha
-           )
-         )
-         AND (
-           (:date_mode='DESPACHO'
-             AND (:from_date IS NULL OR DATE(p.aprobado_en) >= :from_date)
-             AND (:to_date IS NULL OR DATE(p.aprobado_en) <= :to_date))
-           OR
-           (:date_mode<>'DESPACHO'
-             AND (:from_date IS NULL OR DATE(p.creado_en) >= :from_date)
-             AND (:to_date IS NULL OR DATE(p.creado_en) <= :to_date))
-         )
-         AND (:id_categoria IS NULL OR pr.id_categoria=:id_categoria)
-         AND (:id_subcategoria IS NULL OR pr.id_subcategoria=:id_subcategoria)
-         AND ${qf.clause}
-         AND (:lote IS NULL OR EXISTS (
-            SELECT 1
-            FROM pedido_movimiento_vinculo pmv2
-            JOIN movimiento_detalle md2 ON md2.id_detalle=pmv2.id_detalle
-            WHERE pmv2.id_pedido_detalle=d.id_pedido_detalle
-              AND md2.lote LIKE :lote
-         ))
-       ORDER BY p.id_pedido DESC, d.id_pedido_detalle ASC
-       LIMIT ${limit}`,
-      {
-        id_pedido,
-        estado,
-        id_bodega_solicita,
-        id_bodega_surtidor,
-        local_warehouse_id: localWarehouseId,
-        id_usuario_solicita,
-        id_usuario_despacha,
-        date_mode,
-        from_date,
-        to_date,
-        id_categoria,
-        id_subcategoria,
-        lote,
-        ...(requesterAccessFilter?.params || {}),
-        ...qf.params,
-      }
+       JOIN (
+         SELECT DISTINCT p.id_pedido
+         FROM pedido_encabezado p
+         JOIN pedido_detalle d ON d.id_pedido=p.id_pedido
+         JOIN productos pr ON pr.id_producto=d.id_producto
+         LEFT JOIN categorias c ON c.id_categoria=pr.id_categoria
+         LEFT JOIN subcategorias sc ON sc.id_subcategoria=pr.id_subcategoria
+         JOIN usuarios us ON us.id_usuario=p.id_usuario_solicita
+         JOIN bodegas bs ON bs.id_bodega=p.id_bodega_solicita
+         JOIN bodegas bd ON bd.id_bodega=p.id_bodega_surtidor
+         WHERE ${where}
+         ORDER BY p.id_pedido DESC
+         LIMIT ${limit} OFFSET ${offset}
+       ) filtered ON filtered.id_pedido=p.id_pedido
+       ORDER BY p.id_pedido DESC`,
+      params
     );
 
-    res.json(rows);
+    // Get detail lines for those pedidos
+    let rows = [];
+    if (pedidos.length > 0) {
+      const ids = pedidos.map(function(m) { return m.id_pedido; });
+      const inClause = buildNamedInClause(ids, "pedd");
+      const [detailRows] = await pool.query(
+        `SELECT p.id_pedido,
+                d.id_pedido_detalle,
+                d.id_producto,
+                pr.nombre_producto,
+                pr.sku,
+                c.nombre_categoria,
+                sc.nombre_subcategoria,
+                d.cantidad_solicitada,
+                d.cantidad_surtida,
+                (d.cantidad_solicitada - d.cantidad_surtida) AS pendiente,
+                COALESCE(mv.lotes_despachados, '') AS lotes_despachados,
+                COALESCE(mv.total_linea, 0) AS total_linea
+         FROM pedido_encabezado p
+         JOIN pedido_detalle d ON d.id_pedido=p.id_pedido
+         JOIN productos pr ON pr.id_producto=d.id_producto
+         LEFT JOIN categorias c ON c.id_categoria=pr.id_categoria
+         LEFT JOIN subcategorias sc ON sc.id_subcategoria=pr.id_subcategoria
+         LEFT JOIN (
+           SELECT pmv.id_pedido_detalle,
+                  GROUP_CONCAT(DISTINCT COALESCE(md.lote,'(sin lote)') ORDER BY md.lote SEPARATOR ', ') AS lotes_despachados,
+                  SUM(md.cantidad * md.costo_unitario) AS total_linea
+           FROM pedido_movimiento_vinculo pmv
+           JOIN movimiento_detalle md ON md.id_detalle=pmv.id_detalle
+           JOIN movimiento_encabezado me ON me.id_movimiento=pmv.id_movimiento
+           GROUP BY pmv.id_pedido_detalle
+         ) mv ON mv.id_pedido_detalle=d.id_pedido_detalle
+         WHERE p.id_pedido IN (${inClause.sql})
+         ORDER BY p.id_pedido DESC, d.id_pedido_detalle ASC`,
+        inClause.params
+      );
+
+      // Group lines by pedido
+      var movMap = new Map();
+      for (var i = 0; i < pedidos.length; i++) {
+        var m = pedidos[i];
+        movMap.set(m.id_pedido, {
+          id_pedido: m.id_pedido,
+          fecha_pedido: m.fecha_pedido,
+          hora_pedido: m.hora_pedido,
+          creado_en: m.creado_en,
+          estado: m.estado,
+          observaciones: m.observaciones,
+          id_usuario_solicita: m.id_usuario_solicita,
+          solicitante: m.solicitante,
+          id_bodega_solicita: m.id_bodega_solicita,
+          bodega_solicitante: m.bodega_solicitante,
+          id_bodega_surtidor: m.id_bodega_surtidor,
+          bodega_despacho: m.bodega_despacho,
+          id_usuario_aprobador: m.id_usuario_aprobador,
+          usuario_aprobador: m.usuario_aprobador,
+          aprobado_en: m.aprobado_en,
+          fecha_despacho: m.fecha_despacho,
+          hora_despacho: m.hora_despacho,
+          lineas: []
+        });
+      }
+      for (var j = 0; j < detailRows.length; j++) {
+        var d = detailRows[j];
+        var grupo = movMap.get(d.id_pedido);
+        if (grupo) {
+          grupo.lineas.push({
+            id_detalle: d.id_pedido_detalle,
+            id_producto: d.id_producto,
+            nombre_producto: d.nombre_producto,
+            sku: d.sku,
+            nombre_categoria: d.nombre_categoria,
+            nombre_subcategoria: d.nombre_subcategoria,
+            cantidad_solicitada: Number(d.cantidad_solicitada || 0),
+            cantidad_surtida: Number(d.cantidad_surtida || 0),
+            pendiente: Number(d.pendiente || 0),
+            total_linea: Number(d.total_linea || 0),
+          });
+        }
+      }
+      rows = Array.from(movMap.values());
+    }
+
+    res.json({
+      rows,
+      total: totalMovements,
+      page,
+      limit,
+      totalPages: Math.ceil(totalMovements / Math.max(1, limit)),
+    });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }
 });
 
-
 app.get("/api/reportes/tendencia-producto", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
     if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
-    if (!scope.can_view_existencias) return res.json({ producto: null, price_increases: [], price_monthly: [], price_status: "sin_datos", demand_by_date: [], demand_peak_dates: [] });
+    if (!scope.can_view_existencias) return res.json({ producto: null, price_increases: [], price_monthly: [], price_status: "sin_datos", demand_by_date: [], demand_by_warehouse: [], top_consumer_warehouse: null, demand_peak_dates: [], from_date: null, to_date: null, base_warehouse: 0 });
+
+    const requesterScope = getScopedWarehouseFilter(scope, req.query.warehouse_base);
+    if (requesterScope.denied) return res.json({ producto: null, price_increases: [], price_monthly: [], price_status: "sin_datos", demand_by_date: [], demand_by_warehouse: [], top_consumer_warehouse: null, demand_peak_dates: [], from_date: null, to_date: null, base_warehouse: 0 });
+    let id_bodega_base = requesterScope.selected;
+    if (!scope.can_all_bodegas) id_bodega_base = scope.id_bodega;
+    const requesterAccessFilter =
+      requesterScope.restrictedIds.length && !id_bodega_base
+        ? buildNamedInClause(requesterScope.restrictedIds, "rtpw")
+        : null;
 
     const id_producto = Number(req.query.producto || 0) || null;
-    if (!id_producto) return res.status(400).json({ error: "Selecciona un producto" });
-
-    const baseScope = getScopedWarehouseFilter(scope, req.query.warehouse_base);
-    if (baseScope.denied) return res.json({ producto: null, price_increases: [], price_monthly: [], price_status: "sin_datos", demand_by_date: [], demand_peak_dates: [] });
-
-    let id_bodega_base = baseScope.selected;
-    if (!scope.can_all_bodegas) id_bodega_base = Number(scope.id_bodega || 0) || null;
-    if (!id_bodega_base) id_bodega_base = Number(scope.id_bodega || 0) || null;
-    if (!id_bodega_base) return res.status(400).json({ error: "Bodega base invalida" });
-
+    if (!id_producto) return res.status(400).json({ error: "Producto requerido" });
     const from_date = String(req.query.from || "").trim() || null;
     const to_date = String(req.query.to || "").trim() || null;
 
-    const requesterAccessFilter =
-      scope.has_warehouse_restrictions && Array.isArray(scope.allowed_warehouse_ids) && scope.allowed_warehouse_ids.length
-        ? buildNamedInClause(scope.allowed_warehouse_ids, "rtpr")
-        : null;
-
-    const [[prod]] = await pool.query(
+    const [[prod = null]] = await pool.query(
       `SELECT id_producto, nombre_producto, sku
        FROM productos
-       WHERE id_producto=:id_producto
-       LIMIT 1`,
+       WHERE id_producto=:id_producto`,
       { id_producto }
     );
-    if (!prod) return res.status(404).json({ error: "Producto no encontrado" });
 
-    const [priceRows] = await pool.query(
-      `SELECT DATE(k.creado_en) AS fecha,
-              k.creado_en,
-              k.costo_unitario
-       FROM kardex k
-       WHERE k.id_producto=:id_producto
-         AND k.id_bodega=:id_bodega_base
-         AND k.delta_cantidad > 0
-         AND k.costo_unitario > 0
-         AND (:from_date IS NULL OR DATE(k.creado_en) >= :from_date)
-         AND (:to_date IS NULL OR DATE(k.creado_en) <= :to_date)
-       ORDER BY k.creado_en ASC, k.id_kardex ASC`,
-      { id_producto, id_bodega_base, from_date, to_date }
+    const [price_monthly] = await pool.query(
+      `SELECT DATE_FORMAT(me.creado_en, '%Y-%m-01') AS periodo,
+              ROUND(AVG(md.costo_unitario), 2) AS precio
+       FROM movimiento_detalle md
+       JOIN movimiento_encabezado me ON me.id_movimiento=md.id_movimiento
+       WHERE md.id_producto=:id_producto
+         AND md.costo_unitario IS NOT NULL AND md.costo_unitario>0
+         AND (:from_date IS NULL OR DATE(me.creado_en) >= :from_date)
+         AND (:to_date IS NULL OR DATE(me.creado_en) <= :to_date)
+       GROUP BY DATE_FORMAT(me.creado_en, '%Y-%m-01')
+       ORDER BY periodo ASC`,
+      { id_producto, from_date, to_date }
     );
 
-    let prevPrice = null;
-    const price_increases = [];
-    for (const row of priceRows || []) {
-      const nextPrice = Number(row?.costo_unitario || 0);
-      if (!Number.isFinite(nextPrice) || nextPrice <= 0) continue;
-      if (prevPrice !== null && nextPrice > prevPrice) {
-        const pct_up = prevPrice > 0 ? ((nextPrice - prevPrice) / prevPrice) * 100 : 0;
-        price_increases.push({
-          fecha: row.fecha,
-          precio_anterior: prevPrice,
-          precio_nuevo: nextPrice,
-          pct_up: Number(pct_up.toFixed(4)),
-        });
-      }
-      prevPrice = nextPrice;
+    const [price_increases] = await pool.query(
+      `WITH mp AS (
+         SELECT DATE_FORMAT(me.creado_en, '%Y-%m-01') AS fecha,
+                ROUND(AVG(md.costo_unitario), 2) AS precio
+         FROM movimiento_detalle md
+         JOIN movimiento_encabezado me ON me.id_movimiento=md.id_movimiento
+         WHERE md.id_producto=:id_producto
+           AND md.costo_unitario IS NOT NULL AND md.costo_unitario>0
+           AND (:from_date IS NULL OR DATE(me.creado_en) >= :from_date)
+           AND (:to_date IS NULL OR DATE(me.creado_en) <= :to_date)
+         GROUP BY DATE_FORMAT(me.creado_en, '%Y-%m-01')
+       )
+       SELECT m1.fecha,
+              COALESCE(m2.precio, m1.precio) AS precio_anterior,
+              m1.precio AS precio_nuevo,
+              ROUND((m1.precio - COALESCE(m2.precio, m1.precio)) / COALESCE(m2.precio, m1.precio) * 100, 2) AS pct_up
+       FROM mp m1
+       LEFT JOIN mp m2 ON m2.fecha < m1.fecha
+       WHERE NOT EXISTS (SELECT 1 FROM mp m3 WHERE m3.fecha < m1.fecha AND m3.fecha > COALESCE(m2.fecha, '0000-00-00'))
+         AND (m2.fecha IS NULL OR m1.precio > m2.precio)
+       ORDER BY m1.fecha ASC`,
+      { id_producto, from_date, to_date }
+    );
+
+    let price_status = "sin_subidas";
+    if (price_increases.length > 0) {
+      price_status = "subio";
+    } else if (price_monthly.length > 1) {
+      const firstPrice = Number(price_monthly[0]?.precio || 0);
+      const lastPrice = Number(price_monthly[price_monthly.length - 1]?.precio || 0);
+      if (firstPrice === lastPrice) price_status = "se_mantuvo";
     }
 
-    const monthMap = new Map();
-    for (const row of priceRows || []) {
-      const fechaTxt = String(row?.fecha || "").trim();
-      const monthKey = fechaTxt.slice(0, 7);
-      const priceVal = Number(row?.costo_unitario || 0);
-      if (!monthKey || !Number.isFinite(priceVal) || priceVal <= 0) continue;
-      monthMap.set(monthKey, priceVal);
-    }
-
-    const sortedMonths = Array.from(monthMap.entries()).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
-    const price_monthly = [];
-    let prevMonthlyPrice = null;
-    for (const [periodo, precio] of sortedMonths) {
-      const pct_change = prevMonthlyPrice && prevMonthlyPrice > 0
-        ? ((precio - prevMonthlyPrice) / prevMonthlyPrice) * 100
-        : 0;
-      price_monthly.push({
-        periodo,
-        precio: Number(precio || 0),
-        pct_change: Number(pct_change.toFixed(4)),
-      });
-      prevMonthlyPrice = precio;
-    }
-
-    const uniqueMonthlyPrices = Array.from(new Set(price_monthly.map((x) => Number(x.precio || 0).toFixed(4))));
-    const price_status = price_increases.length > 0
-      ? "subio"
-      : (uniqueMonthlyPrices.length <= 1 && price_monthly.length > 0 ? "se_mantuvo" : "sin_subidas");
-
-    const [demandRows] = await pool.query(
+    const [demand_by_date] = await pool.query(
       `SELECT DATE(me.creado_en) AS fecha,
-              SUM(md.cantidad) AS cantidad_solicitada,
-              COUNT(DISTINCT me.id_movimiento) AS pedidos
-       FROM movimiento_encabezado me
-       JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
-       LEFT JOIN (
-         SELECT pmv.id_movimiento, MIN(pd.id_pedido) AS id_pedido
-         FROM pedido_movimiento_vinculo pmv
-         JOIN pedido_detalle pd ON pd.id_pedido_detalle=pmv.id_pedido_detalle
-         GROUP BY pmv.id_movimiento
-       ) pm ON pm.id_movimiento=me.id_movimiento
-       LEFT JOIN pedido_encabezado pe ON pe.id_pedido=pm.id_pedido
+              SUM(md.cantidad) AS cantidad_solicitada
+       FROM movimiento_detalle md
+       JOIN movimiento_encabezado me ON me.id_movimiento=md.id_movimiento
        WHERE md.id_producto=:id_producto
          AND me.tipo_movimiento IN ('SALIDA', 'TRANSFERENCIA')
          AND me.estado<>'ANULADO'
          AND me.id_bodega_origen=:id_bodega_base
-         AND COALESCE(me.id_bodega_destino, pe.id_bodega_solicita) IS NOT NULL
-         AND COALESCE(me.id_bodega_destino, pe.id_bodega_solicita)<>:id_bodega_base
-         AND ${requesterAccessFilter ? `COALESCE(me.id_bodega_destino, pe.id_bodega_solicita) IN (${requesterAccessFilter.sql})` : "1=1"}
          AND (:from_date IS NULL OR DATE(me.creado_en) >= :from_date)
          AND (:to_date IS NULL OR DATE(me.creado_en) <= :to_date)
        GROUP BY DATE(me.creado_en)
        ORDER BY fecha ASC`,
-      {
-        id_producto,
-        id_bodega_base,
-        from_date,
-        to_date,
-        ...(requesterAccessFilter?.params || {}),
-      }
+      { id_producto, id_bodega_base, from_date, to_date }
     );
-    const demand_by_date = (demandRows || []).map((x) => ({
-      fecha: x.fecha,
-      cantidad_solicitada: Number(x.cantidad_solicitada || 0),
-      pedidos: Number(x.pedidos || 0),
-    }));
 
     const [warehouseRows] = await pool.query(
-      `SELECT COALESCE(me.id_bodega_destino, pe.id_bodega_solicita) AS id_bodega_destino,
-              bdest.nombre_bodega,
-              SUM(md.cantidad) AS cantidad_sacada,
-              COUNT(DISTINCT me.id_movimiento) AS pedidos
+      `SELECT
+        COALESCE(me.id_bodega_destino, pe.id_bodega_solicita) AS id_bodega_destino,
+        bdest.nombre_bodega,
+        COALESCE(SUM(md.cantidad), 0) AS cantidad_sacada,
+        COUNT(DISTINCT me.id_movimiento) AS pedidos
        FROM movimiento_encabezado me
        JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
        LEFT JOIN (
@@ -7138,6 +7284,7 @@ app.get("/api/reportes/tendencia-producto", auth, async (req, res) => {
     res.status(500).json({ error: String(e.message || e) });
   }
 });
+
 app.get("/api/reportes/kardex", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
@@ -7284,1716 +7431,63 @@ app.get("/api/reportes/kardex", auth, async (req, res) => {
   }
 });
 
-app.get(
-  "/api/reportes/auditoria-sensibles",
-  auth,
-  requirePermission("section.view.r-auditoria-sensibles", "ver reporte de auditoria sensible"),
-  async (req, res) => {
-    try {
-      const from = String(req.query.from || "").trim() || null;
-      const to = String(req.query.to || "").trim() || null;
-      const action_key = String(req.query.action_key || "").trim() || null;
-      const qRaw = String(req.query.q || "").trim();
-      const qf = buildTokenizedLikeFilter(
-        qRaw,
-        ["actor_nombre", "supervisor_nombre", "supervisor_usuario", "action_label"],
-        "rauq"
-      );
-      const limit = Math.max(1, Math.min(2000, Number(req.query.limit || 500)));
 
-      if (from && !/^\d{4}-\d{2}-\d{2}$/.test(from)) {
-        return res.status(400).json({ error: "Fecha 'from' invalida. Formato esperado: YYYY-MM-DD" });
-      }
-      if (to && !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
-        return res.status(400).json({ error: "Fecha 'to' invalida. Formato esperado: YYYY-MM-DD" });
-      }
-
-      const canSeeAll = await canManageUserPermissions(Number(req.user?.id_user || 0));
-      const id_bodega_actor = canSeeAll ? null : Number(req.user?.id_warehouse || 0) || null;
-
-      const [rows] = await pool.query(
-        `SELECT id_auditoria,
-                action_key,
-                action_label,
-                endpoint,
-                http_method,
-                id_usuario_actor,
-                actor_nombre,
-                id_bodega_actor,
-                id_usuario_supervisor,
-                supervisor_usuario,
-                supervisor_nombre,
-                approval_method,
-                reference_type,
-                reference_id,
-                detail_json,
-                creado_en
-         FROM auditoria_accion_sensible
-         WHERE (:from IS NULL OR DATE(creado_en) >= :from)
-           AND (:to IS NULL OR DATE(creado_en) <= :to)
-           AND (:action_key IS NULL OR action_key = :action_key)
-           AND ${qf.clause}
-           AND (:id_bodega_actor IS NULL OR id_bodega_actor=:id_bodega_actor)
-         ORDER BY creado_en DESC, id_auditoria DESC
-         LIMIT ${limit}`,
-        { from, to, action_key, id_bodega_actor, ...qf.params }
-      );
-
-      res.json(rows || []);
-    } catch (e) {
-      res.status(500).json({ error: String(e.message || e) });
-    }
-  }
-);
-
-
-/* =========================
-   PEDIDOS (TABLAS EN ESPANOL)
-========================= */
-app.post("/api/orders", auth, requirePermission("action.create_update", "crear pedidos"), enforceDailyCloseBeforeMutations, async (req, res) => {
-  const { requested_from_warehouse_id, notes, lines } = req.body || {};
-  const requester_user_id = Number(req.body?.requester_user_id || 0);
-  const requester_pin = String(req.body?.requester_pin || "").trim();
-  if (!requester_user_id) return res.status(400).json({ error: "Falta usuario solicitante" });
-  if (!requester_pin) return res.status(400).json({ error: "Falta codigo del usuario solicitante" });
-  if (!isValidOrderPin(requester_pin)) return res.status(400).json({ error: "El PIN de pedido debe tener entre 6 y 12 digitos" });
-  if (!requested_from_warehouse_id) return res.status(400).json({ error: "Falta bodega origen/destino" });
-  if (!Array.isArray(lines) || !lines.length) return res.status(400).json({ error: "Pedido sin lineas" });
-  const requestedFromWarehouseId = Number(requested_from_warehouse_id || 0);
-  if (!requestedFromWarehouseId) return res.status(400).json({ error: "Bodega que despacha invalida" });
-  if (!beginIdempotentRequest(req, res, { pathKey: "/api/orders" })) {
-    return res.status(409).json({ error: "Solicitud duplicada detectada. Espera unos segundos e intenta de nuevo." });
-  }
-
-  const conn = await pool.getConnection();
+app.get("/api/reportes/transferencias", auth, async (req, res) => {
   try {
-    await conn.beginTransaction();
+    const scope = await resolveStockScope(req.user);
+    if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
+    if (!scope.can_view_existencias) return res.json([]);
 
-    const [[requesterUser]] = await conn.query(
-      `SELECT u.id_usuario, u.id_bodega, u.activo, upp.pin_hash
-       FROM usuarios u
-       LEFT JOIN usuario_pin_pedido upp ON upp.id_usuario=u.id_usuario
-       WHERE u.id_usuario=:id_usuario
-       LIMIT 1`,
-      { id_usuario: requester_user_id }
-    );
-    if (!requesterUser || Number(requesterUser.activo || 0) !== 1) {
-      await conn.rollback();
-      return res.status(400).json({ error: "Usuario solicitante no disponible" });
-    }
-    if (!requesterUser.pin_hash) {
-      await conn.rollback();
-      return res.status(400).json({ error: "El usuario solicitante no tiene PIN de pedidos configurado" });
-    }
-    const pinOk = await bcrypt.compare(requester_pin, requesterUser.pin_hash || "");
-    if (!pinOk) {
-      trackPinFailure("order", { requester_user_id, actor_user_id: Number(req.user?.id_user || 0) });
-      await conn.rollback();
-      return res.status(401).json({ error: "Codigo de usuario solicitante invalido" });
-    }
-    const duplicatedPinOwner = await findOrderPinCollision(requester_pin, requester_user_id, conn, true);
-    if (duplicatedPinOwner) {
-      await conn.rollback();
-      return res.status(409).json({
-        error:
-          "El PIN de pedidos esta repetido con otro usuario activo. Restablece el PIN para continuar.",
-      });
-    }
-    const requester_warehouse_id = Number(requesterUser.id_bodega || 0);
-    if (!requester_warehouse_id) {
-      await conn.rollback();
-      return res.status(400).json({ error: "Usuario solicitante sin bodega asignada" });
-    }
-    if (
-      req.body?.requester_warehouse_id &&
-      Number(req.body.requester_warehouse_id || 0) !== requester_warehouse_id
-    ) {
-      await conn.rollback();
-      return res.status(400).json({ error: "La bodega del usuario solicitante no coincide" });
-    }
+    const from_date = String(req.query.from || "").trim() || null;
+    const to_date = String(req.query.to || "").trim() || null;
+    const limit = Math.max(1, Math.min(5000, Number(req.query.limit || 1000)));
 
-    const [[fromWh]] = await conn.query(
-      `SELECT id_bodega, tipo_bodega, activo
-       FROM bodegas
-       WHERE id_bodega=:id_bodega
-       LIMIT 1`,
-      { id_bodega: requestedFromWarehouseId }
-    );
-    if (!fromWh || Number(fromWh.activo || 0) !== 1) {
-      await conn.rollback();
-      return res.status(400).json({ error: "Bodega que despacha no disponible" });
-    }
-    const tipoFrom = String(fromWh.tipo_bodega || "").toUpperCase();
-    if (!["PRINCIPAL", "RECEPTORA"].includes(tipoFrom)) {
-      await conn.rollback();
-      return res.status(400).json({ error: "Solo se puede pedir a bodegas PRINCIPAL o RECEPTORA" });
-    }
-
-    const [r] = await conn.query(
-      `INSERT INTO pedido_encabezado(id_usuario_solicita, id_bodega_solicita, id_bodega_surtidor, observaciones)
-       VALUES(:u,:bs,:bd,:obs)`,
-      { u: requester_user_id, bs: requester_warehouse_id, bd: requested_from_warehouse_id, obs: notes ?? null }
-    );
-    const id_pedido = r.insertId;
-
-    for (const ln of lines) {
-      if (ln?.id_product && !(await isProductVisibleInWarehouse(conn, ln.id_product, requestedFromWarehouseId))) {
-        await conn.rollback();
-        return res.status(400).json({ error: `El producto #${ln.id_product} no esta habilitado para la bodega que despacha` });
-      }
-      if (!ln.id_product || !ln.qty_requested || ln.qty_requested <= 0) continue;
-      await conn.query(
-        `INSERT INTO pedido_detalle(id_pedido, id_producto, cantidad_solicitada, observacion_producto)
-         VALUES(:id_pedido,:id_producto,:cantidad,:nota)`,
-        { id_pedido, id_producto: ln.id_product, cantidad: ln.qty_requested, nota: ln.line_note ?? null }
-      );
-    }
-
-    await conn.commit();
-    emitPedidoChanged({
-      id_pedido,
-      requester_warehouse_id,
-      requested_from_warehouse_id,
-      status: "PENDIENTE",
-      action: "created",
-    });
-    res.json({ ok: true, id_order: id_pedido });
-  } catch (e) {
-    await conn.rollback();
-    res.status(500).json({ error: String(e.message || e) });
-  } finally {
-    conn.release();
-  }
-});
-
-app.get("/api/pedidos/correlativo-actual", auth, async (req, res) => {
-  try {
-    const [[r]] = await pool.query(
-      `SELECT COALESCE(MAX(id_pedido), 0) AS correlativo
-       FROM pedido_encabezado`
-    );
-    res.json({ correlativo: Number(r?.correlativo || 0) });
-  } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
-  }
-});
-
-app.get("/api/orders", auth, async (req, res) => {
-  const status = req.query.status ? String(req.query.status) : null;
-  const scopeParam = req.query.scope ? String(req.query.scope) : null;
-  const whParam = Number(req.query.warehouse || 0);
-  const stockScope = await resolveStockScope(req.user);
-  const where = [];
-  const params = {};
-  if (status) {
-    where.push("p.estado=:status");
-    params.status = status;
-  }
-  if (scopeParam === "dispatch") {
-    const warehouseScope = getScopedWarehouseFilter(stockScope, whParam);
-    if (warehouseScope.denied) return res.json([]);
-    if (!stockScope.can_all_bodegas) {
-      where.push("p.id_bodega_surtidor=:wh");
-      params.wh = req.user.id_warehouse;
-    } else if (warehouseScope.selected) {
-      where.push("p.id_bodega_surtidor=:wh");
-      params.wh = warehouseScope.selected;
-    } else if (warehouseScope.restrictedIds.length) {
-      const inClause = buildNamedInClause(warehouseScope.restrictedIds, "ordw");
-      where.push(`p.id_bodega_surtidor IN (${inClause.sql})`);
-      Object.assign(params, inClause.params);
-    }
-  } else if (scopeParam === "mine") {
-    where.push("p.id_usuario_solicita=:uid");
-    params.uid = req.user.id_user;
-  }
-  const whereSql = where.length ? "WHERE " + where.join(" AND ") : "";
-  const [rows] = await pool.query(
-    `
-    SELECT p.*, bs.nombre_bodega AS requester_warehouse, bd.nombre_bodega AS from_warehouse,
-           u.nombre_completo AS requester_name,
-           CASE
-             WHEN bsol.tipo_bodega='RECEPTORA' OR cb.modo_despacho_auto='TRANSFERENCIA' THEN 'TRANSFERENCIA'
-             ELSE 'SALIDA'
-           END AS tipo_salida
-    FROM pedido_encabezado p
-    JOIN bodegas bs ON bs.id_bodega=p.id_bodega_solicita
-    JOIN bodegas bd ON bd.id_bodega=p.id_bodega_surtidor
-    JOIN bodegas bsol ON bsol.id_bodega=p.id_bodega_solicita
-    LEFT JOIN configuracion_bodega cb ON cb.id_bodega=p.id_bodega_solicita
-    JOIN usuarios u ON u.id_usuario=p.id_usuario_solicita
-    ${whereSql}
-    ORDER BY p.creado_en DESC
-    `,
-    params
-  );
-  res.json(rows);
-});
-
-app.get("/api/orders/:id/details", auth, async (req, res) => {
-  const id_pedido = Number(req.params.id);
-  if (!Number.isFinite(id_pedido) || id_pedido <= 0) {
-    return res.status(400).json({ error: "Pedido invalido" });
-  }
-  const actorWarehouse = Number(req.user?.id_warehouse || 0);
-  const stockScope = await resolveStockScope(req.user);
-  if (!actorWarehouse) return res.status(400).json({ error: "Usuario sin bodega" });
-  const [[pe]] = await pool.query(
-    `SELECT p.*, b.nombre_bodega AS from_warehouse
-     FROM pedido_encabezado p
-     JOIN bodegas b ON b.id_bodega=p.id_bodega_surtidor
-     WHERE p.id_pedido=:id_pedido`,
-    { id_pedido }
-  );
-  if (!pe) return res.status(404).json({ error: "Pedido no existe" });
-  const orderWarehouses = [Number(pe.id_bodega_solicita || 0), Number(pe.id_bodega_surtidor || 0)].filter((x) => x > 0);
-  if (stockScope.has_warehouse_restrictions) {
-    const allowed = normalizeWarehouseIdList(stockScope.allowed_warehouse_ids);
-    if (!orderWarehouses.some((id) => allowed.includes(id))) {
-      return res.status(403).json({ error: "No tienes acceso a este pedido" });
-    }
-  } else if (!stockScope.can_all_bodegas && !orderWarehouses.includes(actorWarehouse)) {
-    return res.status(403).json({ error: "No tienes acceso a este pedido" });
-  }
-
-  const [lines] = await pool.query(
-    `SELECT d.id_pedido_detalle, d.id_producto, p.nombre_producto,
-            d.cantidad_solicitada, d.cantidad_surtida,
-            COALESCE(d.estado_linea, 'PENDIENTE') AS estado_linea,
-            d.justificacion_linea,
-            CASE
-              WHEN COALESCE(d.estado_linea, 'PENDIENTE')='ANULADO' THEN 0
-              ELSE GREATEST(d.cantidad_solicitada - d.cantidad_surtida, 0)
-            END AS pendiente,
-            s.stock
-     FROM pedido_detalle d
-     JOIN productos p ON p.id_producto=d.id_producto
-     LEFT JOIN v_stock_resumen s
-       ON s.id_bodega=:id_bodega AND s.id_producto=d.id_producto
-     WHERE d.id_pedido=:id_pedido
-     ORDER BY p.nombre_producto ASC`,
-    { id_pedido, id_bodega: pe.id_bodega_surtidor }
-  );
-
-  res.json({
-    from_warehouse: pe.from_warehouse,
-    status: pe.estado || null,
-    justificacion_despacho: pe.justificacion_despacho || null,
-    lines,
-  });
-});
-
-async function recomputePedidoEstado(conn, id_pedido, opts = {}) {
-  const actorUserId = Number(opts?.actorUserId || 0) || null;
-  const justificacion = String(opts?.justificacion || "").trim();
-  const [aggRows] = await conn.query(
-    `SELECT
-       COUNT(*) AS total_lineas,
-       SUM(CASE WHEN COALESCE(estado_linea, 'PENDIENTE')='ANULADO' THEN 1 ELSE 0 END) AS lineas_anuladas,
-       SUM(CASE WHEN cantidad_surtida >= cantidad_solicitada AND cantidad_solicitada > 0 THEN 1 ELSE 0 END) AS lineas_completas_qty,
-       SUM(CASE WHEN cantidad_surtida > 0 AND cantidad_surtida < cantidad_solicitada THEN 1 ELSE 0 END) AS lineas_parciales_qty,
-       SUM(cantidad_solicitada) AS total_solicitado,
-       SUM(cantidad_surtida) AS total_surtido
-     FROM pedido_detalle
-     WHERE id_pedido=:id_pedido`,
-    { id_pedido }
-  );
-  const agg = aggRows?.[0] || {};
-  const totalLineas = Number(agg.total_lineas || 0);
-  const lineasAnuladas = Number(agg.lineas_anuladas || 0);
-  const lineasCompletasQty = Number(agg.lineas_completas_qty || 0);
-  const lineasParcialesQty = Number(agg.lineas_parciales_qty || 0);
-  const totalSurtido = Number(agg.total_surtido || 0);
-  const hasAnyJustified = lineasAnuladas > 0 || lineasParcialesQty > 0;
-  const lineasResueltas = lineasAnuladas + lineasCompletasQty;
-
-  let estado = "PENDIENTE";
-  if (totalLineas > 0 && lineasResueltas >= totalLineas) {
-    estado = hasAnyJustified ? "COMPLETADO_JUSTIFICADO" : "COMPLETADO";
-  } else if (totalSurtido > 0 || lineasAnuladas > 0) {
-    estado = "PARCIAL";
-  }
-
-  if (estado === "COMPLETADO") {
-    await conn.query(
-      `UPDATE pedido_encabezado
-       SET estado=:estado,
-           justificacion_despacho=NULL,
-           aprobado_por=COALESCE(:aprobado_por, aprobado_por),
-           aprobado_en=NOW()
-       WHERE id_pedido=:id_pedido`,
-      { estado, aprobado_por: actorUserId, id_pedido }
-    );
-    return { estado, justificacion_despacho: null };
-  }
-
-  if (justificacion && (estado === "PARCIAL" || estado === "COMPLETADO_JUSTIFICADO")) {
-    const [[head]] = await conn.query(
-      `SELECT justificacion_despacho
-       FROM pedido_encabezado
-       WHERE id_pedido=:id_pedido
-       LIMIT 1`,
-      { id_pedido }
-    );
-    const current = String(head?.justificacion_despacho || "").trim();
-    const finalJust =
-      !current ? justificacion : current.toLowerCase() === justificacion.toLowerCase() ? current : `${current} | ${justificacion}`;
-    await conn.query(
-      `UPDATE pedido_encabezado
-       SET estado=:estado,
-           justificacion_despacho=:justificacion,
-           aprobado_por=COALESCE(:aprobado_por, aprobado_por),
-           aprobado_en=NOW()
-       WHERE id_pedido=:id_pedido`,
+    const [rows] = await pool.query(
+      `SELECT me.id_movimiento,
+              me.tipo_movimiento,
+              DATE(me.creado_en) AS fecha,
+              TIME(me.creado_en) AS hora,
+              me.creado_en,
+              me.no_documento,
+              me.observaciones,
+              bo.id_bodega AS id_bodega_origen,
+              bo.nombre_bodega AS bodega_origen,
+              bd.id_bodega AS id_bodega_destino,
+              bd.nombre_bodega AS bodega_destino,
+              u.nombre_completo AS usuario_creador,
+              md.id_detalle,
+              md.id_producto,
+              p.nombre_producto,
+              p.sku,
+              md.lote,
+              md.fecha_vencimiento,
+              md.cantidad,
+              md.costo_unitario,
+              (md.cantidad * md.costo_unitario) AS total_linea
+       FROM movimiento_encabezado me
+       JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
+       LEFT JOIN bodegas bo ON bo.id_bodega=me.id_bodega_origen
+       LEFT JOIN bodegas bd ON bd.id_bodega=me.id_bodega_destino
+       JOIN productos p ON p.id_producto=md.id_producto
+       LEFT JOIN usuarios u ON u.id_usuario=me.creado_por
+       WHERE me.tipo_movimiento='TRANSFERENCIA'
+         AND me.estado<>'ANULADO'
+         AND (:from_date IS NULL OR DATE(me.creado_en) >= :from_date)
+         AND (:to_date IS NULL OR DATE(me.creado_en) <= :to_date)
+       ORDER BY me.creado_en DESC
+       LIMIT ${limit}`,
       {
-        estado,
-        justificacion: finalJust,
-        aprobado_por: actorUserId,
-        id_pedido,
+        from_date,
+        to_date,
       }
     );
-    return { estado, justificacion_despacho: finalJust };
-  }
-
-  await conn.query(
-    `UPDATE pedido_encabezado
-     SET estado=:estado,
-         aprobado_por=COALESCE(:aprobado_por, aprobado_por),
-         aprobado_en=NOW()
-     WHERE id_pedido=:id_pedido`,
-    { estado, aprobado_por: actorUserId, id_pedido }
-  );
-  const [[head]] = await conn.query(
-    `SELECT justificacion_despacho
-     FROM pedido_encabezado
-     WHERE id_pedido=:id_pedido
-     LIMIT 1`,
-    { id_pedido }
-  );
-  return { estado, justificacion_despacho: head?.justificacion_despacho || null };
-}
-
-async function pickLotsFEFO(conn, id_bodega, id_producto, qtyNeeded, opts = {}) {
-  const allowExpired = opts.allowExpired !== false;
-  const whereVenc = allowExpired ? "" : "AND (fecha_vencimiento IS NULL OR fecha_vencimiento >= CURDATE())";
-  const [lots] = await conn.query(
-    `
-    SELECT lote, fecha_vencimiento, stock
-    FROM v_stock_disponible
-    WHERE id_bodega=:id_bodega
-      AND id_producto=:id_producto
-      ${whereVenc}
-    ORDER BY (fecha_vencimiento IS NULL), fecha_vencimiento ASC
-    `,
-    { id_bodega, id_producto }
-  );
-  const picks = [];
-  let remaining = Number(qtyNeeded);
-  for (const l of lots) {
-    if (remaining <= 0) break;
-    const take = Math.min(remaining, Number(l.stock));
-    picks.push({ lote: l.lote, fecha_vencimiento: l.fecha_vencimiento, qty: take });
-    remaining -= take;
-  }
-
-  if (!picks.length && allowExpired) {
-    const [[r]] = await conn.query(
-      `SELECT stock FROM v_stock_resumen WHERE id_bodega=:id_bodega AND id_producto=:id_producto LIMIT 1`,
-      { id_bodega, id_producto }
-    );
-    const stock = Number(r?.stock || 0);
-    if (stock > 0) {
-      const take = Math.min(stock, Number(qtyNeeded));
-      return { picks: [{ lote: null, fecha_vencimiento: null, qty: take }], remaining: Number(qtyNeeded) - take };
-    }
-  }
-
-  return { picks, remaining };
-}
-
-
-async function getLastUnitCost(conn, id_bodega, id_producto, lote) {
-  const [rows] = await conn.query(
-    `SELECT costo_unitario
-     FROM kardex
-     WHERE id_bodega=:id_bodega AND id_producto=:id_producto AND lote=:lote AND delta_cantidad > 0
-     ORDER BY creado_en DESC
-     LIMIT 1`,
-    { id_bodega, id_producto, lote }
-  );
-  return rows[0]?.costo_unitario ?? 0;
-}
-
-/* =========================
-   SALIDAS DIRECTAS (MOVIMIENTOS + KARDEX)
-========================= */
-app.post("/api/salidas", auth, requirePermission("action.create_update", "registrar salidas"), enforceDailyCloseBeforeMutations, async (req, res) => {
-  const { id_motivo = null, id_bodega_destino = null, observaciones = null, lines = [] } = req.body || {};
-
-  if (!id_bodega_destino) return res.status(400).json({ error: "Falta bodega destino" });
-  if (!Array.isArray(lines) || !lines.length) return res.status(400).json({ error: "Sin lineas" });
-
-  const id_bodega_origen = Number(req.user.id_warehouse || 0);
-  if (!id_bodega_origen) return res.status(400).json({ error: "Usuario sin bodega" });
-  if (!beginIdempotentRequest(req, res, { pathKey: "/api/salidas" })) {
-    return res.status(409).json({ error: "Solicitud duplicada detectada. Espera unos segundos e intenta de nuevo." });
-  }
-  const idDestino = Number(id_bodega_destino || 0);
-  if (!idDestino) return res.status(400).json({ error: "Bodega destino invalida" });
-
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-    let sensitiveApproval = null;
-
-    const [[cfg]] = await conn.query(
-      `SELECT cb.puede_despachar, cb.requiere_precio_salida
-       FROM configuracion_bodega cb
-       WHERE cb.id_bodega=:id_bodega
-       LIMIT 1`,
-      { id_bodega: id_bodega_origen }
-    );
-    if (cfg && Number(cfg.puede_despachar || 0) !== 1) {
-      await conn.rollback();
-      return res.status(400).json({ error: "Tu bodega no puede despachar" });
-    }
-
-    const [[dst]] = await conn.query(
-      `SELECT b.id_bodega, b.activo, b.tipo_bodega, cb.maneja_stock, cb.puede_recibir, cb.modo_despacho_auto
-       FROM bodegas b
-       LEFT JOIN configuracion_bodega cb ON cb.id_bodega=b.id_bodega
-       WHERE b.id_bodega=:id_bodega
-       LIMIT 1`,
-      { id_bodega: idDestino }
-    );
-    if (!dst || Number(dst.activo || 0) !== 1) {
-      await conn.rollback();
-      return res.status(400).json({ error: "Bodega destino no disponible" });
-    }
-
-    const useTransfer =
-      idDestino !== id_bodega_origen &&
-      Number(dst.maneja_stock || 0) === 1 &&
-      Number(dst.puede_recibir || 0) === 1 &&
-      (String(dst.modo_despacho_auto || "").toUpperCase() === "TRANSFERENCIA" ||
-        String(dst.tipo_bodega || "").toUpperCase() === "RECEPTORA");
-    const tipo_mov = useTransfer ? "TRANSFERENCIA" : "SALIDA";
-
-    let mot = null;
-    if (id_motivo) {
-      const [[motById]] = await conn.query(
-        `SELECT id_motivo, nombre_motivo, tipo_movimiento
-         FROM motivos_movimiento
-         WHERE id_motivo=:id_motivo
-         LIMIT 1`,
-        { id_motivo: Number(id_motivo || 0) }
-      );
-      mot = motById || null;
-      if (mot && String(mot.tipo_movimiento || "").toUpperCase() !== tipo_mov) {
-        mot = null;
-      }
-    }
-
-    if (!mot) {
-      const [[autoMot]] = await conn.query(
-        `SELECT id_motivo, nombre_motivo, tipo_movimiento
-         FROM motivos_movimiento
-         WHERE tipo_movimiento=:tipo
-         ORDER BY (nombre_motivo='Transferencia') DESC, id_motivo ASC
-         LIMIT 1`,
-        { tipo: tipo_mov }
-      );
-      mot = autoMot || null;
-    }
-
-    if (!mot) {
-      await conn.rollback();
-      return res.status(400).json({ error: `No existe motivo para tipo ${tipo_mov}` });
-    }
-    if (String(mot.tipo_movimiento || "").toUpperCase() === "AJUSTE") {
-      const approval = await verifySensitiveApproval(req, conn, "ajuste manual de salida");
-      if (!approval.ok) {
-        await conn.rollback();
-        return res.status(Number(approval.status || 403)).json(approval);
-      }
-      sensitiveApproval = approval;
-    }
-
-    const [[corrPed]] = await conn.query(
-      `SELECT COALESCE(MAX(id_pedido), 0) AS correlativo
-       FROM pedido_encabezado`
-    );
-    const correlativoPedido = Number(corrPed?.correlativo || 0);
-    const no_documento = correlativoPedido > 0 ? String(correlativoPedido) : null;
-
-    const [mhRes] = await conn.query(
-      `INSERT INTO movimiento_encabezado
-       (tipo_movimiento, id_motivo, id_bodega_origen, id_bodega_destino, no_documento, observaciones, creado_por, confirmado_en, estado)
-       VALUES (:tipo_movimiento, :id_motivo, :id_bodega_origen, :id_bodega_destino, :no_documento, :observaciones, :creado_por, NOW(), 'CONFIRMADO')`,
-      {
-        tipo_movimiento: tipo_mov,
-        id_motivo: mot.id_motivo,
-        id_bodega_origen,
-        id_bodega_destino: idDestino,
-        no_documento: no_documento || null,
-        observaciones: observaciones || null,
-        creado_por: req.user.id_user,
-      }
-    );
-    const id_movimiento = mhRes.insertId;
-
-    let anyOut = false;
-    const normalize = (s) =>
-      String(s || "")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toUpperCase();
-    const motNameNorm = normalize(mot?.nombre_motivo || "");
-    const allowExpiredWriteoff = motNameNorm.includes("MERMA") || motNameNorm.includes("DESCOMPOSICION");
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const requierePrecioSalida = Number(cfg?.requiere_precio_salida || 0) === 1;
-
-    for (const ln of lines) {
-      const id_producto = Number(ln.id_producto || 0);
-      const qtyRequested = Number(ln.cantidad || ln.qty || 0);
-      const precioSalida = Number(ln.precio_salida || 0);
-      if (!id_producto || qtyRequested <= 0) continue;
-      if (requierePrecioSalida && precioSalida <= 0) {
-        await conn.rollback();
-        return res.status(400).json({ error: `El precio de salida es obligatorio para producto #${id_producto}` });
-      }
-      if (!(await isProductVisibleInWarehouse(conn, id_producto, id_bodega_origen))) {
-        await conn.rollback();
-        return res.status(400).json({ error: `El producto #${id_producto} no esta habilitado para la bodega origen` });
-      }
-      if (useTransfer && !(await isProductVisibleInWarehouse(conn, id_producto, idDestino))) {
-        await conn.rollback();
-        return res.status(400).json({ error: `El producto #${id_producto} no esta habilitado para la bodega destino` });
-      }
-
-      const { picks, remaining } = await pickLotsFEFO(conn, id_bodega_origen, id_producto, qtyRequested);
-      if (!picks.length || remaining > 0) {
-        await conn.rollback();
-        return res.status(400).json({ error: `Stock insuficiente para producto #${id_producto}` });
-      }
-
-      const hasExpiredPick = picks.some((p) => p.fecha_vencimiento && String(p.fecha_vencimiento).slice(0, 10) < todayStr);
-      if (hasExpiredPick && !allowExpiredWriteoff) {
-        await conn.rollback();
-        return res.status(400).json({
-          error: "No puedes dar salida a producto vencido con ese motivo. Usa Merma o Descomposicion.",
-        });
-      }
-
-      for (const p of picks) {
-        const costo_unitario = await getLastUnitCost(conn, id_bodega_origen, id_producto, p.lote);
-        const [d] = await conn.query(
-          `INSERT INTO movimiento_detalle
-           (id_movimiento, id_producto, lote, fecha_vencimiento, cantidad, costo_unitario, precio_salida, observacion_linea)
-           VALUES(:id_movimiento,:id_producto,:lote,:fecha,:cantidad,:costo,:precio_salida,:obs)`,
-          {
-            id_movimiento,
-            id_producto,
-            lote: p.lote || null,
-            fecha: p.fecha_vencimiento || null,
-            cantidad: p.qty,
-            costo: costo_unitario,
-            precio_salida: precioSalida > 0 ? precioSalida : null,
-            obs: ln.observacion_linea || null,
-          }
-        );
-        const id_detalle = d.insertId;
-
-        await conn.query(
-          `INSERT INTO kardex
-           (id_movimiento, id_detalle, id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, costo_unitario)
-           VALUES(:id_movimiento,:id_detalle,:id_bodega,:id_producto,:lote,:fecha,:delta,:costo)`,
-          {
-            id_movimiento,
-            id_detalle,
-            id_bodega: id_bodega_origen,
-            id_producto,
-            lote: p.lote || null,
-            fecha: p.fecha_vencimiento || null,
-            delta: -p.qty,
-            costo: costo_unitario,
-          }
-        );
-        if (useTransfer) {
-          await conn.query(
-            `INSERT INTO kardex
-             (id_movimiento, id_detalle, id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, costo_unitario)
-             VALUES(:id_movimiento,:id_detalle,:id_bodega,:id_producto,:lote,:fecha,:delta,:costo)`,
-            {
-              id_movimiento,
-              id_detalle,
-              id_bodega: idDestino,
-              id_producto,
-              lote: p.lote || null,
-              fecha: p.fecha_vencimiento || null,
-              delta: +p.qty,
-              costo: costo_unitario,
-            }
-          );
-        }
-        anyOut = true;
-      }
-    }
-
-    if (!anyOut) {
-      await conn.rollback();
-      return res.status(400).json({ error: "Sin lineas validas para salida" });
-    }
-
-    await conn.commit();
-    await writeSensitiveActionAudit({
-      req,
-      action_key: "SALIDA_AJUSTE_MANUAL",
-      action_label: "Ajuste manual en salida",
-      approval: sensitiveApproval,
-      reference_type: "MOVIMIENTO",
-      reference_id: id_movimiento,
-      detail: { id_motivo: Number(id_motivo || 0), lineas: Number(lines.length || 0) },
-    });
-    res.json({
-      ok: true,
-      id_movimiento,
-      tipo_movimiento: tipo_mov,
-      correlativo_pedido: correlativoPedido,
-      sensitive_approval: toSensitiveApprovalPayload(sensitiveApproval),
-    });
+    res.json(rows || []);
   } catch (e) {
-    await conn.rollback();
     res.status(500).json({ error: String(e.message || e) });
-  } finally {
-    conn.release();
-  }
-});
-
-/* =========================
-   DESPACHO (MOVIMIENTOS + KARDEX)
-========================= */
-app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "despachar pedidos"), enforceDailyCloseBeforeMutations, async (req, res) => {
-  const id_pedido = Number(req.params.id);
-  if (!Number.isFinite(id_pedido) || id_pedido <= 0) {
-    return res.status(400).json({ error: "Pedido invalido" });
-  }
-  const { lines = [], justificacion = null } = req.body || {};
-  const justificacionTxt = String(justificacion || "").trim();
-  if (!Array.isArray(lines) || !lines.length) return res.status(400).json({ error: "Sin lineas a despachar" });
-  if (!beginIdempotentRequest(req, res, { pathKey: `/api/orders/${id_pedido}/fulfill` })) {
-    return res.status(409).json({ error: "Solicitud duplicada detectada. Espera unos segundos e intenta de nuevo." });
-  }
-  const actorWarehouse = Number(req.user?.id_warehouse || 0);
-  if (!actorWarehouse) return res.status(400).json({ error: "Usuario sin bodega" });
-
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-
-    const [[pe]] = await conn.query("SELECT * FROM pedido_encabezado WHERE id_pedido=:id_pedido FOR UPDATE", { id_pedido });
-    if (!pe) return res.status(404).json({ error: "Pedido no existe" });
-    if (Number(pe.id_bodega_surtidor || 0) !== actorWarehouse) {
-      return res.status(403).json({ error: "No puedes despachar pedidos de otra bodega" });
-    }
-    if (pe.estado === "CANCELADO" || pe.estado === "COMPLETADO" || pe.estado === "COMPLETADO_JUSTIFICADO") {
-      return res.status(400).json({ error: "Pedido no despachable" });
-    }
-
-    const [[cfg]] = await conn.query(
-      `SELECT cb.modo_despacho_auto, cb.maneja_stock, b.tipo_bodega
-       FROM configuracion_bodega cb
-       JOIN bodegas b ON b.id_bodega=cb.id_bodega
-       WHERE cb.id_bodega=:id`,
-      { id: pe.id_bodega_solicita }
-    );
-    const useTransfer = cfg?.tipo_bodega === "RECEPTORA" || cfg?.modo_despacho_auto === "TRANSFERENCIA";
-    const tipo_mov = useTransfer ? "TRANSFERENCIA" : "SALIDA";
-    const [[solUser]] = await conn.query(
-      `SELECT nombre_completo
-       FROM usuarios
-       WHERE id_usuario=:id_usuario
-       LIMIT 1`,
-      { id_usuario: pe.id_usuario_solicita }
-    );
-    const solicitanteNombre = String(solUser?.nombre_completo || `Usuario #${pe.id_usuario_solicita}`);
-
-    const [[mot]] = await conn.query(
-      `SELECT id_motivo
-       FROM motivos_movimiento
-       WHERE (nombre_motivo='Transferencia' AND :tipo='TRANSFERENCIA')
-          OR (:tipo='SALIDA' AND tipo_movimiento='SALIDA')
-       ORDER BY (nombre_motivo='Transferencia') DESC
-       LIMIT 1`,
-      { tipo: tipo_mov }
-    );
-    if (!mot) return res.status(400).json({ error: "No existe motivo para el movimiento" });
-
-    const [mhRes] = await conn.query(
-      `INSERT INTO movimiento_encabezado
-       (tipo_movimiento, id_motivo, id_bodega_origen, id_bodega_destino, observaciones, creado_por, confirmado_en, estado)
-       VALUES(:tipo, :id_motivo, :origen, :destino, :obs, :u, NOW(), 'CONFIRMADO')`,
-      {
-        tipo: tipo_mov,
-        id_motivo: mot.id_motivo,
-        origen: pe.id_bodega_surtidor,
-        // Siempre guardamos la bodega solicitante para trazabilidad del despacho.
-        destino: pe.id_bodega_solicita,
-        obs: `Despacho Pedido #${id_pedido} | Solicitante: ${solicitanteNombre}`,
-        u: req.user.id_user,
-      }
-    );
-    const id_movimiento = mhRes.insertId;
-
-    let anyFulfilled = false;
-    let requiresJustificacion = false;
-    const skipped = [];
-
-    for (const ln of lines) {
-      const id_pedido_detalle = Number(ln.id_pedido_detalle);
-      const qtyToFill = Number(ln.qty || 0);
-      if (!id_pedido_detalle || qtyToFill <= 0) continue;
-
-      const [[line]] = await conn.query(
-        `SELECT * FROM pedido_detalle WHERE id_pedido_detalle=:id AND id_pedido=:id_pedido FOR UPDATE`,
-        { id: id_pedido_detalle, id_pedido }
-      );
-      if (!line) continue;
-      if (String(line.estado_linea || "").toUpperCase() === "ANULADO") {
-        skipped.push({ id_pedido_detalle, id_producto: line.id_producto, motivo: "LINEA_ANULADA" });
-        continue;
-      }
-
-      const remainingToFill = Number(line.cantidad_solicitada) - Number(line.cantidad_surtida);
-      if (remainingToFill <= 0) continue;
-      const requested = qtyToFill;
-      if (requested < remainingToFill) requiresJustificacion = true;
-
-      const { picks } = await pickLotsFEFO(conn, pe.id_bodega_surtidor, line.id_producto, requested, {
-        allowExpired: false,
-      });
-      if (!picks.length) {
-        requiresJustificacion = true;
-        skipped.push({ id_pedido_detalle, id_producto: line.id_producto, motivo: "SIN_STOCK_NO_VIGENTE" });
-        continue;
-      }
-
-      anyFulfilled = true;
-
-      for (const p of picks) {
-        const costo_unitario = await getLastUnitCost(conn, pe.id_bodega_surtidor, line.id_producto, p.lote);
-        const [d] = await conn.query(
-          `INSERT INTO movimiento_detalle
-           (id_movimiento, id_producto, lote, fecha_vencimiento, cantidad, costo_unitario, observacion_linea)
-           VALUES(:id_movimiento,:id_producto,:lote,:fecha,:cantidad,:costo,:obs)`,
-          {
-            id_movimiento,
-            id_producto: line.id_producto,
-            lote: p.lote || null,
-            fecha: p.fecha_vencimiento || null,
-            cantidad: p.qty,
-            costo: costo_unitario,
-            obs: `Pedido #${id_pedido}`,
-          }
-        );
-        const id_detalle = d.insertId;
-
-        await conn.query(
-          `INSERT INTO kardex
-           (id_movimiento, id_detalle, id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, costo_unitario)
-           VALUES(:id_movimiento,:id_detalle,:id_bodega,:id_producto,:lote,:fecha,:delta,:costo)`,
-          {
-            id_movimiento,
-            id_detalle,
-            id_bodega: pe.id_bodega_surtidor,
-            id_producto: line.id_producto,
-            lote: p.lote || null,
-            fecha: p.fecha_vencimiento || null,
-            delta: -p.qty,
-            costo: costo_unitario,
-          }
-        );
-
-        if (useTransfer && cfg?.maneja_stock === 1) {
-          await conn.query(
-            `INSERT INTO kardex
-             (id_movimiento, id_detalle, id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, costo_unitario)
-             VALUES(:id_movimiento,:id_detalle,:id_bodega,:id_producto,:lote,:fecha,:delta,:costo)`,
-            {
-              id_movimiento,
-              id_detalle,
-              id_bodega: pe.id_bodega_solicita,
-              id_producto: line.id_producto,
-              lote: p.lote || null,
-              fecha: p.fecha_vencimiento || null,
-              delta: +p.qty,
-              costo: costo_unitario,
-            }
-          );
-        }
-
-        await conn.query(
-          `INSERT INTO pedido_movimiento_vinculo (id_pedido_detalle, id_movimiento, id_detalle)
-           VALUES(:id_pedido_detalle,:id_movimiento,:id_detalle)`,
-          { id_pedido_detalle, id_movimiento, id_detalle }
-        );
-      }
-
-      const fulfilledNow = picks.reduce((a, b) => a + Number(b.qty), 0);
-      const projectedSurtida = Number(line.cantidad_surtida) + fulfilledNow;
-      if (projectedSurtida < Number(line.cantidad_solicitada)) {
-        requiresJustificacion = true;
-      }
-      await conn.query(
-        `UPDATE pedido_detalle
-         SET cantidad_surtida = cantidad_surtida + :add,
-             estado_linea = CASE
-               WHEN (cantidad_surtida + :add) >= cantidad_solicitada THEN 'DESPACHADO'
-               ELSE 'PENDIENTE'
-             END,
-             justificacion_linea = CASE
-               WHEN :justificacion IS NULL OR :justificacion='' THEN justificacion_linea
-               WHEN (cantidad_surtida + :add) < cantidad_solicitada THEN :justificacion
-               ELSE justificacion_linea
-             END
-         WHERE id_pedido_detalle=:id`,
-        {
-          add: fulfilledNow,
-          id: id_pedido_detalle,
-          justificacion: justificacionTxt || null,
-        }
-      );
-    }
-
-    if (!anyFulfilled) {
-      await conn.rollback();
-      return res.status(400).json({ error: "Sin stock en las lineas seleccionadas", skipped });
-    }
-
-    if (requiresJustificacion && !justificacionTxt) {
-      await conn.rollback();
-      return res.status(400).json({ error: "Para despacho parcial debes ingresar una justificacion." });
-    }
-
-    const recalc = await recomputePedidoEstado(conn, id_pedido, {
-      actorUserId: req.user.id_user,
-      justificacion: justificacionTxt || null,
-    });
-    const newStatus = recalc.estado;
-
-    await conn.commit();
-    emitPedidoChanged({
-      id_pedido,
-      requester_warehouse_id: pe.id_bodega_solicita,
-      requested_from_warehouse_id: pe.id_bodega_surtidor,
-      status: newStatus,
-      action: "fulfilled",
-    });
-    res.json({
-      ok: true,
-      id_movimiento,
-      status: newStatus,
-      justificacion_despacho: recalc.justificacion_despacho || null,
-      skipped,
-    });
-  } catch (e) {
-    await conn.rollback();
-    res.status(500).json({ error: String(e.message || e) });
-  } finally {
-    conn.release();
-  }
-});
-
-/* =========================
-   REVERTIR DESPACHO (MISMO DIA)
-========================= */
-app.post("/api/orders/:id/revert", auth, requirePermission("action.dispatch", "revertir despachos"), requireSensitiveApproval("reversa de despacho"), enforceDailyCloseBeforeMutations, async (req, res) => {
-  const id_pedido = Number(req.params.id);
-  const actorWarehouse = Number(req.user?.id_warehouse || 0);
-  if (!actorWarehouse) return res.status(400).json({ error: "Usuario sin bodega" });
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-
-    const [[pe]] = await conn.query(
-      "SELECT id_bodega_solicita, id_bodega_surtidor FROM pedido_encabezado WHERE id_pedido=:id_pedido",
-      { id_pedido }
-    );
-    if (!pe) return res.status(404).json({ error: "Pedido no existe" });
-    if (Number(pe.id_bodega_surtidor || 0) !== actorWarehouse) {
-      return res.status(403).json({ error: "No puedes revertir pedidos de otra bodega" });
-    }
-
-    const [links] = await conn.query(
-      `SELECT pmv.id_movimiento, pmv.id_detalle, pmv.id_pedido_detalle, md.cantidad
-       FROM pedido_movimiento_vinculo pmv
-       JOIN movimiento_detalle md ON md.id_detalle=pmv.id_detalle
-       JOIN movimiento_encabezado me ON me.id_movimiento=pmv.id_movimiento
-       WHERE pmv.id_pedido_detalle IN (
-         SELECT id_pedido_detalle FROM pedido_detalle WHERE id_pedido=:id_pedido
-       )
-       AND DATE(me.creado_en)=CURDATE()`,
-      { id_pedido }
-    );
-    if (!links.length) return res.status(400).json({ error: "No hay movimientos reversibles hoy" });
-
-    const movIds = [...new Set(links.map((x) => x.id_movimiento))];
-
-    /* Validar que la bodega destino no haya movido los productos */
-    const id_bodega_destino = Number(pe.id_bodega_solicita || 0);
-    if (id_bodega_destino) {
-      const [destRows] = await conn.query(
-        `SELECT COUNT(*) as cnt FROM kardex k
-         WHERE k.id_bodega = ?
-         AND k.delta_cantidad < 0
-         AND k.id_producto IN (
-           SELECT pd.id_producto FROM pedido_detalle pd
-           WHERE pd.id_pedido = ? AND pd.cantidad_surtida > 0
-         )
-         AND k.id_movimiento NOT IN (${movIds.map(() => "?").join(",")})`,
-        [id_bodega_destino, id_pedido, ...movIds]
-      );
-      if (Number(destRows[0]?.cnt || 0) > 0) {
-        await conn.rollback();
-        return res.status(409).json({
-          error: "No se puede revertir: la bodega destino (solicitante) ya realizo movimientos de salida con los productos recibidos. El stock quedaria INCONSISTENTE.",
-          code: "DESTINATION_HAS_MOVEMENTS"
-        });
-      }
-    }
-
-    for (const ln of links) {
-      await conn.query(
-        `UPDATE pedido_detalle
-         SET cantidad_surtida = GREATEST(cantidad_surtida - :qty, 0),
-             estado_linea = CASE
-               WHEN COALESCE(estado_linea, 'PENDIENTE')='ANULADO' THEN 'ANULADO'
-               WHEN GREATEST(cantidad_surtida - :qty, 0) >= cantidad_solicitada THEN 'DESPACHADO'
-               ELSE 'PENDIENTE'
-             END
-         WHERE id_pedido_detalle=:id`,
-        { qty: ln.cantidad, id: ln.id_pedido_detalle }
-      );
-    }
-
-    await conn.query(
-      `DELETE FROM kardex WHERE id_movimiento IN (${movIds.map(() => "?").join(",")})`,
-      movIds
-    );
-    await conn.query(
-      `DELETE FROM pedido_movimiento_vinculo WHERE id_movimiento IN (${movIds.map(() => "?").join(",")})`,
-      movIds
-    );
-    await conn.query(
-      `DELETE FROM movimiento_detalle WHERE id_movimiento IN (${movIds.map(() => "?").join(",")})`,
-      movIds
-    );
-    await conn.query(
-      `DELETE FROM movimiento_encabezado WHERE id_movimiento IN (${movIds.map(() => "?").join(",")})`,
-      movIds
-    );
-
-    const recalc = await recomputePedidoEstado(conn, id_pedido, {
-      actorUserId: req.user.id_user,
-    });
-    const estado = recalc.estado;
-
-    await conn.commit();
-    await writeSensitiveActionAudit({
-      req,
-      action_key: "REVERSA_DESPACHO_TOTAL",
-      action_label: "Reversa total de despacho",
-      approval: req.sensitive_approval,
-      reference_type: "PEDIDO",
-      reference_id: id_pedido,
-      detail: { movimientos_revertidos: movIds.length },
-    });
-    emitPedidoChanged({
-      id_pedido,
-      requester_warehouse_id: pe?.id_bodega_solicita,
-      requested_from_warehouse_id: pe?.id_bodega_surtidor,
-      status: estado,
-      action: "reverted",
-    });
-    res.json({ ok: true, sensitive_approval: toSensitiveApprovalPayload(req.sensitive_approval) });
-  } catch (e) {
-    await conn.rollback();
-    res.status(500).json({ error: String(e.message || e) });
-  } finally {
-    conn.release();
   }
 });
 
 
-app.get("/api/orders/:id/lots", auth, async (req, res) => {
-  const id_pedido = Number(req.params.id);
-  const actorWarehouse = Number(req.user?.id_warehouse || 0);
-  const stockScope = await resolveStockScope(req.user);
-  if (!actorWarehouse) return res.status(400).json({ error: "Usuario sin bodega" });
-  const [[pe]] = await pool.query(
-    `SELECT id_bodega_solicita, id_bodega_surtidor
-     FROM pedido_encabezado
-     WHERE id_pedido=:id_pedido
-     LIMIT 1`,
-    { id_pedido }
-  );
-  if (!pe) return res.status(404).json({ error: "Pedido no existe" });
-  const orderWarehouses = [Number(pe.id_bodega_solicita || 0), Number(pe.id_bodega_surtidor || 0)].filter((x) => x > 0);
-  if (stockScope.has_warehouse_restrictions) {
-    const allowed = normalizeWarehouseIdList(stockScope.allowed_warehouse_ids);
-    if (!orderWarehouses.some((id) => allowed.includes(id))) {
-      return res.status(403).json({ error: "No tienes acceso a este pedido" });
-    }
-  } else if (!orderWarehouses.includes(actorWarehouse)) {
-    return res.status(403).json({ error: "No tienes acceso a este pedido" });
-  }
-  const [rows] = await pool.query(
-    `SELECT pr.nombre_producto, md.lote, md.fecha_vencimiento, md.cantidad,
-            me.tipo_movimiento, me.creado_en
-     FROM pedido_movimiento_vinculo pmv
-     JOIN movimiento_detalle md ON md.id_detalle=pmv.id_detalle
-     JOIN movimiento_encabezado me ON me.id_movimiento=pmv.id_movimiento
-     JOIN pedido_detalle pd ON pd.id_pedido_detalle=pmv.id_pedido_detalle
-     JOIN productos pr ON pr.id_producto=pd.id_producto
-     WHERE pd.id_pedido=:id_pedido
-     ORDER BY me.creado_en DESC, pr.nombre_producto ASC`,
-    { id_pedido }
-  );
-  res.json({ count: rows.length, rows });
-});
-
-
-app.post("/api/orders/:id/revert-line", auth, requirePermission("action.dispatch", "revertir lineas despachadas"), requireSensitiveApproval("reversa de linea despachada"), enforceDailyCloseBeforeMutations, async (req, res) => {
-  const id_pedido = Number(req.params.id);
-  const id_pedido_detalle = Number(req.body?.id_pedido_detalle || 0);
-  if (!id_pedido_detalle) return res.status(400).json({ error: "Falta linea" });
-  const actorWarehouse = Number(req.user?.id_warehouse || 0);
-  if (!actorWarehouse) return res.status(400).json({ error: "Usuario sin bodega" });
-
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-
-    const [[pe]] = await conn.query(
-      "SELECT id_bodega_solicita, id_bodega_surtidor FROM pedido_encabezado WHERE id_pedido=:id_pedido",
-      { id_pedido }
-    );
-    if (!pe) return res.status(404).json({ error: "Pedido no existe" });
-    if (Number(pe.id_bodega_surtidor || 0) !== actorWarehouse) {
-      return res.status(403).json({ error: "No puedes revertir pedidos de otra bodega" });
-    }
-
-    const [links] = await conn.query(
-      `SELECT pmv.id_movimiento, pmv.id_detalle, pmv.id_pedido_detalle, md.cantidad
-       FROM pedido_movimiento_vinculo pmv
-       JOIN movimiento_detalle md ON md.id_detalle=pmv.id_detalle
-       JOIN movimiento_encabezado me ON me.id_movimiento=pmv.id_movimiento
-       WHERE pmv.id_pedido_detalle=:id_pedido_detalle
-         AND DATE(me.creado_en)=CURDATE()`,
-      { id_pedido_detalle }
-    );
-    if (!links.length) return res.status(400).json({ error: "No hay movimientos reversibles hoy" });
-
-    const movIds = [...new Set(links.map((x) => x.id_movimiento))];
-
-    /* Validar que la bodega destino no haya movido los productos (linea individual) */
-    const id_bodega_destino2 = Number(pe.id_bodega_solicita || 0);
-    if (id_bodega_destino2) {
-      const [destRows2] = await conn.query(
-        `SELECT COUNT(*) as cnt FROM kardex k
-         WHERE k.id_bodega = ?
-         AND k.delta_cantidad < 0
-         AND k.id_producto IN (
-           SELECT pd.id_producto FROM pedido_detalle pd
-           WHERE pd.id_pedido_detalle = ?
-         )
-         AND k.id_movimiento NOT IN (${movIds.map(() => "?").join(",")})`,
-        [id_bodega_destino2, id_pedido_detalle, ...movIds]
-      );
-      if (Number(destRows2[0]?.cnt || 0) > 0) {
-        await conn.rollback();
-        return res.status(409).json({
-          error: "No se puede revertir la linea: la bodega destino (solicitante) ya realizo movimientos de salida con este producto. El stock quedaria INCONSISTENTE.",
-          code: "DESTINATION_HAS_MOVEMENTS"
-        });
-      }
-    }
-
-    const reverted_qty = links.reduce((a, b) => a + Number(b.cantidad || 0), 0);
-
-    await conn.query(
-      `UPDATE pedido_detalle
-       SET cantidad_surtida = GREATEST(cantidad_surtida - :qty, 0),
-           estado_linea = CASE
-             WHEN COALESCE(estado_linea, 'PENDIENTE')='ANULADO' THEN 'ANULADO'
-             WHEN GREATEST(cantidad_surtida - :qty, 0) >= cantidad_solicitada THEN 'DESPACHADO'
-             ELSE 'PENDIENTE'
-           END
-       WHERE id_pedido_detalle=:id`,
-      { qty: reverted_qty, id: id_pedido_detalle }
-    );
-
-    await conn.query(
-      `DELETE FROM kardex WHERE id_movimiento IN (${movIds.map(() => "?").join(",")})`,
-      movIds
-    );
-    await conn.query(
-      `DELETE FROM pedido_movimiento_vinculo WHERE id_movimiento IN (${movIds.map(() => "?").join(",")})`,
-      movIds
-    );
-    await conn.query(
-      `DELETE FROM movimiento_detalle WHERE id_movimiento IN (${movIds.map(() => "?").join(",")})`,
-      movIds
-    );
-    await conn.query(
-      `DELETE FROM movimiento_encabezado WHERE id_movimiento IN (${movIds.map(() => "?").join(",")})`,
-      movIds
-    );
-
-    const recalc = await recomputePedidoEstado(conn, id_pedido, {
-      actorUserId: req.user.id_user,
-    });
-    const estado = recalc.estado;
-
-    await conn.commit();
-    await writeSensitiveActionAudit({
-      req,
-      action_key: "REVERSA_DESPACHO_LINEA",
-      action_label: "Reversa de linea despachada",
-      approval: req.sensitive_approval,
-      reference_type: "PEDIDO_DETALLE",
-      reference_id: id_pedido_detalle,
-      detail: { id_pedido, movimientos_revertidos: movIds.length, reverted_qty },
-    });
-    emitPedidoChanged({
-      id_pedido,
-      requester_warehouse_id: pe?.id_bodega_solicita,
-      requested_from_warehouse_id: pe?.id_bodega_surtidor,
-      status: estado,
-      action: "reverted_line",
-    });
-    res.json({ ok: true, reverted_qty, sensitive_approval: toSensitiveApprovalPayload(req.sensitive_approval) });
-  } catch (e) {
-    await conn.rollback();
-    res.status(500).json({ error: String(e.message || e) });
-  } finally {
-    conn.release();
-  }
-});
-
-app.post("/api/orders/:id/cancel-line", auth, requirePermission("action.dispatch", "anular lineas de pedido"), enforceDailyCloseBeforeMutations, async (req, res) => {
-  const id_pedido = Number(req.params.id);
-  const id_pedido_detalle = Number(req.body?.id_pedido_detalle || 0);
-  const justificacion = String(req.body?.justificacion || "").trim();
-  if (!id_pedido_detalle) return res.status(400).json({ error: "Falta linea" });
-  if (!justificacion) return res.status(400).json({ error: "La justificacion es obligatoria para anular una linea." });
-  const actorWarehouse = Number(req.user?.id_warehouse || 0);
-  if (!actorWarehouse) return res.status(400).json({ error: "Usuario sin bodega" });
-
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-
-    const [[pe]] = await conn.query(
-      `SELECT id_bodega_solicita, id_bodega_surtidor
-       FROM pedido_encabezado
-       WHERE id_pedido=:id_pedido
-       FOR UPDATE`,
-      { id_pedido }
-    );
-    if (!pe) return res.status(404).json({ error: "Pedido no existe" });
-    if (Number(pe.id_bodega_surtidor || 0) !== actorWarehouse) {
-      return res.status(403).json({ error: "No puedes anular lineas de otra bodega" });
-    }
-
-    const [[line]] = await conn.query(
-      `SELECT id_pedido_detalle, cantidad_solicitada, cantidad_surtida, COALESCE(estado_linea, 'PENDIENTE') AS estado_linea
-       FROM pedido_detalle
-       WHERE id_pedido_detalle=:id_pedido_detalle
-         AND id_pedido=:id_pedido
-       FOR UPDATE`,
-      { id_pedido_detalle, id_pedido }
-    );
-    if (!line) return res.status(404).json({ error: "Linea no encontrada" });
-    if (String(line.estado_linea || "").toUpperCase() === "ANULADO") {
-      return res.status(400).json({ error: "La linea ya esta anulada." });
-    }
-    const pendiente = Math.max(0, Number(line.cantidad_solicitada || 0) - Number(line.cantidad_surtida || 0));
-    if (pendiente <= 0) {
-      return res.status(400).json({ error: "La linea ya fue despachada completamente." });
-    }
-
-    await conn.query(
-      `UPDATE pedido_detalle
-       SET estado_linea='ANULADO',
-           justificacion_linea=:justificacion,
-           anulado_por=:anulado_por,
-           anulado_en=NOW()
-       WHERE id_pedido_detalle=:id_pedido_detalle`,
-      {
-        justificacion,
-        anulado_por: req.user.id_user,
-        id_pedido_detalle,
-      }
-    );
-
-    const recalc = await recomputePedidoEstado(conn, id_pedido, {
-      actorUserId: req.user.id_user,
-      justificacion,
-    });
-
-    await conn.commit();
-    emitPedidoChanged({
-      id_pedido,
-      requester_warehouse_id: pe?.id_bodega_solicita,
-      requested_from_warehouse_id: pe?.id_bodega_surtidor,
-      status: recalc.estado,
-      action: "cancel_line",
-    });
-    res.json({
-      ok: true,
-      status: recalc.estado,
-      justificacion_despacho: recalc.justificacion_despacho || null,
-      id_pedido_detalle,
-    });
-  } catch (e) {
-    await conn.rollback();
-    res.status(500).json({ error: String(e.message || e) });
-  } finally {
-    conn.release();
-  }
-});
-
-app.post("/api/orders/:id/uncancel-line", auth, requirePermission("action.dispatch", "rehabilitar lineas anuladas"), enforceDailyCloseBeforeMutations, async (req, res) => {
-  const id_pedido = Number(req.params.id);
-  const id_pedido_detalle = Number(req.body?.id_pedido_detalle || 0);
-  if (!id_pedido_detalle) return res.status(400).json({ error: "Falta linea" });
-  const actorWarehouse = Number(req.user?.id_warehouse || 0);
-  if (!actorWarehouse) return res.status(400).json({ error: "Usuario sin bodega" });
-
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-
-    const [[pe]] = await conn.query(
-      `SELECT id_bodega_solicita, id_bodega_surtidor
-       FROM pedido_encabezado
-       WHERE id_pedido=:id_pedido
-       FOR UPDATE`,
-      { id_pedido }
-    );
-    if (!pe) return res.status(404).json({ error: "Pedido no existe" });
-    if (Number(pe.id_bodega_surtidor || 0) !== actorWarehouse) {
-      return res.status(403).json({ error: "No puedes modificar lineas de otra bodega" });
-    }
-
-    const [[line]] = await conn.query(
-      `SELECT id_pedido_detalle, COALESCE(estado_linea, 'PENDIENTE') AS estado_linea
-       FROM pedido_detalle
-       WHERE id_pedido_detalle=:id_pedido_detalle
-         AND id_pedido=:id_pedido
-       FOR UPDATE`,
-      { id_pedido_detalle, id_pedido }
-    );
-    if (!line) return res.status(404).json({ error: "Linea no encontrada" });
-    if (String(line.estado_linea || "").toUpperCase() !== "ANULADO") {
-      return res.status(400).json({ error: "La linea no esta anulada." });
-    }
-
-    await conn.query(
-      `UPDATE pedido_detalle
-       SET estado_linea='PENDIENTE',
-           justificacion_linea=NULL,
-           anulado_por=NULL,
-           anulado_en=NULL
-       WHERE id_pedido_detalle=:id_pedido_detalle`,
-      { id_pedido_detalle }
-    );
-
-    const recalc = await recomputePedidoEstado(conn, id_pedido, {
-      actorUserId: req.user.id_user,
-    });
-
-    await conn.commit();
-    emitPedidoChanged({
-      id_pedido,
-      requester_warehouse_id: pe?.id_bodega_solicita,
-      requested_from_warehouse_id: pe?.id_bodega_surtidor,
-      status: recalc.estado,
-      action: "uncancel_line",
-    });
-    res.json({
-      ok: true,
-      status: recalc.estado,
-      id_pedido_detalle,
-    });
-  } catch (e) {
-    await conn.rollback();
-    res.status(500).json({ error: String(e.message || e) });
-  } finally {
-    conn.release();
-  }
-});
-
-app.get("/api/print/order/:id", auth, async (req, res) => {
-  const id_pedido = Number(req.params.id);
-  const actorWarehouse = Number(req.user?.id_warehouse || 0);
-  const stockScope = await resolveStockScope(req.user);
-  const [[oh]] = await pool.query(
-    `SELECT p.*, u.nombre_completo AS requester_name, bs.nombre_bodega AS req_wh, bd.nombre_bodega AS from_wh,
-            bs.telefono_contacto AS req_wh_phone, bs.direccion_contacto AS req_wh_address,
-            bd.telefono_contacto AS from_wh_phone, bd.direccion_contacto AS from_wh_address,
-            ua.nombre_completo AS approver_name
-     FROM pedido_encabezado p
-     JOIN usuarios u ON u.id_usuario=p.id_usuario_solicita
-     JOIN bodegas bs ON bs.id_bodega=p.id_bodega_solicita
-     JOIN bodegas bd ON bd.id_bodega=p.id_bodega_surtidor
-     LEFT JOIN usuarios ua ON ua.id_usuario=p.aprobado_por
-     WHERE p.id_pedido=:id_pedido`,
-    { id_pedido }
-  );
-  if (!oh) return res.status(404).send("Pedido no existe");
-  const orderWarehouses = [Number(oh.id_bodega_solicita || 0), Number(oh.id_bodega_surtidor || 0)].filter((x) => x > 0);
-  if (stockScope.has_warehouse_restrictions) {
-    const allowed = normalizeWarehouseIdList(stockScope.allowed_warehouse_ids);
-    if (!orderWarehouses.some((id) => allowed.includes(id))) {
-      return res.status(403).send("Sin permiso");
-    }
-  } else if (!stockScope.can_all_bodegas && !orderWarehouses.includes(actorWarehouse)) {
-    return res.status(403).send("Sin permiso");
-  }
-  const [lines] = await pool.query(
-    `SELECT d.*, pr.nombre_producto
-     FROM pedido_detalle d
-     JOIN productos pr ON pr.id_producto=d.id_producto
-     WHERE d.id_pedido=:id_pedido
-     ORDER BY pr.nombre_producto ASC`,
-    { id_pedido }
-  );
-  const logoSrc = await getPreferredWarehousePrintLogoDataUri(oh.id_bodega_solicita, oh.id_bodega_surtidor);
-  const footerHtml = buildWarehouseFooterHtml(
-    { telefono_contacto: oh.req_wh_phone, direccion_contacto: oh.req_wh_address },
-    { telefono_contacto: oh.from_wh_phone, direccion_contacto: oh.from_wh_address }
-  );
-
-  const html = `
-<!doctype html><html lang="es"><head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Pedido #${id_pedido}</title>
-<style>
-  body{font-family: Arial; padding:16px;}
-  .headLogo{display:block; margin:0 auto 10px; max-height:64px; width:auto; object-fit:contain;}
-  .headTitle{margin:4px 0 0; text-align:center;}
-  .row{display:flex; justify-content:space-between; gap:12px;}
-  .muted{color:#666; font-size:12px;}
-  table{width:100%; border-collapse:collapse; margin-top:12px;}
-  th,td{border:1px solid #ddd; padding:4px 6px; font-size:11px; line-height:1.2;}
-  th{background:#f5f5f5;}
-  @media print{
-    @page{ size: A4 portrait; margin: 10mm; }
-  }
-</style>
-</head><body>
-  <img class="headLogo" src="${logoSrc}" alt="Hotel Jardines del Lago" />
-  <h2 class="headTitle">Pedido #${id_pedido}</h2>
-  <div class="row">
-    <div>
-      <div class="muted">Solicita</div>
-      <div><b>${oh.requester_name || ""}</b></div>
-      <div class="muted">Area/Bodega: ${oh.req_wh || ""}</div>
-    </div>
-    <div>
-      <div class="muted">De bodega</div>
-      <div><b>${oh.from_wh || ""}</b></div>
-      <div class="muted">Fecha: ${oh.creado_en ? (() => {
-        const dt = new Date(oh.creado_en);
-        if (Number.isNaN(dt.getTime())) return "";
-        const dd = String(dt.getDate()).padStart(2, "0");
-        const mm = String(dt.getMonth() + 1).padStart(2, "0");
-        const yyyy = dt.getFullYear();
-        const hh = String(dt.getHours()).padStart(2, "0");
-        const mi = String(dt.getMinutes()).padStart(2, "0");
-        const ss = String(dt.getSeconds()).padStart(2, "0");
-        return `${dd}-${mm}-${yyyy} ${hh}:${mi}:${ss}`;
-      })() : ""}</div>
-      <div class="muted">Estado: ${oh.estado || ""}</div>
-    </div>
-  </div>
-  ${oh.observaciones ? `<p><b>Notas:</b> ${oh.observaciones}</p>` : ``}
-  <table>
-    <thead><tr><th>Producto</th><th>Cant.</th><th>Despachado</th><th>Observacion</th></tr></thead>
-    <tbody>
-      ${lines.map(x=>`
-        <tr>
-          <td>${x.nombre_producto}</td>
-          <td style="text-align:right">${x.cantidad_solicitada}</td>
-          <td style="text-align:right">${x.cantidad_surtida}</td>
-          <td>${x.observacion_producto ?? ""}</td>
-        </tr>
-      `).join("")}
-    </tbody>
-  </table>
-  <script>window.print()</script>
-
-  <div style="margin-top:48px; display:flex; gap:20px;">
-    <div style="flex:1; text-align:center;">
-      <div style="border-top:1px solid #999; padding-top:6px; font-size:12px;">Firma solicitante<br/>${oh.requester_name || ""}</div>
-    </div>
-    <div style="flex:1; text-align:center;">
-      <div style="border-top:1px solid #999; padding-top:6px; font-size:12px;">Firma despacha<br/>${oh.approver_name || ""}</div>
-    </div>
-  </div>
-</body></html>`;
-  res.setHeader("Content-Type","text/html; charset=utf-8");
-  res.send(html);
-});
-
-app.get("/api/print/order/:id/pos80", auth, async (req, res) => {
-  const id_pedido = Number(req.params.id);
-  const actorWarehouse = Number(req.user?.id_warehouse || 0);
-  const stockScope = await resolveStockScope(req.user);
-  const [[oh]] = await pool.query(
-    `SELECT p.*, u.nombre_completo AS requester_name, bs.nombre_bodega AS req_wh, bd.nombre_bodega AS from_wh,
-            bs.telefono_contacto AS req_wh_phone, bs.direccion_contacto AS req_wh_address,
-            bd.telefono_contacto AS from_wh_phone, bd.direccion_contacto AS from_wh_address,
-            ua.nombre_completo AS approver_name
-     FROM pedido_encabezado p
-     JOIN usuarios u ON u.id_usuario=p.id_usuario_solicita
-     JOIN bodegas bs ON bs.id_bodega=p.id_bodega_solicita
-     JOIN bodegas bd ON bd.id_bodega=p.id_bodega_surtidor
-     LEFT JOIN usuarios ua ON ua.id_usuario=p.aprobado_por
-     WHERE p.id_pedido=:id_pedido`,
-    { id_pedido }
-  );
-  if (!oh) return res.status(404).send("Pedido no existe");
-  const orderWarehouses = [Number(oh.id_bodega_solicita || 0), Number(oh.id_bodega_surtidor || 0)].filter((x) => x > 0);
-  if (stockScope.has_warehouse_restrictions) {
-    const allowed = normalizeWarehouseIdList(stockScope.allowed_warehouse_ids);
-    if (!orderWarehouses.some((id) => allowed.includes(id))) {
-      return res.status(403).send("Sin permiso");
-    }
-  } else if (!stockScope.can_all_bodegas && !orderWarehouses.includes(actorWarehouse)) {
-    return res.status(403).send("Sin permiso");
-  }
-  const [lines] = await pool.query(
-    `SELECT d.*, pr.nombre_producto
-     FROM pedido_detalle d
-     JOIN productos pr ON pr.id_producto=d.id_producto
-     WHERE d.id_pedido=:id_pedido
-     ORDER BY pr.nombre_producto ASC`,
-    { id_pedido }
-  );
-
-  const esc = (v) =>
-    String(v ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  const fmtQty = (n) => Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 3 });
-  const fmtDate = (d) => {
-    if (!d) return "";
-    try {
-      const dt = new Date(d);
-      if (Number.isNaN(dt.getTime())) return "";
-      const dd = String(dt.getDate()).padStart(2, "0");
-      const mm = String(dt.getMonth() + 1).padStart(2, "0");
-      const yyyy = dt.getFullYear();
-      const hh = String(dt.getHours()).padStart(2, "0");
-      const mi = String(dt.getMinutes()).padStart(2, "0");
-      const ss = String(dt.getSeconds()).padStart(2, "0");
-      return `${dd}-${mm}-${yyyy} ${hh}:${mi}:${ss}`;
-    } catch {
-      return "";
-    }
-  };
-  const totalSolicitado = (lines || []).reduce((a, x) => a + Number(x.cantidad_solicitada || 0), 0);
-  const totalDespachado = (lines || []).reduce((a, x) => a + Number(x.cantidad_surtida || 0), 0);
-  const logoSrc = await getPreferredWarehousePrintLogoDataUri(oh.id_bodega_solicita, oh.id_bodega_surtidor);
-  const footerHtml = buildWarehouseFooterHtml(
-    { telefono_contacto: oh.req_wh_phone, direccion_contacto: oh.req_wh_address },
-    { telefono_contacto: oh.from_wh_phone, direccion_contacto: oh.from_wh_address }
-  );
-
-  const html = `
-<!doctype html><html lang="es"><head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Pedido #${id_pedido} - POS 80mm</title>
-<style>
-  :root{ --paper-width:80mm; }
-  *{ box-sizing:border-box; }
-  body{
-    margin:0;
-    background:#eef2f7;
-    font-family:Arial,"Helvetica Neue",Helvetica,"Liberation Sans","Noto Sans",sans-serif;
-    color:#0f172a;
-  }
-  .toolbar{
-    position:sticky;
-    top:0;
-    z-index:5;
-    background:#0f172a;
-    color:#fff;
-    padding:8px 10px;
-    display:flex;
-    justify-content:center;
-    gap:8px;
-  }
-  .toolbar button{
-    border:1px solid #334155;
-    background:#1e293b;
-    color:#fff;
-    border-radius:8px;
-    padding:6px 10px;
-    font-size:14px;
-    cursor:pointer;
-  }
-  .paper{
-    width:var(--paper-width);
-    margin:14px auto;
-    background:#fff;
-    border:1px solid #dbe2ea;
-    border-radius:8px;
-    padding:8px 8px 10px;
-    box-shadow:0 10px 28px rgba(2,6,23,.16);
-    font-size:13px;
-    line-height:1.35;
-      font-variant-numeric:tabular-nums;
-  }
-  .center{ text-align:center; }
-  .logoWrap{
-    width:52mm;
-    height:18mm;
-    margin:0 auto 3px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-  }
-  .logo{
-    max-width:52mm;
-    max-height:18mm;
-    width:auto;
-    height:auto;
-    display:block;
-    object-fit:contain;
-  }
-  .sep{
-    border-top:1px dashed #334155;
-    margin:6px 0;
-  }
-  .row{
-    display:flex;
-    justify-content:space-between;
-    gap:6px;
-  }
-  .muted{ color:#475569; }  .tableHead{ padding:0 2px 5px; border-bottom:2px solid #475569; margin-bottom:5px; }
-  .line{ margin:7px 0; padding:7px 6px; border:2px solid #64748b; border-left:4px solid #0f172a; border-radius:4px; font-size:14px; }
-  .lineMain{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
-  .productName{ flex:1; font-weight:700; line-height:1.25; word-break:break-word; }
-  .qtyWrap{ min-width:22mm; padding-left:6px; padding-right:4.2mm; border-left:2px dashed #64748b; text-align:right; margin-right:0; }
-  .qtyLabel{ color:#0f172a; font-size:12px; line-height:1.15; font-weight:800; letter-spacing:.1px; }
-  .qtyValue{ font-size:16px; font-weight:900; line-height:1.15; color:#000; }
-  .qtyNum{ font-size:16px; font-weight:900; line-height:1.1; color:#000; }
-  .lineNote{ margin-top:5px; padding-top:4px; border-top:2px dashed #94a3b8; color:#334155; font-size:12px; white-space:pre-wrap; }
-  .n{ text-align:right; white-space:nowrap; padding-right:0; }
-  .tableHead .n{ color:#0f172a; font-weight:900; padding-right:4.2mm; }
-  .sign{ margin-top:36px; text-align:center; color:#334155; font-size:12px; }
-  .signLine{ width:85%; margin:0 auto 6px; border-top:1px solid #64748b; }
-  .foot{
-    margin-top:8px;
-    text-align:center;
-    color:#334155;
-    font-size:12px;
-  }
-  @media print{
-    @page{ size:80mm auto; margin:2mm; }
-    body{ background:#fff; }
-    .toolbar{ display:none !important; }
-    .paper{
-      width:auto;
-      margin:0;
-      border:0;
-      border-radius:0;
-      box-shadow:none;
-      padding:0 2.8mm 0 0.8mm;
-      font-size:12px;
-    }
-  }
-</style>
-</head><body>
-  <div class="toolbar">
-    <button type="button" onclick="window.print()">Imprimir</button>
-    <button type="button" onclick="window.close()">Cerrar</button>
-  </div>
-
-  <div class="paper">
-    <div class="center">
-      <div class="logoWrap">
-        <img class="logo" src="${logoSrc}" alt="Hotel Jardines del Lago" />
-      </div>
-      <div class="muted">Pedido #${esc(id_pedido)}</div>
-    </div>
-    <div class="sep"></div>
-
-    <div><b>Solicita:</b> ${esc(oh.requester_name || "")}</div>
-    <div><b>Bodega solicita:</b> ${esc(oh.req_wh || "")}</div>
-    <div><b>Bodega surtidor:</b> ${esc(oh.from_wh || "")}</div>
-    <div><b>Fecha:</b> ${esc(fmtDate(oh.creado_en))}</div>
-    <div><b>Estado:</b> ${esc(oh.estado || "")}</div>
-    ${oh.observaciones ? `<div><b>Notas:</b> ${esc(oh.observaciones)}</div>` : ``}
-
-    <div class="sep"></div>
-    <div class="row muted tableHead"><div>Producto</div><div class="n">Sol/Desp</div></div>
-    ${(lines || [])
-      .map(
-        (x) => `
-      <div class="line">
-        <div class="lineMain">
-          <div class="productName">${esc(x.nombre_producto || "")}</div>
-          <div class="qtyWrap">
-            <div class="qtyLabel">Sol: <b>${esc(fmtQty(x.cantidad_solicitada))}</b></div>
-            <div class="qtyLabel">Desp:</div>
-            <div class="qtyValue">${esc(fmtQty(x.cantidad_surtida))}</div>
-          </div>
-        </div>
-        ${x.observacion_producto ? `<div class="lineNote">${esc(x.observacion_producto)}</div>` : ``}
-      </div>`
-      )
-      .join("")}<div class="sep"></div>
-    <div class="row"><div><b>Total solicitado</b></div><div class="n"><b>${esc(fmtQty(totalSolicitado))}</b></div></div>
-    <div class="row"><div><b>Total despachado</b></div><div class="n"><b>${esc(fmtQty(totalDespachado))}</b></div></div>
-    <div class="sign">
-      <div class="signLine"></div>
-      <div>Firma Encargado de Despacho</div>
-    </div>
-    <div class="foot">
-      ${footerHtml ? `${footerHtml}<br/>` : ``}
-      Generado: ${esc(fmtDate(new Date().toISOString()))}
-    </div>
-  </div>
-</body></html>`;
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.send(html);
-});
-
-/* =========================
-   ROLES (LISTA)
-========================= */
-app.get("/api/roles", auth, async (req, res) => {
-  const [rows] = await pool.query(
-    `SELECT id_rol AS id_role, nombre_rol AS role_name
-     FROM roles
-     WHERE activo=1
-     ORDER BY nombre_rol ASC`
-  );
-  res.json(rows);
-});
-
-/* =========================
-   USUARIOS (CREAR)
-========================= */
 app.post("/api/usuarios", auth, async (req, res) => {
   try {
     const {
@@ -9077,7 +7571,7 @@ app.post("/api/usuarios", auth, async (req, res) => {
       { id_usuario: r.insertId, activo: canSupervisor }
     );
 
-    res.json({ ok: true, id_user: r.insertId });
+    clearPermisosCache(r.insertId); res.json({ ok: true, id_user: r.insertId });
   } catch (e) {
     if (e && e.code === "ER_DUP_ENTRY") {
       return res.status(400).json({ error: "El usuario ya existe" });
@@ -9297,6 +7791,7 @@ app.patch("/api/usuarios/:id", auth, async (req, res) => {
       }
     }
 
+    clearPermisosCache(id_user);
     res.json({ ok: true });
   } catch (e) {
     if (e && e.code === "ER_DUP_ENTRY") {
@@ -9571,6 +8066,7 @@ app.put("/api/usuarios/:id/permisos", auth, async (req, res) => {
       );
     }
     await conn.commit();
+    clearPermisosCache(id_usuario);
     res.json({ ok: true });
   } catch (e) {
     await conn.rollback();

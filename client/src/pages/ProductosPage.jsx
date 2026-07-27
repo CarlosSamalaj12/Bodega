@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
+import { Pagination } from '@/components/ui/Pagination';
 import { toast } from '@/components/ui/Toast';
 import { ProductosFilters } from '@/components/productos/ProductosFilters';
 import { ProductoForm } from '@/components/productos/ProductoForm';
@@ -68,6 +69,11 @@ export default function ProductosPage() {
   const [categoriaId, setCategoriaId] = useState(null);
   const [medidaId, setMedidaId] = useState(null);
 
+  // Paginación
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+
   // Datos
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -105,24 +111,33 @@ export default function ProductosPage() {
     return () => ctrl.abort();
   }, []);
 
-  // Carga productos cuando cambian filtros
+  // Carga productos cuando cambian filtros o página
   const fetchProductos = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
-      const data = await productosService.list({
+      const result = await productosService.list({
         q: debouncedSearch,
         all: showInactive,
-        limit: 500,
+        limit: 50,
+        page,
+        categoria: categoriaId || undefined,
+        medida: medidaId || undefined,
       });
-      setProductos(data || []);
+      setProductos(result?.rows || []);
+      setTotalPages(result?.totalPages || 1);
+      setTotal(result?.total || 0);
     } catch (e) {
       toast.error(e?.response?.data?.error || 'Error al cargar productos');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [debouncedSearch, showInactive]);
+  }, [debouncedSearch, showInactive, page, categoriaId, medidaId]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, showInactive, categoriaId, medidaId]);
 
   useEffect(() => {
     fetchProductos();
@@ -142,14 +157,7 @@ export default function ProductosPage() {
     return [...known, ...unknown];
   }, [productos]);
 
-  // Filtro client-side por categoría/medida (el backend ya filtra por q)
-  const productosFiltrados = useMemo(() => {
-    return ordered.filter((p) => {
-      if (categoriaId && Number(p.id_categoria) !== Number(categoriaId)) return false;
-      if (medidaId && Number(p.id_medida) !== Number(medidaId)) return false;
-      return true;
-    });
-  }, [ordered, categoriaId, medidaId]);
+  // Filtro ahora server-side (categoría/medida se envían al backend)
 
   // ---- Drag reorder ----
   const handleReorder = useCallback((fromId, toId) => {
@@ -237,13 +245,13 @@ export default function ProductosPage() {
     <>
       <Header
         title="Productos"
-        subtitle={`${productosFiltrados.length} producto${productosFiltrados.length === 1 ? '' : 's'}${
+        subtitle={`${total} producto${total === 1 ? '' : 's'}${
           hasActiveFilters ? ' (filtrado)' : ''
-        }`}
+        }${page > 1 ? ` · Pág. ${page}` : ''}`}
         actions={
           <div className="productos-page__header-actions">
             {refreshing && <Spinner size={14} />}
-            {productosFiltrados.length > 0 && (
+            {ordered.length > 0 && (
               <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
                 Exportar CSV
               </Button>
@@ -281,7 +289,7 @@ export default function ProductosPage() {
 
         {loading ? (
           <div className="productos-page__loading"><Spinner size={20} label="Cargando productos…" /></div>
-        ) : productosFiltrados.length === 0 ? (
+        ) : ordered.length === 0 ? (
           <EmptyState
             icon="◧"
             title="Sin productos"
@@ -289,45 +297,54 @@ export default function ProductosPage() {
             action={canEdit ? <Button onClick={handleCreate}>Crear primer producto</Button> : null}
           />
         ) : (
-          <div className="productos-page__list">
-            {productosFiltrados.map((row) => (
-              <DragItem key={row.id_producto} row={row} onReorder={handleReorder}>
-                <span className="productos-page__drag-handle" title="Arrastrar para reordenar">⠿</span>
-                <div className="productos-page__item-info">
-                  <div className="productos-page__item-main">
-                    <div className="productos-page__item-head">
-                      <span className="productos-page__item-name">{row.nombre_producto}</span>
-                      {row.sku && <code className="productos-page__item-sku">{row.sku}</code>}
+          <>
+            <div className="productos-page__list">
+              {ordered.map((row) => (
+                <DragItem key={row.id_producto} row={row} onReorder={handleReorder}>
+                  <span className="productos-page__drag-handle" title="Arrastrar para reordenar">⠿</span>
+                  <div className="productos-page__item-info">
+                    <div className="productos-page__item-main">
+                      <div className="productos-page__item-head">
+                        <span className="productos-page__item-name">{row.nombre_producto}</span>
+                        {row.sku && <code className="productos-page__item-sku">{row.sku}</code>}
+                      </div>
+                      <div className="productos-page__item-meta">
+                        {row.nombre_categoria && <span className="productos-page__item-tag">{row.nombre_categoria}</span>}
+                        {row.nombre_subcategoria && <span className="productos-page__item-tag">{row.nombre_subcategoria}</span>}
+                        {row.nombre_medida && <span className="productos-page__item-tag">{row.nombre_medida}</span>}
+                        <span className={`productos-page__vis-badge ${Number(row.total_bodegas_visibles) > 0 ? 'productos-page__vis-badge--limited' : ''}`}>
+                          {Number(row.total_bodegas_visibles) > 0 ? `${row.total_bodegas_visibles} bodega${Number(row.total_bodegas_visibles) === 1 ? '' : 's'}` : 'Todas'}
+                        </span>
+                      </div>
                     </div>
-                    <div className="productos-page__item-meta">
-                      {row.nombre_categoria && <span className="productos-page__item-tag">{row.nombre_categoria}</span>}
-                      {row.nombre_subcategoria && <span className="productos-page__item-tag">{row.nombre_subcategoria}</span>}
-                      {row.nombre_medida && <span className="productos-page__item-tag">{row.nombre_medida}</span>}
-                      <span className={`productos-page__vis-badge ${Number(row.total_bodegas_visibles) > 0 ? 'productos-page__vis-badge--limited' : ''}`}>
-                        {Number(row.total_bodegas_visibles) > 0 ? `${row.total_bodegas_visibles} bodega${Number(row.total_bodegas_visibles) === 1 ? '' : 's'}` : 'Todas'}
+                    <div className="productos-page__item-end">
+                      <span className={`productos-page__item-badge ${Number(row.activo) === 1 ? 'productos-page__item-badge--active' : 'productos-page__item-badge--inactive'}`}>
+                        {Number(row.activo) === 1 ? 'Activo' : 'Inactivo'}
                       </span>
                     </div>
                   </div>
-                  <div className="productos-page__item-end">
-                    <span className={`productos-page__item-badge ${Number(row.activo) === 1 ? 'productos-page__item-badge--active' : 'productos-page__item-badge--inactive'}`}>
-                      {Number(row.activo) === 1 ? 'Activo' : 'Inactivo'}
-                    </span>
+                  <div className="productos-page__item-actions">
+                    {canEdit && (
+                      <Button size="sm" variant="ghost" onClick={() => handleEdit(row)} title="Editar">✎</Button>
+                    )}
+                    {Boolean(user?.id_warehouse) && Number(row.visible_en_bodega_usuario) === 0 && (
+                      <Button size="sm" variant="subtle" onClick={() => handleToggleVisibilidad(row, true)} title="Hacer visible en tu bodega">Mostrar</Button>
+                    )}
+                    {Boolean(user?.id_warehouse) && Number(row.visible_en_bodega_usuario) === 1 && Number(row.total_bodegas_visibles) > 0 && (
+                      <Button size="sm" variant="ghost" onClick={() => handleToggleVisibilidad(row, false)} title="Ocultar en tu bodega">Ocultar</Button>
+                    )}
                   </div>
-                </div>
-                <div className="productos-page__item-actions">
-                  {canEdit && (
-                    <Button size="sm" variant="ghost" onClick={() => handleEdit(row)} title="Editar">✎</Button>
-                  )}
-                  {Boolean(user?.id_warehouse) && Number(row.visible_en_bodega_usuario) === 0 && (
-                    <Button size="sm" variant="subtle" onClick={() => handleToggleVisibilidad(row, true)} title="Hacer visible en tu bodega">Mostrar</Button>
-                  )}
-                  {Boolean(user?.id_warehouse) && Number(row.visible_en_bodega_usuario) === 1 && Number(row.total_bodegas_visibles) > 0 && (
-                    <Button size="sm" variant="ghost" onClick={() => handleToggleVisibilidad(row, false)} title="Ocultar en tu bodega">Ocultar</Button>
-                  )}
-                </div>
-              </DragItem>
-            ))}
-          </div>
+                </DragItem>
+              ))}
+            </div>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              onChange={setPage}
+              loading={loading}
+            />
+          </>
         )}
       </div>
 
@@ -338,7 +355,7 @@ export default function ProductosPage() {
         storageKey="export-columns-productos"
         onConfirm={(cols, format) => {
           const fn = { csv: downloadCSV, xlsx: downloadXLSX, pdf: downloadPDF }[format] || downloadCSV;
-          fn(productosFiltrados, {
+          fn(ordered, {
             filename: `productos_${new Date().toISOString().slice(0, 10)}`,
             columns: cols,
             format: (row, col) => {

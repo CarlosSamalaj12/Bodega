@@ -56,14 +56,11 @@ export default function KardexPage() {
   // Export column selector
   const [showColumnSelector, setShowColumnSelector] = useState(false);
 
-  // Paginación
+  // Paginación server-side
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
-  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
-  const paginatedRows = useMemo(
-    () => rows.slice((page - 1) * pageSize, page * pageSize),
-    [rows, page, pageSize]
-  );
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [pageSize, setPageSize] = useState(100);
 
   // Catálogos
   const [categorias, setCategorias] = useState([]);
@@ -75,20 +72,22 @@ export default function KardexPage() {
   const fetchKardex = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { limit: 2000 };
+      const params = { limit: pageSize, page };
       if (debouncedSearch) params.q = debouncedSearch;
       if (tipo) params.tipo = tipo;
       if (categoriaId) params.categoria = categoriaId;
       if (fromDate) params.from = fromDate;
       if (toDate) params.to = toDate;
-      const data = await kardexService.list(params);
-      setRows(data);
+      const result = await kardexService.list(params);
+      setRows(result?.rows || []);
+      setTotalPages(result?.totalPages || 1);
+      setTotal(result?.total || 0);
     } catch (e) {
       toast.error('No se pudieron cargar los movimientos');
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, tipo, categoriaId, fromDate, toDate]);
+  }, [debouncedSearch, tipo, categoriaId, fromDate, toDate, page, pageSize]);
 
   useEffect(() => { fetchKardex(); }, [fetchKardex]);
 
@@ -264,8 +263,8 @@ export default function KardexPage() {
         subtitle={
           loading
             ? 'Cargando…'
-            : `${rows.length} movimiento${rows.length === 1 ? '' : 's'}` +
-              (rows.length > pageSize ? ` (pág. ${page}/${totalPages})` : '') +
+            : `${total} movimiento${total === 1 ? '' : 's'}` +
+              (total > pageSize ? ` (pág. ${page}/${totalPages})` : '') +
               (totales.entradas > 0 || totales.salidas > 0
                 ? ` · +${totales.entradas} / −${totales.salidas}`
                 : '')
@@ -353,7 +352,7 @@ export default function KardexPage() {
         {/* Tabla */}
         <DataList
           columns={columns}
-          rows={paginatedRows}
+          rows={rows}
           loading={loading}
           keyFn={(r) => `${r.id_movimiento}-${r.id_detalle}`}
           onRowClick={(r) => setDetailRow(r)}
@@ -366,12 +365,12 @@ export default function KardexPage() {
           emptyIcon="◉"
         />
 
-        {/* Paginación */}
-        {rows.length > pageSize && !loading && (
+        {/* Paginación server-side */}
+        {total > pageSize && !loading && (
           <Card compact>
             <div className="kardex-page__pagination">
               <span className="kardex-page__pagination-info">
-                Página {page} de {totalPages}
+                {total} registro{total !== 1 ? 's' : ''} · Pág. {page} de {totalPages}
               </span>
               <select
                 className="kardex-page__pagination-size"
@@ -387,14 +386,13 @@ export default function KardexPage() {
                 <button
                   type="button"
                   className="kardex-page__pagination-btn"
-                  disabled={page <= 1}
+                  disabled={page <= 1 || loading}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                 >
                   ‹ Anterior
                 </button>
                 <div className="kardex-page__pagination-pages">
                   {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                    // Mostrar páginas alrededor de la actual
                     let pageNum;
                     if (totalPages <= 7) {
                       pageNum = i + 1;
@@ -413,6 +411,7 @@ export default function KardexPage() {
                           pageNum === page ? 'kardex-page__pagination-page--active' : ''
                         }`}
                         onClick={() => setPage(pageNum)}
+                        disabled={loading}
                       >
                         {pageNum}
                       </button>
@@ -422,7 +421,7 @@ export default function KardexPage() {
                 <button
                   type="button"
                   className="kardex-page__pagination-btn"
-                  disabled={page >= totalPages}
+                  disabled={page >= totalPages || loading}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 >
                   Siguiente ›

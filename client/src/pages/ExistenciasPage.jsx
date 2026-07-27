@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
+import { Pagination } from '@/components/ui/Pagination';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { toast } from '@/components/ui/Toast';
@@ -59,6 +60,11 @@ export default function ExistenciasPage() {
   const [bodegaId, setBodegaId] = useState(null);
   const [showZeroStock, setShowZeroStock] = useState(() => searchParams.get('show_zero') === '1');
 
+  // Paginación
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(new Set());
@@ -89,19 +95,26 @@ export default function ExistenciasPage() {
   const fetchExistencias = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { limit: 2000 };
+      const params = { limit: 100, page };
       if (debouncedSearch) params.q = debouncedSearch;
       if (categoriaId) params.categoria = categoriaId;
       if (subcategoriaId) params.subcategoria = subcategoriaId;
       if (bodegaId) params.warehouse = bodegaId;
       if (showZeroStock) params.show_zero = '1';
-      const data = await existenciasService.list(params);
-      setRows(data);
+      const result = await existenciasService.list(params);
+      setRows(result?.rows || []);
+      setTotalPages(result?.totalPages || 1);
+      setTotal(result?.total || 0);
     } catch (e) {
       toast.error('No se pudieron cargar las existencias');
     } finally {
       setLoading(false);
     }
+  }, [debouncedSearch, categoriaId, subcategoriaId, bodegaId, showZeroStock, page]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
   }, [debouncedSearch, categoriaId, subcategoriaId, bodegaId, showZeroStock]);
 
   useEffect(() => { fetchExistencias(); }, [fetchExistencias]);
@@ -239,8 +252,9 @@ export default function ExistenciasPage() {
     // ---- Móvil: cards expandibles ----
     if (isMobile) {
       return (
-        <div className="existencias-page__cards">
-          {grupos.map((g) => {
+        <>
+          <div className="existencias-page__cards">
+            {grupos.map((g) => {
             const isOpen = expanded.has(g.key);
             const alert = getGroupAlert(g);
             return (
@@ -306,12 +320,13 @@ export default function ExistenciasPage() {
             );
           })}
         </div>
+          <Pagination page={page} totalPages={totalPages} total={total} onChange={setPage} loading={loading} />
+        </>
       );
-    }
-
-    // ---- Desktop: tabla expandible ----
+    }      // ---- Desktop: tabla expandible ----
     return (
-      <div className="table-wrapper">
+      <>
+        <div className="table-wrapper">
         <table className="table table--sm">
           <thead>
             <tr>
@@ -409,6 +424,8 @@ export default function ExistenciasPage() {
           </tbody>
         </table>
       </div>
+        <Pagination page={page} totalPages={totalPages} total={total} onChange={setPage} loading={loading} />
+      </>
     );
   };
 
@@ -419,11 +436,12 @@ export default function ExistenciasPage() {
         subtitle={
           loading
             ? 'Cargando…'
-            : `${grupos.length} producto${grupos.length === 1 ? '' : 's'}` +
+            : `${total} producto${total === 1 ? '' : 's'}` +
               ` · ${resumen.totalStock} unidades` +
               (resumen.totalValor > 0 ? ` · Q ${resumen.totalValor.toFixed(2)}` : '') +
               (resumen.bajoMinimo > 0 ? ` · ⚠ ${resumen.bajoMinimo} bajo mínimo` : '') +
-              (expanded.size > 0 ? ` · ▸ ${expanded.size} expandido${expanded.size !== 1 ? 's' : ''}` : '')
+              (expanded.size > 0 ? ` · ▸ ${expanded.size} expandido${expanded.size !== 1 ? 's' : ''}` : '') +
+              (page > 1 ? ` · Pág. ${page}` : '')
         }
         actions={
           <div className="existencias-page__header-actions">

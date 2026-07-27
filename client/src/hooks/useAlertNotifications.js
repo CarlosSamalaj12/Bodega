@@ -1,4 +1,5 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getSocket } from '@/services/socket';
 import { existenciasService } from '@/services/existencias.service';
 import { requestNotificationPermission, showAlertaNotification } from '@/services/notification.service';
@@ -23,8 +24,7 @@ let permSolicitado = false;
  */
 export function useAlertNotifications() {
   const user = useAuthStore((s) => s.user);
-  const intervalRef = useRef(null);
-  const socketRef = useRef(null);
+  const navigate = useNavigate();
 
   const checkAlertas = useCallback(async () => {
     if (!user?.id_warehouse) return;
@@ -86,7 +86,7 @@ export function useAlertNotifications() {
             toast.warn(`${tipoLabel}: ${alerta.nombre_producto}`, {
               duration: 8000,
               onClick: () => {
-                window.location.href = '/alertas';
+                navigate('/alertas');
               },
               actionLabel: 'Ver alertas',
             });
@@ -94,9 +94,9 @@ export function useAlertNotifications() {
         }
       }
     } catch {
-      // Silencioso — no mostrar error al usuario por polling
+      // Silencioso — no mostrar error al usuario
     }
-  }, [user?.id_warehouse]);
+  }, [user?.id_warehouse, navigate]);
 
   useEffect(() => {
     if (!user?.id_warehouse) return;
@@ -110,11 +110,10 @@ export function useAlertNotifications() {
     // 2. Cargar snapshot inicial
     checkAlertas();
 
-    // 3. Conectar Socket.IO y escuchar eventos
+    // 3. Conectar Socket.IO y escuchar eventos push
     let socket;
     try {
       socket = getSocket();
-      socketRef.current = socket;
     } catch {
       return;
     }
@@ -137,20 +136,9 @@ export function useAlertNotifications() {
     socket.on('pedido:changed', handlePedidoChanged);
     socket.on('stock:changed', handleStockChanged);
 
-    // 4. Respaldo: refrescar cada 60s cuando la página está visible
-    intervalRef.current = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        checkAlertas();
-      }
-    }, 60_000);
-
     return () => {
       socket.off('pedido:changed', handlePedidoChanged);
       socket.off('stock:changed', handleStockChanged);
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
     };
   }, [user?.id_warehouse, checkAlertas]);
 

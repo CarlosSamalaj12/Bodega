@@ -7,8 +7,9 @@ export const kardexService = {
    */
   async list(opts = {}) {
     const { data } = await api.get('/api/reportes/kardex', {
-      params: { limit: 2000, ...opts },
+      params: { limit: 100, ...opts },
     });
-    return Array.isArray(data) ? data : [];
+    // Returns { rows, total, page, limit, totalPages }
+    return data;
   },
 };

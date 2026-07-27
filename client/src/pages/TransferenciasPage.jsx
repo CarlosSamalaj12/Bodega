@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
+import { Pagination } from '@/components/ui/Pagination';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
@@ -50,7 +51,14 @@ export default function TransferenciasPage() {
 
   // Datos
   const [rows, setRows] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+
+  // Paginación server-side
+  const [page, setPage] = useState(1);
+  const limit = 20;
+  const fetchIdRef = useRef(0);
 
   // Export
   const [showColumnSelector, setShowColumnSelector] = useState(false);
@@ -214,63 +222,74 @@ export default function TransferenciasPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    const fetchId = ++fetchIdRef.current;
     try {
-      const params = { from: dateFrom, to: dateTo, limit: 2000 };
+      const params = { from: dateFrom, to: dateTo, limit, page };
       const { data } = await api.get('/api/reportes/transferencias', { params });
-      setRows(Array.isArray(data) ? data : []);
+      if (fetchId !== fetchIdRef.current) return;
+      if (data && Array.isArray(data.rows)) {
+        setRows(data.rows);
+        setTotal(data.total || 0);
+        setTotalPages(data.totalPages || 1);
+      } else {
+        setRows([]);
+        setTotal(0);
+        setTotalPages(1);
+      }
     } catch (e) {
-      toast.error('Error al cargar transferencias');
-      setRows([]);
+      if (fetchId === fetchIdRef.current) {
+        toast.error('Error al cargar transferencias');
+        setRows([]);
+        setTotal(0);
+        setTotalPages(1);
+      }
     } finally {
-      setLoading(false);
+      if (fetchId === fetchIdRef.current) setLoading(false);
     }
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, page, limit]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Agrupar por movimiento
-  const grouped = useMemo(() => {
-    const map = new Map();
-    for (const r of rows) {
-      const id = r.id_movimiento;
-      if (!map.has(id)) {
-        map.set(id, {
-          id_movimiento: r.id_movimiento,
-          fecha: r.fecha,
-          hora: r.hora,
-          bodega_origen: r.bodega_origen,
-          bodega_destino: r.bodega_destino,
-          no_documento: r.no_documento,
-          usuario_creador: r.usuario_creador,
-          observaciones: r.observaciones,
-          lineas: [],
-        });
-      }
-      const g = map.get(id);
-      g.lineas.push({
-        id_detalle: r.id_detalle,
-        nombre_producto: r.nombre_producto,
-        sku: r.sku,
-        lote: r.lote,
-        fecha_vencimiento: r.fecha_vencimiento,
-        cantidad: Number(r.cantidad || 0),
-        costo_unitario: Number(r.costo_unitario || 0),
-        total_linea: Number(r.total_linea || 0),
-      });
-    }
-    return Array.from(map.values());
-  }, [rows]);
+  useEffect(() => { setPage(1); }, [dateFrom, dateTo]);
+
+  // Filtro client-side sobre los datos de la página actual
+  const filtered = useMemo(() => {
+    if (!debouncedSearch) return rows;
+    const q = debouncedSearch.toLowerCase();
+    return rows.filter((g) =>
+      g.bodega_origen?.toLowerCase().includes(q) ||
+      g.bodega_destino?.toLowerCase().includes(q) ||
+      (g.lineas || []).some((l) =>
+        l.nombre_producto?.toLowerCase().includes(q) ||
+        l.sku?.toLowerCase().includes(q)
+      )
+    );
+  }, [rows, debouncedSearch]);
+
+  const displayRows = filtered;
 
   const totales = useMemo(() => {
     let totalCantidad = 0, totalCosto = 0;
-    for (const g of grouped) {
-      for (const l of g.lineas) {
+    for (const g of displayRows) {
+      const lineas = g.lineas || [];
+      for (const l of lineas) {
         totalCantidad += l.cantidad;
         totalCosto += l.total_linea;
       }
     }
     return { totalCantidad, totalCosto };
-  }, [grouped]);
+  }, [displayRows]);
+
+  // Aplanar datos agrupados para exportación
+  const flatForExport = useMemo(() => {
+    const flat = [];
+    for (const m of rows) {
+      for (const l of (m.lineas || [])) {
+        flat.push({ ...m, ...l });
+      }
+    }
+    return flat;
+  }, [rows]);
 
   const allExportColumns = [
     { key: 'id_movimiento', label: 'ID' },
@@ -290,7 +309,7 @@ export default function TransferenciasPage() {
 
   const handleExportWithColumns = (cols, format) => {
     const fn = { csv: downloadCSV, xlsx: downloadXLSX, pdf: downloadPDF }[format] || downloadCSV;
-    fn(rows, {
+    fn(flatForExport, {
       filename: `transferencias_${new Date().toISOString().slice(0, 10)}`,
       columns: cols,
       format: (row, col) => {
@@ -314,19 +333,6 @@ export default function TransferenciasPage() {
     });
   };
 
-  const filtered = useMemo(() => {
-    if (!debouncedSearch) return grouped;
-    const q = debouncedSearch.toLowerCase();
-    return grouped.filter((g) =>
-      g.bodega_origen?.toLowerCase().includes(q) ||
-      g.bodega_destino?.toLowerCase().includes(q) ||
-      g.lineas.some((l) =>
-        l.nombre_producto?.toLowerCase().includes(q) ||
-        l.sku?.toLowerCase().includes(q)
-      )
-    );
-  }, [grouped, debouncedSearch]);
-
   // --- Navegación entre reversiones ---
   const tableRef = useRef(null);
 
@@ -334,7 +340,7 @@ export default function TransferenciasPage() {
   const revertLinks = useMemo(() => {
     const originalToRev = {};
     const revToOriginal = {};
-    for (const g of grouped) {
+    for (const g of rows) {
       const obs = g.observaciones || '';
       const match = obs.match(/REVERSIÓN de #(\d+)/);
       if (match) {
@@ -344,7 +350,7 @@ export default function TransferenciasPage() {
       }
     }
     return { originalToRev, revToOriginal };
-  }, [grouped]);
+  }, [rows]);
 
   const goToMovimiento = (id) => {
     // Expandir el target
@@ -414,7 +420,7 @@ export default function TransferenciasPage() {
     <>
       <Header
         title="Transferencias"
-        subtitle={`${filtered.length}${filtered.length !== grouped.length ? ` de ${grouped.length}` : ''} transferencia${filtered.length === 1 ? '' : 's'} · ${totales.totalCantidad.toFixed(2)} unidades`}
+        subtitle={`${total} transferencia${total === 1 ? '' : 's'} · Pág. ${page} de ${totalPages} · ${totales.totalCantidad.toFixed(2)} unidades`}
         actions={
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <Button variant="primary" size="sm" onClick={openCreateModal}>+ Nueva transferencia</Button>
@@ -449,7 +455,7 @@ export default function TransferenciasPage() {
 
         {loading ? (
           <div className="transferencias-page__state"><Spinner size={20} label="Cargando transferencias…" /></div>
-        ) : filtered.length === 0 ? (
+        ) : displayRows.length === 0 ? (
           <EmptyState icon="🔄" title="Sin datos" message="No hay transferencias en el período seleccionado." />
         ) : (
           <div className="transferencias-page__table-wrapper" ref={tableRef}>
@@ -467,7 +473,7 @@ export default function TransferenciasPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.flatMap((g) => {
+                {displayRows.flatMap((g) => {
                   const isOpen = expanded.has(g.id_movimiento);
                   const sumCant = g.lineas.reduce((a, l) => a + l.cantidad, 0);
                   const sumTotal = g.lineas.reduce((a, l) => a + l.total_linea, 0);
@@ -581,6 +587,9 @@ export default function TransferenciasPage() {
               </tfoot>
             </table>
           </div>
+        )}
+        {rows.length > 0 && (
+          <Pagination page={page} totalPages={totalPages} total={total} onChange={setPage} loading={loading} />
         )}
       </div>
 
