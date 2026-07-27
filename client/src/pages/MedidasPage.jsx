@@ -198,7 +198,7 @@ export default function MedidasPage() {
         ) : (
           <div className="medidas-page__list">
             {filtered.map((row) => (
-              <DragItem key={row.id_medida} row={row} onReorder={handleReorder}>
+              <DragItem key={`med-med-${row.id_medida}`} row={row} onReorder={handleReorder}>
                 <span className="medidas-page__drag-handle" title="Arrastrar para reordenar">⠿</span>
                 <span className="medidas-page__item-name">{row.nombre_medida}</span>
                 <div className="medidas-page__item-actions">

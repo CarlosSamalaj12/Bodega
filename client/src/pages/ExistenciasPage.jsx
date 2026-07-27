@@ -258,7 +258,7 @@ export default function ExistenciasPage() {
             const isOpen = expanded.has(g.key);
             const alert = getGroupAlert(g);
             return (
-              <div key={g.key} className="existencias-page__group-card">
+              <div key={`exi-grp-${g.key}`} className="existencias-page__group-card">
                 <button
                   type="button"
                   className="existencias-page__group-card-header"
@@ -283,7 +283,7 @@ export default function ExistenciasPage() {
                     {g.lotes.map((lot, i) => {
                       const lotAlert = getAlertBadge(lot);
                       return (
-                        <div key={i} className="existencias-page__lot-row">
+                        <div key={`exi-${i}`} className="existencias-page__lot-row">
                           <div className="existencias-page__lot-field">
                             <span className="existencias-page__lot-label">Stock</span>
                             <span className="existencias-page__lot-value">
@@ -347,7 +347,7 @@ export default function ExistenciasPage() {
               const isOpen = expanded.has(g.key);
               const alert = getGroupAlert(g);
               return (
-                <Fragment key={g.key}>
+                <Fragment key={`exi-grp-${g.key}`}>
                   <tr
                     className="existencias-page__group-row"
                     onClick={() => toggleGroup(g.key)}
@@ -466,17 +466,17 @@ export default function ExistenciasPage() {
             <div className="existencias-page__select-group">
               <select className="select" value={categoriaId ?? ''} onChange={(e) => setCategoriaId(e.target.value ? Number(e.target.value) : null)} aria-label="Categoría">
                 <option value="">Todas las categorías</option>
-                {categorias.map((c) => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre_categoria}</option>)}
+                {categorias.map((c) => <option key={`exi-cat-${c.id_categoria}`} value={c.id_categoria}>{c.nombre_categoria}</option>)}
               </select>
             <div className={`existencias-page__cascade ${categoriaId && !cleaning ? 'existencias-page__cascade--visible' : ''} ${cleaning ? 'existencias-page__cascade--cleaning' : ''}`}>
               <select className="select" value={subcategoriaId ?? ''} onChange={(e) => setSubcategoriaId(e.target.value ? Number(e.target.value) : null)} aria-label="Subcategoría">
                 <option value="">Todas las subcategorías</option>
-                {subcategorias.map((s) => <option key={s.id_subcategoria} value={s.id_subcategoria}>{s.nombre_subcategoria}</option>)}
+                {subcategorias.map((s) => <option key={`exi-sub-${s.id_subcategoria}`} value={s.id_subcategoria}>{s.nombre_subcategoria}</option>)}
               </select>
             </div>
               <select className="select" value={bodegaId ?? ''} onChange={(e) => setBodegaId(e.target.value ? Number(e.target.value) : null)} aria-label="Bodega">
                 <option value="">Todas las bodegas</option>
-                {bodegas.map((b) => <option key={b.id_bodega} value={b.id_bodega}>{b.nombre_bodega}</option>)}
+                {bodegas.map((b) => <option key={`exi-bod-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>)}
               </select>
             </div>
             <label className="existencias-page__checkbox-label" title="Incluir productos sin stock">

@@ -372,7 +372,7 @@ export default function DespacharPage() {
             <div className="despachar-page__status-chips">
               {STATUS_OPTIONS.map((opt) => (
                 <button
-                  key={opt.value}
+                  key={`des-opt-${opt.value}`}
                   type="button"
                   className={`despachar-page__chip ${statusFilter === opt.value ? 'despachar-page__chip--active' : ''} ${opt.variant ? `despachar-page__chip--${opt.variant}` : ''}`}
                   onClick={() => setStatusFilter(opt.value)}

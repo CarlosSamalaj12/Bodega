@@ -125,7 +125,7 @@ function BodegaForm({ open, onClose, editingId, editValues, onSaved }) {
           <div className="bodegas-page__field">
             <label className="bodegas-page__label" htmlFor="bod-tipo">Tipo <span className="bodegas-page__required">*</span></label>
             <select id="bod-tipo" className="select" value={values.tipo_bodega ?? 'OPERATIVA'} onChange={(e) => set('tipo_bodega', e.target.value)}>
-              {TIPO_OPTS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+              {TIPO_OPTS.map((opt) => <option key={`bdg-opt-${opt.value}`} value={opt.value}>{opt.label}</option>)}
             </select>
             {errors.tipo_bodega && <span className="bodegas-page__field-error">{errors.tipo_bodega}</span>}
           </div>
@@ -264,7 +264,7 @@ export default function BodegasPage() {
         ) : (
           <div className="bodegas-page__list">
             {filtered.map((row) => (
-              <DragItem key={row.id_bodega} row={row} onReorder={handleReorder}>
+              <DragItem key={`bdg-${row.id_bodega}`} row={row} onReorder={handleReorder}>
                 <span className="bodegas-page__drag-handle" title="Arrastrar para reordenar">⠿</span>
                 <div className="bodegas-page__item-info">
                   <div className="bodegas-page__item-main">

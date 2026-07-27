@@ -273,7 +273,7 @@ export default function CorteDiarioPage() {
               >
                 <option value="">Todas las bodegas</option>
                 {bodegas.map((b) => (
-                  <option key={b.id_bodega} value={b.id_bodega}>{b.nombre_bodega}</option>
+                  <option key={`cor-bod-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>
                 ))}
               </select>
               <label className="corte-diario__toggle">

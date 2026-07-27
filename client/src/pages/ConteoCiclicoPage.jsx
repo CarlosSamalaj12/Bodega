@@ -215,7 +215,7 @@ export default function ConteoCiclicoPage() {
               </thead>
               <tbody>
                 {conteos.map((c) => (
-                  <tr key={c.id_conteo} className="conteo-ciclico-page__row">
+                  <tr key={`cco-cont-${c.id_conteo}`} className="conteo-ciclico-page__row">
                     <td><code>#{c.id_conteo}</code></td>
                     <td>{formatDate(c.fecha_conteo)}</td>
                     <td>{c.nombre_bodega}</td>
@@ -342,7 +342,7 @@ export default function ConteoCiclicoPage() {
                       selectedConteo.estado !== 'COMPLETADO' && selectedConteo.estado !== 'AJUSTADO';
                     return (
                       <tr
-                        key={d.id_detalle}
+                        key={`cco-det-${d.id_detalle}`}
                         className={`conteo-ciclico-page__det-row ${dif !== null && dif !== 0 ? 'conteo-ciclico-page__det-row--diff' : ''}`}
                       >
                         <td>{d.nombre_producto}</td>

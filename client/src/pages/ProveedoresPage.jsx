@@ -110,7 +110,7 @@ function ProveedorForm({ open, onClose, editingId, editValues, onSaved }) {
         {error && <div className="proveedores-page__form-error">{error}</div>}
         <div className="proveedores-page__form-grid">
           {fields.map((f) => (
-            <div className="proveedores-page__field" key={f.key}>
+            <div className="proveedores-page__field" key={`prv-${f.key}`}>
               <label className="proveedores-page__label" htmlFor={`pf-${f.key}`}>
                 {f.label}{f.required && <span className="proveedores-page__required"> *</span>}
               </label>
@@ -248,7 +248,7 @@ export default function ProveedoresPage() {
         ) : (
           <div className="proveedores-page__list">
             {filtered.map((row) => (
-              <DragItem key={row.id_proveedor} row={row} onReorder={handleReorder}>
+              <DragItem key={`prv-prv-${row.id_proveedor}`} row={row} onReorder={handleReorder}>
                 <span className="proveedores-page__drag-handle" title="Arrastrar para reordenar">⠿</span>
                 <div className="proveedores-page__item-info">
                   <div className="proveedores-page__item-main">

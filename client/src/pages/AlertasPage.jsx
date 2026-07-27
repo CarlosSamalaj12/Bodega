@@ -443,7 +443,7 @@ export default function AlertasPage() {
           <div className="alertas-page__tabs">
             {TABS.map((tab) => (
               <button
-                key={tab.key}
+                key={`ale-tab-${tab.key}`}
                 type="button"
                 className={`alertas-page__tab ${tipo === tab.key ? 'alertas-page__tab--active' : ''}`}
                 onClick={() => handleTabChange(tab.key)}
@@ -472,7 +472,7 @@ export default function AlertasPage() {
                 <div className="alertas-page__dias-chips">
                   {DIAS_OPTIONS.map((opt) => (
                     <button
-                      key={opt.value}
+                      key={`ale-opt-${opt.value}`}
                       type="button"
                       className={`alertas-page__chip ${dias === opt.value ? 'alertas-page__chip--active' : ''}`}
                       onClick={() => setDias(opt.value)}
@@ -492,7 +492,7 @@ export default function AlertasPage() {
             >
               <option value="">Todas las categorías</option>
               {categorias.map((c) => (
-                <option key={c.id_categoria} value={c.id_categoria}>
+                <option key={`ale-cat-${c.id_categoria}`} value={c.id_categoria}>
                   {c.nombre_categoria}
                 </option>
               ))}
@@ -507,7 +507,7 @@ export default function AlertasPage() {
               >
                 <option value="">Todas las subcategorías</option>
                 {subcategorias.map((s) => (
-                  <option key={s.id_subcategoria} value={s.id_subcategoria}>
+                  <option key={`ale-sub-${s.id_subcategoria}`} value={s.id_subcategoria}>
                     {s.nombre_subcategoria}
                   </option>
                 ))}

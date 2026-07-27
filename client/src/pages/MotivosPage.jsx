@@ -120,7 +120,7 @@ function MotivoForm({ open, onClose, editingId, editValues, onSaved }) {
         <div className="motivos-page__field">
           <label className="motivos-page__label" htmlFor="mot-tipo">Tipo de movimiento <span className="motivos-page__required">*</span></label>
           <select id="mot-tipo" className="select" value={values.tipo_movimiento ?? 'ENTRADA'} onChange={(e) => set('tipo_movimiento', e.target.value)}>
-            {TIPO_OPTS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+            {TIPO_OPTS.map((opt) => <option key={`mtv-opt-${opt.value}`} value={opt.value}>{opt.label}</option>)}
           </select>
           {errors.tipo_movimiento && <span className="motivos-page__field-error">{errors.tipo_movimiento}</span>}
         </div>
@@ -245,7 +245,7 @@ export default function MotivosPage() {
         ) : (
           <div className="motivos-page__list">
             {filtered.map((row) => (
-              <DragItem key={row.id_motivo} row={row} onReorder={handleReorder}>
+              <DragItem key={`mtv-${row.id_motivo}`} row={row} onReorder={handleReorder}>
                 <span className="motivos-page__drag-handle" title="Arrastrar para reordenar">⠿</span>
                 <div className="motivos-page__item-info">
                   <span className="motivos-page__item-name">{row.nombre_motivo}</span>

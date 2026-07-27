@@ -445,7 +445,7 @@ export default function TransferenciasPage() {
             </div>
             <div className="transferencias-page__rango">
               {RANGE_PRESETS.map((p) => (
-                <button key={p.days} type="button"
+                <button key={`tra-pdays-${p.days}`} type="button"
                   className={`transferencias-page__rango-btn ${rango === p.days ? 'transferencias-page__rango-btn--active' : ''}`}
                   onClick={() => handlePreset(p.days)}>{p.label}</button>
               ))}
@@ -478,7 +478,7 @@ export default function TransferenciasPage() {
                   const sumCant = g.lineas.reduce((a, l) => a + l.cantidad, 0);
                   const sumTotal = g.lineas.reduce((a, l) => a + l.total_linea, 0);
                   return [
-                    <tr key={g.id_movimiento} data-mov-id={g.id_movimiento} className="transferencias-page__mov-row">
+                    <tr key={`tra-${g.id_movimiento}`} data-mov-id={g.id_movimiento} className="transferencias-page__mov-row">
                       <td>
                         <button type="button" className="transferencias-page__expand-btn" onClick={() => toggleExpand(g.id_movimiento)}>
                           <span className={`transferencias-page__chevron ${isOpen ? 'transferencias-page__chevron--open' : ''}`}>▸</span>
@@ -545,7 +545,7 @@ export default function TransferenciasPage() {
                               </thead>
                               <tbody>
                                 {g.lineas.map((l) => (
-                                  <tr key={l.id_detalle}>
+                                  <tr key={`tra-${l.id_detalle}`}>
                                     <td>{l.nombre_producto}</td>
                                     <td>{l.sku ? <code>{l.sku}</code> : '—'}</td>
                                     <td>{l.lote || '—'}</td>

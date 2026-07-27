@@ -300,7 +300,7 @@ export default function ProductosPage() {
           <>
             <div className="productos-page__list">
               {ordered.map((row) => (
-                <DragItem key={row.id_producto} row={row} onReorder={handleReorder}>
+                <DragItem key={`prd-prd-${row.id_producto}`} row={row} onReorder={handleReorder}>
                   <span className="productos-page__drag-handle" title="Arrastrar para reordenar">⠿</span>
                   <div className="productos-page__item-info">
                     <div className="productos-page__item-main">

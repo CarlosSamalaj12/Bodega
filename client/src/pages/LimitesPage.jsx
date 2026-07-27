@@ -124,7 +124,7 @@ function LimiteForm({ open, onClose, editingKey, editValues, bodegas, productos,
                   onChange={(e) => set('id_bodega', e.target.value)}>
                   <option value="">Seleccionar…</option>
                   {bodegas.map((b) => (
-                    <option key={b.id_bodega} value={b.id_bodega}>{b.nombre_bodega}</option>
+                    <option key={`lim-bod-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>
                   ))}
                 </select>
                 {errors.id_bodega && <span className="limites-page__field-error">{errors.id_bodega}</span>}
@@ -135,7 +135,7 @@ function LimiteForm({ open, onClose, editingKey, editValues, bodegas, productos,
                   onChange={(e) => set('id_producto', Number(e.target.value))}>
                   <option value="">Seleccionar…</option>
                   {productos.map((p) => (
-                    <option key={p.id_producto} value={p.id_producto}>
+                    <option key={`lim-${p.id_producto}`} value={p.id_producto}>
                       {p.nombre_producto}{p.sku ? ` (${p.sku})` : ''}
                     </option>
                   ))}

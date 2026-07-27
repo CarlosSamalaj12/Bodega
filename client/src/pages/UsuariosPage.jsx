@@ -451,7 +451,7 @@ export default function UsuariosPage() {
         ) : (
           <div className="usuarios-page__list">
             {filtered.map((row) => (
-              <DragItem key={row.id_user} row={row} onReorder={handleReorder}>
+              <DragItem key={`usu-${row.id_user}`} row={row} onReorder={handleReorder}>
                 <span className="usuarios-page__drag-handle" title="Arrastrar para reordenar">⠿</span>
                 <div className="usuarios-page__item-info">
                   <div className="usuarios-page__item-main">
@@ -557,7 +557,7 @@ export default function UsuariosPage() {
               >
                 <option value="">Seleccionar…</option>
                 {roles.map((r) => (
-                  <option key={r.id_role} value={r.id_role}>
+                  <option key={`usu-${r.id_role}`} value={r.id_role}>
                     {r.role_name}
                   </option>
                 ))}
@@ -577,7 +577,7 @@ export default function UsuariosPage() {
               >
                 <option value="">Sin bodega</option>
                 {bodegas.map((b) => (
-                  <option key={b.id_bodega} value={b.id_bodega}>
+                  <option key={`usu-bod-${b.id_bodega}`} value={b.id_bodega}>
                     {b.nombre_bodega}
                   </option>
                 ))}
@@ -667,11 +667,11 @@ export default function UsuariosPage() {
                 ) : (
                   <>
                     {Object.entries(permisosPorGrupo).map(([grupo, perms]) => (
-                      <div key={grupo} className="usuarios-page__perm-group">
+                      <div key={`usu-${grupo}`} className="usuarios-page__perm-group">
                         <div className="usuarios-page__perm-group-title">{grupo}</div>
                         <div className="usuarios-page__perm-list">
                           {perms.map((p) => (
-                            <label key={p.key} className="usuarios-page__perm-item">
+                            <label key={`usu-${p.key}`} className="usuarios-page__perm-item">
                               <input
                                 type="checkbox"
                                 checked={permisosValues[p.key] === 1 || permisosValues[p.key] === true}
@@ -719,7 +719,7 @@ export default function UsuariosPage() {
                   <>
                     <div className="usuarios-page__bodegas-list">
                       {bodegas.map((b) => (
-                        <label key={b.id_bodega} className="usuarios-page__bodega-item">
+                        <label key={`usu-bod-${b.id_bodega}`} className="usuarios-page__bodega-item">
                           <input
                             type="checkbox"
                             checked={bodegasAccesoAll || bodegasAccesoIds.includes(b.id_bodega)}

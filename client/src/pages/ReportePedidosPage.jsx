@@ -266,7 +266,7 @@ export default function ReportePedidosPage() {
             <div className="reporte-pedidos__rango">
               {RANGE_PRESETS.map((p) => (
                 <button
-                  key={p.days}
+                  key={`rep-pdays-${p.days}`}
                   type="button"
                   className={`reporte-pedidos__rango-btn ${rango === p.days ? 'reporte-pedidos__rango-btn--active' : ''}`}
                   onClick={() => handlePreset(p.days)}
@@ -284,28 +284,28 @@ export default function ReportePedidosPage() {
             <select className="select" value={estado} onChange={(e) => setEstado(e.target.value)}>
               <option value="">Todos los estados</option>
               {ESTADOS.map((e) => (
-                <option key={e} value={e}>{e.replace(/_/g, ' ')}</option>
+                <option key={`rep-${e}`} value={e}>{e.replace(/_/g, ' ')}</option>
               ))}
             </select>
 
             <select className="select" value={categoriaId ?? ''} onChange={(e) => { setCategoriaId(e.target.value ? Number(e.target.value) : null); setSubcategoriaId(null); }}>
               <option value="">Todas las categorías</option>
-              {categorias.map((c) => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre_categoria}</option>)}
+              {categorias.map((c) => <option key={`rep-cat-${c.id_categoria}`} value={c.id_categoria}>{c.nombre_categoria}</option>)}
             </select>
 
             <select className="select" value={subcategoriaId ?? ''} onChange={(e) => setSubcategoriaId(e.target.value ? Number(e.target.value) : null)} disabled={!categoriaId}>
               <option value="">Todas las subcategorías</option>
-              {subcategoriasFiltradas.map((s) => <option key={s.id_subcategoria} value={s.id_subcategoria}>{s.nombre_subcategoria}</option>)}
+              {subcategoriasFiltradas.map((s) => <option key={`rep-sub-${s.id_subcategoria}`} value={s.id_subcategoria}>{s.nombre_subcategoria}</option>)}
             </select>
 
             <select className="select" value={bodegaSolicitaId ?? ''} onChange={(e) => setBodegaSolicitaId(e.target.value ? Number(e.target.value) : null)}>
               <option value="">Bodega solicitante (todas)</option>
-              {bodegas.map((b) => <option key={b.id_bodega} value={b.id_bodega}>{b.nombre_bodega}</option>)}
+              {bodegas.map((b) => <option key={`rep-bodsol-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>)}
             </select>
 
             <select className="select" value={bodegaDespachoId ?? ''} onChange={(e) => setBodegaDespachoId(e.target.value ? Number(e.target.value) : null)}>
               <option value="">Bodega despacho (todas)</option>
-              {bodegas.map((b) => <option key={b.id_bodega} value={b.id_bodega}>{b.nombre_bodega}</option>)}
+              {bodegas.map((b) => <option key={`rep-boddes-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>)}
             </select>
           </div>
         </Card>
@@ -338,7 +338,7 @@ export default function ReportePedidosPage() {
                   const sumSur = g.lineas.reduce((a, l) => a + l.cantidad_surtida, 0);
                   const sumTotal = g.lineas.reduce((a, l) => a + l.total_linea, 0);
                   const parentRow = (
-                    <tr key={g.id_pedido} className="reporte-pedidos__ped-row">
+                    <tr key={`rep-${g.id_pedido}`} className="reporte-pedidos__ped-row">
                       <td>
                         <button type="button" className="reporte-pedidos__expand-btn" onClick={() => toggleExpand(g.id_pedido)}>
                           <span className={`reporte-pedidos__chevron ${isOpen ? 'reporte-pedidos__chevron--open' : ''}`}>▸</span>
@@ -380,7 +380,7 @@ export default function ReportePedidosPage() {
                             </thead>
                             <tbody>
                               {g.lineas.map((l) => (
-                                <tr key={l.id_detalle}>
+                                <tr key={`rep-${l.id_detalle}`}>
                                   <td>{l.nombre_producto}</td>
                                   <td>{l.sku ? <code>{l.sku}</code> : '—'}</td>
                                   {!isMobile && <td>{l.nombre_categoria || '—'}</td>}

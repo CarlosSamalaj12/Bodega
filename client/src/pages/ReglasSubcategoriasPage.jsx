@@ -123,7 +123,7 @@ function ReglaForm({ open, onClose, editingId, editValues, subcategorias, onSave
                 onChange={(e) => set('id_subcategoria', e.target.value)}>
                 <option value="">Seleccionar…</option>
                 {subcategoriasDisponibles.map((s) => (
-                  <option key={s.id_subcategoria} value={s.id_subcategoria}>
+                  <option key={`rsc-sub-${s.id_subcategoria}`} value={s.id_subcategoria}>
                     {s.nombre_categoria} → {s.nombre_subcategoria}
                   </option>
                 ))}
@@ -298,7 +298,7 @@ export default function ReglasSubcategoriasPage() {
         ) : (
           <div className="reglas-page__list">
             {filtered.map((row) => (
-              <DragItem key={row.id_subcategoria} row={row} onReorder={handleReorder}>
+              <DragItem key={`rsc-${row.id_subcategoria}`} row={row} onReorder={handleReorder}>
                 <span className="reglas-page__drag-handle" title="Arrastrar para reordenar">⠿</span>
                 <div className="reglas-page__item-info">
                   <div className="reglas-page__item-main">

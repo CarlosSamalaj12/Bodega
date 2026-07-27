@@ -177,7 +177,7 @@ function SubcategoriaForm({ open, onClose, editingId, subValues, categorias, onS
           <label className="categorias-page__label" htmlFor="sub-categoria">Categoría <span className="categorias-page__required">*</span></label>
           <select id="sub-categoria" className="select" value={values.id_categoria ?? ''} onChange={(e) => set('id_categoria', e.target.value)}>
             <option value="">Seleccionar…</option>
-            {categorias.map((c) => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre_categoria}</option>)}
+            {categorias.map((c) => <option key={`cat-cat-${c.id_categoria}`} value={c.id_categoria}>{c.nombre_categoria}</option>)}
           </select>
           {errors.id_categoria && <span className="categorias-page__field-error">{errors.id_categoria}</span>}
         </div>
@@ -521,7 +521,7 @@ export default function CategoriasPage() {
             <SearchInput value={subSearch} onChange={setSubSearch} placeholder="Buscar subcategoría…" />
             <select className="select" value={subCategoriaId ?? ''} onChange={(e) => setSubCategoriaId(e.target.value ? Number(e.target.value) : null)} aria-label="Filtrar por categoría">
               <option value="">Todas las categorías</option>
-              {catItems.map((c) => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre_categoria}</option>)}
+              {catItems.map((c) => <option key={`cat-cat-${c.id_categoria}`} value={c.id_categoria}>{c.nombre_categoria}</option>)}
             </select>
           </div>
           <div className="categorias-page__panel-body">

@@ -298,7 +298,7 @@ export default function ReporteEntradasPage() {
             <div className="reporte-entradas__rango">
               {RANGE_PRESETS.map((p) => (
                 <button
-                  key={p.days}
+                  key={`ent-pdays-${p.days}`}
                   type="button"
                   className={`reporte-entradas__rango-btn ${rango === p.days ? 'reporte-entradas__rango-btn--active' : ''}`}
                   onClick={() => handlePreset(p.days)}
@@ -310,17 +310,17 @@ export default function ReporteEntradasPage() {
 
             <select className="select" value={categoriaId ?? ''} onChange={(e) => { setCategoriaId(e.target.value ? Number(e.target.value) : null); setSubcategoriaId(null); }}>
               <option value="">Todas las categorías</option>
-              {categorias.map((c) => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre_categoria}</option>)}
+              {categorias.map((c) => <option key={`ent-cat-${c.id_categoria}`} value={c.id_categoria}>{c.nombre_categoria}</option>)}
             </select>
 
             <select className="select" value={subcategoriaId ?? ''} onChange={(e) => setSubcategoriaId(e.target.value ? Number(e.target.value) : null)} disabled={!categoriaId}>
               <option value="">Todas las subcategorías</option>
-              {subcategoriasFiltradas.map((s) => <option key={s.id_subcategoria} value={s.id_subcategoria}>{s.nombre_subcategoria}</option>)}
+              {subcategoriasFiltradas.map((s) => <option key={`ent-sub-${s.id_subcategoria}`} value={s.id_subcategoria}>{s.nombre_subcategoria}</option>)}
             </select>
 
             <select className="select" value={motivoId ?? ''} onChange={(e) => setMotivoId(e.target.value ? Number(e.target.value) : null)}>
               <option value="">Todos los motivos</option>
-              {filteredMotivos.map((m) => <option key={m.id_motivo} value={m.id_motivo}>{m.nombre_motivo}</option>)}
+              {filteredMotivos.map((m) => <option key={`ent-mot-${m.id_motivo}`} value={m.id_motivo}>{m.nombre_motivo}</option>)}
             </select>
 
             <input type="text" className="input" placeholder="No. Documento…"
@@ -331,7 +331,7 @@ export default function ReporteEntradasPage() {
 
             <select className="select" value={warehouseId ?? ''} onChange={(e) => setWarehouseId(e.target.value ? Number(e.target.value) : null)}>
               <option value="">Todas las bodegas</option>
-              {bodegas.map((b) => <option key={b.id_bodega} value={b.id_bodega}>{b.nombre_bodega}</option>)}
+              {bodegas.map((b) => <option key={`ent-bod-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>)}
             </select>
           </div>
         </Card>
@@ -365,7 +365,7 @@ export default function ReporteEntradasPage() {
                   const sumCant = g.lineas.reduce((a, l) => a + l.cantidad, 0);
                   const sumTotal = g.lineas.reduce((a, l) => a + l.total_linea, 0);
                   const parentRow = (
-                    <tr key={g.id_movimiento} className="reporte-entradas__mov-row">
+                    <tr key={`ent-${g.id_movimiento}`} className="reporte-entradas__mov-row">
                       <td>
                         <button type="button" className="reporte-entradas__expand-btn" onClick={() => toggleExpand(g.id_movimiento)}>
                           <span className={`reporte-entradas__chevron ${isOpen ? 'reporte-entradas__chevron--open' : ''}`}>▸</span>
@@ -385,7 +385,7 @@ export default function ReporteEntradasPage() {
                     </tr>
                   );
                   const detailRow = isOpen ? (
-                    <tr key={`det-${g.id_movimiento}`} className="reporte-entradas__det-row">
+                    <tr key={`ent-det-${g.id_movimiento}`} className="reporte-entradas__det-row">
                       <td colSpan={isMobile ? 6 : 9}>
                         <div className="reporte-entradas__detalle">
                           <table className="reporte-entradas__det-table">
@@ -402,7 +402,7 @@ export default function ReporteEntradasPage() {
                             </thead>
                             <tbody>
                               {g.lineas.map((l) => (
-                                <tr key={l.id_detalle}>
+                                <tr key={`ent-${l.id_detalle}`}>
                                   <td>{l.nombre_producto}</td>
                                   <td>{l.sku ? <code>{l.sku}</code> : '—'}</td>
                                   {!isMobile && <td>{l.nombre_categoria || '—'}</td>}

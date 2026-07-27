@@ -562,7 +562,7 @@ export default function CuadreCajaPage() {
                     onChange={(e) => setFormBodega(e.target.value ? Number(e.target.value) : null)}>
                     <option value="">Seleccionar…</option>
                     {bodegas.map((b) => (
-                      <option key={b.id_bodega} value={b.id_bodega}>{b.nombre_bodega}</option>
+                      <option key={`cua-bod-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>
                     ))}
                   </select>
                 </div>
@@ -591,7 +591,7 @@ export default function CuadreCajaPage() {
                         const qty = parseNum(payload.monedas[key]);
                         const subtotal = qty * denom;
                         return (
-                          <div key={key} className="cuadre-caja__denom-row">
+                          <div key={`cua-k-${key}`} className="cuadre-caja__denom-row">
                             <span className="cuadre-caja__denom-label">
                               Q {denom === 0.25 ? '0.25' : denom === 0.5 ? '0.50' : denom.toFixed(2)}
                             </span>
@@ -621,7 +621,7 @@ export default function CuadreCajaPage() {
                     <h3 className="cuadre-caja__section-title">Pagos</h3>
                     <div className="cuadre-caja__pagos">
                       {Object.keys(PAGO_LABELS).map((key) => (
-                        <div key={key} className="cuadre-caja__pago-row">
+                        <div key={`cua-k-${key}`} className="cuadre-caja__pago-row">
                           <span className="cuadre-caja__pago-label">{PAGO_LABELS[key]}</span>
                           <div className="cuadre-caja__pago-input-wrap">
                             <span className="cuadre-caja__pago-currency">Q</span>
@@ -715,7 +715,7 @@ export default function CuadreCajaPage() {
                         <span></span>
                       </div>
                       {payload.ventas_rows.map((row, idx) => (
-                        <div key={idx} className="cuadre-caja__mini-table-row">
+                        <div key={`cua-${idx}`} className="cuadre-caja__mini-table-row">
                           <input
                             type="text" className="input input--sm"
                             value={row.ambiente}
@@ -737,7 +737,7 @@ export default function CuadreCajaPage() {
                         </div>
                       ))}
                       <datalist id="ventas-sugeridas">
-                        {VENTAS_SUGERIDAS.map((v) => <option key={v} value={v} />)}
+                        {VENTAS_SUGERIDAS.map((v) => <option key={`cua-${v}`} value={v} />)}
                       </datalist>
                       <div className="cuadre-caja__mini-table-row cuadre-caja__mini-table-row--total">
                         <span>Total Ventas</span>
@@ -764,7 +764,7 @@ export default function CuadreCajaPage() {
                         <span></span>
                       </div>
                       {payload.detalle.map((row, idx) => (
-                        <div key={idx} className="cuadre-caja__mini-table-row cuadre-caja__mini-table-row--4col">
+                        <div key={`cua-${idx}`} className="cuadre-caja__mini-table-row cuadre-caja__mini-table-row--4col">
                           <input type="text" className="input input--sm" value={row.descripcion}
                             onChange={(e) => updateDetalleRow(idx, 'descripcion', e.target.value)} placeholder="Descripción" />
                           <input type="text" className="input input--sm" value={row.nombre}
@@ -865,7 +865,7 @@ export default function CuadreCajaPage() {
               <select className="select" value={warehouseId ?? ''}
                 onChange={(e) => setWarehouseId(e.target.value ? Number(e.target.value) : null)}>
                 <option value="">Todas las bodegas</option>
-                {bodegas.map((b) => <option key={b.id_bodega} value={b.id_bodega}>{b.nombre_bodega}</option>)}
+                {bodegas.map((b) => <option key={`cua-bod-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>)}
               </select>
             </div>
             <div className="cuadre-caja__filter-group">
@@ -995,7 +995,7 @@ export default function CuadreCajaPage() {
                         if (numQty === 0) return null;
                         const total = numQty * Number(denom);
                         return (
-                          <tr key={denom}>
+                          <tr key={`cua-${denom}`}>
                             <td>Q {fmtMoney(denom)}</td>
                             <td style={{ textAlign: 'right' }}>{fmtMoney(numQty)}</td>
                             <td style={{ textAlign: 'right' }}>Q {fmtMoney(total)}</td>
@@ -1030,7 +1030,7 @@ export default function CuadreCajaPage() {
                           dolares_cantidad: 'Dólares (cant.)',
                         };
                         return (
-                          <tr key={key}>
+                          <tr key={`cua-k-${key}`}>
                             <td>{labels[key] || key}</td>
                             <td style={{ textAlign: 'right' }}>{fmtMoneda(num)}</td>
                           </tr>
@@ -1056,7 +1056,7 @@ export default function CuadreCajaPage() {
                         const num = Number(val || 0);
                         if (num === 0) return null;
                         return (
-                          <tr key={key}>
+                          <tr key={`cua-k-${key}`}>
                             <td>{key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}</td>
                             <td style={{ textAlign: 'right' }}>{fmtMoneda(num)}</td>
                           </tr>
@@ -1082,7 +1082,7 @@ export default function CuadreCajaPage() {
                         const num = Number(val || 0);
                         if (num === 0) return null;
                         return (
-                          <tr key={key}>
+                          <tr key={`cua-k-${key}`}>
                             <td>{key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}</td>
                             <td style={{ textAlign: 'right' }}>{fmtMoneda(num)}</td>
                           </tr>

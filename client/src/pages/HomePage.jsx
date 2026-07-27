@@ -155,7 +155,7 @@ export default function HomePage() {
             <div className="home-page__days-selector" role="group" aria-label="Rango de días">
               {[7, 15, 30, 60, 90].map((nd) => (
                 <button
-                  key={nd}
+                  key={`hom-nd-${nd}`}
                   type="button"
                   className={`home-page__days-btn ${nd === days ? 'home-page__days-btn--active' : ''}`}
                   onClick={() => handleDaysChange(nd)}
@@ -194,7 +194,7 @@ export default function HomePage() {
               const Tag = isClickable ? 'button' : 'div';
               return (
                 <Tag
-                  key={card.title}
+                  key={`hom-${card.title}`}
                   className={`home-page__stat-card ${isClickable ? 'home-page__stat-card--clickable' : ''}`}
                   onClick={isClickable ? () => navigate(card.to) : undefined}
                   type={isClickable ? 'button' : undefined}
@@ -266,7 +266,7 @@ export default function HomePage() {
               <div className="home-page__list">
                 {recentEntradas.map((e) => (
                   <button
-                    key={e.id_movimiento}
+                    key={`hom-est-${e.id_movimiento}`}
                     type="button"
                     className="home-page__list-item"
                     onClick={() => navigate(`/entradas?open=${e.id_movimiento}`)}
@@ -298,7 +298,7 @@ export default function HomePage() {
               <div className="home-page__list">
                 {recentSalidas.map((s) => (
                   <button
-                    key={s.id_movimiento}
+                    key={`hom-${s.id_movimiento}`}
                     type="button"
                     className="home-page__list-item"
                     onClick={() => navigate(`/salidas?open=${s.id_movimiento}`)}

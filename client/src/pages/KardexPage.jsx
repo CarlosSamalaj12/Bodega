@@ -303,7 +303,7 @@ export default function KardexPage() {
                 aria-label="Tipo de movimiento"
               >
                 {TIPO_MOVIMIENTO.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
+                  <option key={`kar-${t.value}`} value={t.value}>{t.label}</option>
                 ))}
               </select>
 
@@ -315,7 +315,7 @@ export default function KardexPage() {
               >
                 <option value="">Todas las categorías</option>
                 {categorias.map((c) => (
-                  <option key={c.id_categoria} value={c.id_categoria}>
+                  <option key={`kar-cat-${c.id_categoria}`} value={c.id_categoria}>
                     {c.nombre_categoria}
                   </option>
                 ))}
@@ -405,7 +405,7 @@ export default function KardexPage() {
                     }
                     return (
                       <button
-                        key={pageNum}
+                        key={`kar-${pageNum}`}
                         type="button"
                         className={`kardex-page__pagination-page ${
                           pageNum === page ? 'kardex-page__pagination-page--active' : ''

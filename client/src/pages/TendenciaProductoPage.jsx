@@ -53,7 +53,7 @@ function TrendBarChart({ data, valueKey, labelFmt, valueFmt, barColorClass = 'te
         const pct = (val / maxVal) * 100;
         const barH = Math.max(4, pct * 0.9); // 90% del contenedor
         return (
-          <div key={i} className="tendencia__bar-wrap" title={`${labelFmt(r)}: ${valueFmt(val)}`}>
+          <div key={`ten-${i}`} className="tendencia__bar-wrap" title={`${labelFmt(r)}: ${valueFmt(val)}`}>
             <div className={`tendencia__bar ${barColorClass}`} style={{ height: `${barH}%` }} />
             <div className="tendencia__bar-value">{valueFmt(val)}</div>
             <div className="tendencia__bar-label">{labelFmt(r)}</div>
@@ -501,7 +501,7 @@ export default function TendenciaProductoPage() {
                     <div className="tendencia__search-results">
                       {productResults.map((p) => (
                         <button
-                          key={p.id_producto}
+                          key={`ten-${p.id_producto}`}
                           type="button"
                           className="tendencia__search-option"
                           onClick={() => handleSelectProduct(p)}
@@ -533,7 +533,7 @@ export default function TendenciaProductoPage() {
               >
                 <option value="">Todas las categorías</option>
                 {categorias.map((c) => (
-                  <option key={c.id_categoria} value={c.id_categoria}>
+                  <option key={`ten-cat-${c.id_categoria}`} value={c.id_categoria}>
                     {c.nombre_categoria}
                   </option>
                 ))}
@@ -550,7 +550,7 @@ export default function TendenciaProductoPage() {
               >
                 <option value="">Todas las bodegas</option>
                 {warehouses.map((w) => (
-                  <option key={w.id_bodega} value={w.id_bodega}>{w.nombre_bodega}</option>
+                  <option key={`ten-${w.id_bodega}`} value={w.id_bodega}>{w.nombre_bodega}</option>
                 ))}
               </select>
             </div>
@@ -676,7 +676,7 @@ export default function TendenciaProductoPage() {
                         </thead>
                         <tbody>
                           {data.price_monthly.map((r, i) => (
-                            <tr key={i}>
+                            <tr key={`ten-${i}`}>
                               <td>{monthLabel(r.periodo)}</td>
                               <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
                                 {fmtMoney(r.precio)}
@@ -712,7 +712,7 @@ export default function TendenciaProductoPage() {
                         </thead>
                         <tbody>
                           {data.price_increases.map((r, i) => (
-                            <tr key={i}>
+                            <tr key={`ten-${i}`}>
                               <td>{fmtDateDMY(r.fecha)}</td>
                               <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{fmtMoney(r.precio_anterior)}</td>
                               <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{fmtMoney(r.precio_nuevo)}</td>
@@ -740,7 +740,7 @@ export default function TendenciaProductoPage() {
                     <div className="tendencia__group-selector">
                       {DEMAND_GROUP_OPTIONS.map((opt) => (
                         <button
-                          key={opt.label}
+                          key={`ten-${opt.label}`}
                           type="button"
                           className={`tendencia__group-chip ${groupDays === opt.value ? 'tendencia__group-chip--active' : ''}`}
                           onClick={() => setGroupDays(opt.value)}
@@ -775,7 +775,7 @@ export default function TendenciaProductoPage() {
                         </thead>
                         <tbody>
                           {demandData.map((r, i) => (
-                            <tr key={i}>
+                            <tr key={`ten-${i}`}>
                               <td>{groupDays ? r.label : fmtDateDMY(r.fecha)}</td>
                               <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
                                 {Number(r.cantidad_solicitada || 0).toFixed(2)}

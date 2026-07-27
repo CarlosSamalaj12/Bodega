@@ -179,7 +179,7 @@ export default function AuditoriaSensiblesPage() {
             <select className="select" value={actionKey} onChange={(e) => setActionKey(e.target.value)}>
               <option value="">Todas las acciones</option>
               {actionKeyOptions.map((o) => (
-                <option key={o.key} value={o.key}>{o.label}</option>
+                <option key={`aud-${o.key}`} value={o.key}>{o.label}</option>
               ))}
             </select>
 
@@ -211,7 +211,7 @@ export default function AuditoriaSensiblesPage() {
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id_auditoria} className="auditoria-sensibles__row"
+                  <tr key={`aud-${r.id_auditoria}`} className="auditoria-sensibles__row"
                     onClick={() => setDetailRow(r)} style={{ cursor: 'pointer' }}>
                     <td><code>#{r.id_auditoria}</code></td>
                     <td className="auditoria-sensibles__date">
