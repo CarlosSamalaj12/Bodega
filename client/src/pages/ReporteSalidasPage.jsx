@@ -126,18 +126,54 @@ export default function ReporteSalidasPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Agrupar líneas planas del server por id_movimiento
+  const grouped = useMemo(() => {
+    const map = new Map();
+    for (const r of rows || []) {
+      const id = r.id_movimiento;
+      if (!id) continue;
+      if (!map.has(id)) {
+        map.set(id, {
+          id_movimiento: id,
+          fecha: r.creado_en || r.fecha,
+          hora: r.hora,
+          nombre_bodega_origen: r.nombre_bodega_origen,
+          nombre_bodega_destino: r.nombre_bodega_destino,
+          nombre_motivo: r.nombre_motivo,
+          no_documento: r.no_documento,
+          usuario_creador: r.usuario_creador,
+          observaciones: r.observaciones,
+          tipo_salida: r.tipo_salida,
+          lineas: [],
+        });
+      }
+      map.get(id).lineas.push({
+        id_detalle: r.id_detalle,
+        id_producto: r.id_producto,
+        nombre_producto: r.nombre_producto,
+        sku: r.sku,
+        nombre_categoria: r.nombre_categoria,
+        nombre_subcategoria: r.nombre_subcategoria,
+        lote: r.lote,
+        cantidad: Number(r.cantidad || 0),
+        costo_unitario: Number(r.costo_unitario || 0),
+        total_linea: Number(r.total_linea || 0),
+      });
+    }
+    return Array.from(map.values());
+  }, [rows]);
+
   const totales = useMemo(() => {
     let totalCantidad = 0;
     let totalCosto = 0;
-    for (const g of rows) {
-      const lineas = g.lineas || [];
-      for (const l of lineas) {
+    for (const g of grouped) {
+      for (const l of g.lineas || []) {
         totalCantidad += l.cantidad;
         totalCosto += l.total_linea;
       }
     }
     return { totalCantidad, totalCosto };
-  }, [rows]);
+  }, [grouped]);
 
   const subcategoriasFiltradas = useMemo(() => {
     if (!categoriaId) return subcategorias;
@@ -153,13 +189,13 @@ export default function ReporteSalidasPage() {
   // Aplanar datos agrupados para exportación
   const flatForExport = useMemo(() => {
     const flat = [];
-    for (const m of rows) {
+    for (const m of grouped) {
       for (const l of (m.lineas || [])) {
         flat.push({ ...m, ...l });
       }
     }
     return flat;
-  }, [rows]);
+  }, [grouped]);
 
   // Columnas disponibles para exportación
   const allExportColumns = [
@@ -218,7 +254,7 @@ export default function ReporteSalidasPage() {
         title="Reporte de Salidas"
         subtitle={`${total} movimiento${total === 1 ? '' : 's'} · Pág. ${page} de ${totalPages}`}
         actions={
-          rows.length > 0 && !loading ? (
+          grouped.length > 0 && !loading ? (
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
                 Exportar
@@ -293,7 +329,7 @@ export default function ReporteSalidasPage() {
         </Card>
 
         {loading ? (
-          <div className="reporte-salidas__state"><Spinner size={20} label="Cargando reporte…" /></div>        ) : rows.length === 0 ? (
+          <div className="reporte-salidas__state"><Spinner size={20} label="Cargando reporte…" /></div>        ) : grouped.length === 0 ? (
           <EmptyState
             icon="⇡"
             title="Sin datos"
@@ -316,7 +352,7 @@ export default function ReporteSalidasPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.flatMap((g) => {
+                {grouped.flatMap((g) => {
                   const isOpen = expandedMovs.has(g.id_movimiento);
                   const sumCant = g.lineas.reduce((a, l) => a + l.cantidad, 0);
                   const sumTotal = g.lineas.reduce((a, l) => a + l.total_linea, 0);

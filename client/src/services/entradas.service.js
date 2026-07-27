@@ -47,7 +47,8 @@ export const entradasService = {
     const { data } = await api.get('/api/reportes/entradas', {
       params: { limit: 100, ...opts },
     });
-    return agruparMovimientos(data);
+    const rows = Array.isArray(data) ? data : (data?.rows || []);
+    return agruparMovimientos(rows);
   },
 
   /**
@@ -58,9 +59,10 @@ export const entradasService = {
     const { data } = await api.get('/api/reportes/entradas', {
       params: { limit: 500 },
     });
-    const lines = (data || []).filter((r) => Number(r.id_movimiento) === Number(id));
+    const rows = Array.isArray(data) ? data : (data?.rows || []);
+    const lines = (rows || []).filter((r) => Number(r.id_movimiento) === Number(id));
     if (!lines.length) {
-      return agruparMovimientos(data).find((m) => m.id_movimiento === Number(id)) || null;
+      return agruparMovimientos(rows).find((m) => m.id_movimiento === Number(id)) || null;
     }
     const first = lines[0];
     return {
