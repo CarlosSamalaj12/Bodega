@@ -156,6 +156,43 @@
     font-size: $font-size-sm;
   }
 
+  // ---- Productos en fila principal ----
+  &__muted {
+    color: $color-text-subtle;
+  }
+
+  &__productos-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 6px;
+    align-items: center;
+  }
+
+  &__productos-name {
+    font-size: $font-size-sm;
+    color: $color-text;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+  }
+
+  &__productos-more {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 18px;
+    padding: 0 5px;
+    background: $color-accent-soft;
+    color: $color-accent;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    border-radius: $radius-pill;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
   // ---- Detalle expandido ----
   &__det-row {
     td {

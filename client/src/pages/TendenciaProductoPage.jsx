@@ -1,9 +1,10 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Header } from '@/components/layout/Header';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ProductPicker } from '@/components/ui/ProductPicker';
 import { toast } from '@/components/ui/Toast';
 import api from '@/services/api';
 import { catalogosService } from '@/services/catalogos.service';
@@ -90,9 +91,6 @@ export default function TendenciaProductoPage() {
   const mesPasado = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   // ── Filters ──
-  const [searchQuery, setSearchQuery] = useState('');
-  const [productResults, setProductResults] = useState([]);
-  const [searching, setSearching] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [warehouseId, setWarehouseId] = useState(null);
   const [warehouses, setWarehouses] = useState([]);
@@ -108,11 +106,6 @@ export default function TendenciaProductoPage() {
   const [data, setData] = useState(null);
   const [searched, setSearched] = useState(false);
 
-  // ── Refs ──
-  const searchRef = useRef(null);
-  const searchTimerRef = useRef(null);
-  const searchWrapRef = useRef(null);
-
   // ── Cargar bodegas ──
   useEffect(() => {
     api.get('/api/cuadre-caja/context')
@@ -125,55 +118,9 @@ export default function TendenciaProductoPage() {
     catalogosService.getCategorias().then(setCategorias).catch(() => {});
   }, []);
 
-  // Limpiar timeout al desmontar
-  useEffect(() => {
-    return () => {
-      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    };
-  }, []);
-
-  // Cerrar resultados al hacer click fuera
-  useEffect(() => {
-    if (productResults.length === 0) return;
-    const handler = (e) => {
-      if (!e.target.closest('.tendencia__product-search')) {
-        setProductResults([]);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [productResults]);
-
-  // ── Búsqueda de productos ──
-  const handleSearchInput = (e) => {
-    const q = e.target.value;
-    setSearchQuery(q);
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-
-    if (q.length < 2) {
-      setProductResults([]);
-      return;
-    }
-
-    searchTimerRef.current = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const params = { q, limit: 15 };
-        if (categoriaId) params.categoria = categoriaId;
-        const { data: res } = await api.get('/api/productos/search', { params });
-        setProductResults(Array.isArray(res) ? res : res?.rows || []);
-      } catch {
-        setProductResults([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 300);
-  };
-
+  // ── Seleccionar producto ──
   const handleSelectProduct = (p) => {
     setSelectedProduct(p);
-    setSearchQuery('');
-    setProductResults([]);
     setData(null);
     setSearched(false);
   };
@@ -468,55 +415,11 @@ export default function TendenciaProductoPage() {
             {/* Product search */}
             <div className="tendencia__product-search">
               <label className="tendencia__filter-label">Producto</label>
-              {selectedProduct ? (
-                <div className="tendencia__product-chip">
-                  <div className="tendencia__product-chip-info">
-                    <strong>{selectedProduct.nombre_producto}</strong>
-                    {selectedProduct.sku && <code>{selectedProduct.sku}</code>}
-                  </div>
-                  <button
-                    type="button"
-                    className="tendencia__product-chip-remove"
-                    onClick={handleClearProduct}
-                    title="Cambiar producto"
-                  >✕</button>
-                </div>
-              ) : (
-                <div className="tendencia__search-wrap">
-                  <input
-                    ref={searchRef}
-                    type="text"
-                    className="input"
-                    value={searchQuery}
-                    onChange={handleSearchInput}
-                    placeholder="Buscar producto por nombre o SKU…"
-                    autoComplete="off"
-                  />
-                  {searching && (
-                    <span className="tendencia__search-spinner">
-                      <Spinner size={14} />
-                    </span>
-                  )}
-                  {productResults.length > 0 && (
-                    <div className="tendencia__search-results">
-                      {productResults.map((p) => (
-                        <button
-                          key={`ten-${p.id_producto}`}
-                          type="button"
-                          className="tendencia__search-option"
-                          onClick={() => handleSelectProduct(p)}
-                        >
-                          <div className="tendencia__search-option-name">{p.nombre_producto}</div>
-                          <div className="tendencia__search-option-meta">
-                            {p.sku && <code>{p.sku}</code>}
-                            {p.nombre_categoria && <span>{p.nombre_categoria}</span>}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+              <ProductPicker
+                value={selectedProduct}
+                onChange={handleSelectProduct}
+                placeholder="Buscar producto por nombre o SKU…"
+              />
             </div>
 
             {/* Category */}
@@ -527,7 +430,6 @@ export default function TendenciaProductoPage() {
                 value={categoriaId ?? ''}
                 onChange={(e) => {
                   setCategoriaId(e.target.value ? Number(e.target.value) : null);
-                  setProductResults([]);
                   handleClearProduct();
                 }}
               >

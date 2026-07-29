@@ -111,18 +111,23 @@ export default function ProductosPage() {
     return () => ctrl.abort();
   }, []);
 
+  // Ref con filtros actuales para evitar recrear fetchProductos
+  const filtersRef = useRef({});
+  filtersRef.current = { debouncedSearch, showInactive, categoriaId, medidaId };
+
   // Carga productos cuando cambian filtros o página
   const fetchProductos = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
+      const f = filtersRef.current;
       const result = await productosService.list({
-        q: debouncedSearch,
-        all: showInactive,
+        q: f.debouncedSearch,
+        all: f.showInactive,
         limit: 50,
         page,
-        categoria: categoriaId || undefined,
-        medida: medidaId || undefined,
+        categoria: f.categoriaId || undefined,
+        medida: f.medidaId || undefined,
       });
       setProductos(result?.rows || []);
       setTotalPages(result?.totalPages || 1);
@@ -133,15 +138,20 @@ export default function ProductosPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [debouncedSearch, showInactive, page, categoriaId, medidaId]);
+  }, [page]); // Solo cambia cuando cambia la página
+
+  // Re-fetch cuando cambian filtros (leídos del ref) o página
+  useEffect(() => { fetchProductos(); }, [
+    fetchProductos,
+    debouncedSearch,
+    showInactive,
+    categoriaId,
+    medidaId,
+  ]);
 
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch, showInactive, categoriaId, medidaId]);
-
-  useEffect(() => {
-    fetchProductos();
-  }, [fetchProductos]);
 
   // ---- Orden ----
   const ordered = useMemo(() => {

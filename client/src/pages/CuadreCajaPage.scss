@@ -34,6 +34,34 @@
     &--action { justify-content: end; @media (min-width: 768px) { align-self: end; } }
   }
 
+  &__search-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  &__search-btn {
+    position: absolute;
+    right: $space-2;
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: none;
+    border-radius: $radius-pill;
+    color: $color-accent;
+    font-size: $font-size-lg;
+    cursor: pointer;
+    padding: 0;
+    transition: background $transition-fast, color $transition-fast;
+
+    &:hover {
+      background: $color-accent-soft;
+      color: $color-accent;
+    }
+  }
+
   &__filter-label {
     font-size: $font-size-xs;
     font-weight: $font-weight-semibold;

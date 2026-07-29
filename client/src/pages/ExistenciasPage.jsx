@@ -9,7 +9,6 @@ import { Pagination } from '@/components/ui/Pagination';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { toast } from '@/components/ui/Toast';
-import { useDebounce } from '@/hooks/useDebounce';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
@@ -54,7 +53,7 @@ export default function ExistenciasPage() {
   const isMobile = !useMediaQuery('(min-width: 768px)');
 
   const [search, setSearch] = useState(() => searchParams.get('q') || '');
-  const debouncedSearch = useDebounce(search, 350);
+  const [committedSearch, setCommittedSearch] = useState(() => searchParams.get('q') || '');
   const [categoriaId, setCategoriaId] = useState(null);
   const [subcategoriaId, setSubcategoriaId] = useState(null);
   const [bodegaId, setBodegaId] = useState(null);
@@ -76,6 +75,9 @@ export default function ExistenciasPage() {
   const cleaningRef = useRef(null);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
 
+  // Ref con filtros actuales para evitar recrear fetchExistencias
+  const filtersRef = useRef({});
+
   useEffect(() => {
     catalogosService.getCategorias().then(setCategorias).catch(() => {});
     catalogosService.getBodegas().then(setBodegas).catch(() => {});
@@ -92,15 +94,28 @@ export default function ExistenciasPage() {
     return () => controller.abort();
   }, [categoriaId]);
 
+  const handleSearch = () => {
+    setCommittedSearch(search);
+    setPage(1);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleSearch();
+  };
+
+  // Mantener ref actualizada con los filtros (no triggea re-renders)
+  filtersRef.current = { committedSearch, categoriaId, subcategoriaId, bodegaId, showZeroStock };
+
   const fetchExistencias = useCallback(async () => {
     setLoading(true);
     try {
+      const f = filtersRef.current;
       const params = { limit: 100, page };
-      if (debouncedSearch) params.q = debouncedSearch;
-      if (categoriaId) params.categoria = categoriaId;
-      if (subcategoriaId) params.subcategoria = subcategoriaId;
-      if (bodegaId) params.warehouse = bodegaId;
-      if (showZeroStock) params.show_zero = '1';
+      if (f.committedSearch) params.q = f.committedSearch;
+      if (f.categoriaId) params.categoria = f.categoriaId;
+      if (f.subcategoriaId) params.subcategoria = f.subcategoriaId;
+      if (f.bodegaId) params.warehouse = f.bodegaId;
+      if (f.showZeroStock) params.show_zero = '1';
       const result = await existenciasService.list(params);
       setRows(result?.rows || []);
       setTotalPages(result?.totalPages || 1);
@@ -110,14 +125,22 @@ export default function ExistenciasPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, categoriaId, subcategoriaId, bodegaId, showZeroStock, page]);
+  }, [page]); // Solo cambia cuando cambia page
 
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, categoriaId, subcategoriaId, bodegaId, showZeroStock]);
+  }, [committedSearch, categoriaId, subcategoriaId, bodegaId, showZeroStock]);
 
-  useEffect(() => { fetchExistencias(); }, [fetchExistencias]);
+  // Re-fetch cuando cambian los filtros (leídos del ref) o la paginación
+  useEffect(() => { fetchExistencias(); }, [
+    fetchExistencias,
+    committedSearch,
+    categoriaId,
+    subcategoriaId,
+    bodegaId,
+    showZeroStock,
+  ]);
 
   // Agrupar filas por producto+bodega
   const grupos = useMemo(() => {
@@ -173,6 +196,7 @@ export default function ExistenciasPage() {
     setSubcategoriaId(null);
     cleaningRef.current = setTimeout(() => {
       setSearch('');
+      setCommittedSearch('');
       setCategoriaId(null);
       setBodegaId(null);
       setShowZeroStock(false);
@@ -181,7 +205,7 @@ export default function ExistenciasPage() {
     }, 250);
   };
 
-  const hasActiveFilters = debouncedSearch || categoriaId || subcategoriaId || bodegaId || showZeroStock;
+  const hasActiveFilters = committedSearch || categoriaId || subcategoriaId || bodegaId || showZeroStock;
 
   const exportColumns = [
     { key: 'nombre_producto', label: 'Producto' },
@@ -461,7 +485,7 @@ export default function ExistenciasPage() {
         <Card>
           <div className="existencias-page__filters">
             <div className="existencias-page__search">
-              <SearchInput value={search} onChange={setSearch} placeholder="Buscar producto o SKU…" />
+              <SearchInput value={search} onChange={setSearch} onKeyDown={handleKeyDown} onSearch={handleSearch} activeLabel={committedSearch || undefined} placeholder="Buscar producto o SKU…" />
             </div>
             <div className="existencias-page__select-group">
               <select className="select" value={categoriaId ?? ''} onChange={(e) => setCategoriaId(e.target.value ? Number(e.target.value) : null)} aria-label="Categoría">

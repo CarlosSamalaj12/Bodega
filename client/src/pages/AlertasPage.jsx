@@ -8,7 +8,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { DataList } from '@/components/ui/DataList';
 import { toast } from '@/components/ui/Toast';
-import { useDebounce } from '@/hooks/useDebounce';
+
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
@@ -61,9 +61,9 @@ export default function AlertasPage() {
   // Tabs
   const [tipo, setTipo] = useState('vencimiento');
 
-  // Filtros
+  // Filtros — búsqueda diferida (Enter o botón Buscar)
   const [search, setSearch] = useState('');
-  const debouncedSearch = useDebounce(search, 350);
+  const [committedSearch, setCommittedSearch] = useState('');
   const [dias, setDias] = useState(15);
   const [categoriaId, setCategoriaId] = useState(null);
   const [subcategoriaId, setSubcategoriaId] = useState(null);
@@ -98,14 +98,27 @@ export default function AlertasPage() {
     return () => controller.abort();
   }, [categoriaId]);
 
+  const handleSearch = () => {
+    setCommittedSearch(search);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleSearch();
+  };
+
+  // Ref con filtros actuales para evitar recrear los callbacks
+  const filtersRef = useRef({});
+  filtersRef.current = { committedSearch, dias, categoriaId, subcategoriaId, showZeroStock };
+
   const fetchAlertas = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { days: dias };
-      if (debouncedSearch) params.q = debouncedSearch;
-      if (categoriaId) params.categoria = categoriaId;
-      if (subcategoriaId) params.subcategoria = subcategoriaId;
-      if (showZeroStock) params.show_zero = '1';
+      const f = filtersRef.current;
+      const params = { days: f.dias };
+      if (f.committedSearch) params.q = f.committedSearch;
+      if (f.categoriaId) params.categoria = f.categoriaId;
+      if (f.subcategoriaId) params.subcategoria = f.subcategoriaId;
+      if (f.showZeroStock) params.show_zero = '1';
       const data = await existenciasService.alertas(params);
       setRows(data);
     } catch (e) {
@@ -113,15 +126,16 @@ export default function AlertasPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, dias, categoriaId, subcategoriaId, showZeroStock]);
+  }, []); // Sin dependencias — lee los filtros del ref
 
   const fetchMinimos = useCallback(async () => {
     setLoading(true);
     try {
+      const f = filtersRef.current;
       const params = {};
-      if (debouncedSearch) params.q = debouncedSearch;
-      if (categoriaId) params.categoria = categoriaId;
-      if (subcategoriaId) params.subcategoria = subcategoriaId;
+      if (f.committedSearch) params.q = f.committedSearch;
+      if (f.categoriaId) params.categoria = f.categoriaId;
+      if (f.subcategoriaId) params.subcategoria = f.subcategoriaId;
       const data = await existenciasService.stockMinimo(params);
       setMinRows(data);
     } catch (e) {
@@ -129,17 +143,18 @@ export default function AlertasPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, categoriaId, subcategoriaId]);
+  }, []); // Sin dependencias — lee los filtros del ref
 
   const currentRows = tipo === 'vencimiento' ? rows : minRows;
 
+  // Re-fetch cuando cambian los filtros (leídos del ref) o el tab
   useEffect(() => {
     if (tipo === 'vencimiento') {
       fetchAlertas();
     } else {
       fetchMinimos();
     }
-  }, [tipo, fetchAlertas, fetchMinimos]);
+  }, [tipo, committedSearch, dias, categoriaId, subcategoriaId, showZeroStock]);
 
   const resumen = useMemo(() => {
     if (tipo === 'vencimiento') {
@@ -170,6 +185,7 @@ export default function AlertasPage() {
     setSubcategoriaId(null);
     cleaningRef.current = setTimeout(() => {
       setSearch('');
+      setCommittedSearch('');
       setCategoriaId(null);
       setDias(15);
       setShowZeroStock(false);
@@ -178,7 +194,7 @@ export default function AlertasPage() {
     }, 250);
   };
 
-  const hasActiveFilters = debouncedSearch || categoriaId || subcategoriaId || dias !== 15 || showZeroStock;
+  const hasActiveFilters = committedSearch || categoriaId || subcategoriaId || dias !== 15 || showZeroStock;
 
   const goToKardex = (r) => {
     const q = r.nombre_producto || r.sku || '';
@@ -462,6 +478,9 @@ export default function AlertasPage() {
               <SearchInput
                 value={search}
                 onChange={setSearch}
+                onKeyDown={handleKeyDown}
+                onSearch={handleSearch}
+                activeLabel={committedSearch || undefined}
                 placeholder="Buscar producto o SKU…"
               />
             </div>

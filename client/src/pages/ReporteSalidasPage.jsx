@@ -4,10 +4,9 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { Pagination } from '@/components/ui/Pagination';
-import { SearchInput } from '@/components/ui/SearchInput';
+import { ProductPicker } from '@/components/ui/ProductPicker';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { toast } from '@/components/ui/Toast';
-import { useDebounce } from '@/hooks/useDebounce';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
@@ -27,12 +26,12 @@ const RANGE_PRESETS = [
 export default function ReporteSalidasPage() {
   const isMobile = !useMediaQuery('(min-width: 768px)');
 
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebounce(search, 350);
+  // Filtros
+  const [selectedProduct, setSelectedProduct] = useState(null);
   const [documento, setDocumento] = useState('');
-  const debouncedDocumento = useDebounce(documento, 350);
+  const [committedDocumento, setCommittedDocumento] = useState('');
   const [lote, setLote] = useState('');
-  const debouncedLote = useDebounce(lote, 350);
+  const [committedLote, setCommittedLote] = useState('');
   const [rango, setRango] = useState(30);
   const hoy = new Date().toISOString().slice(0, 10);
   const hace30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -58,6 +57,9 @@ export default function ReporteSalidasPage() {
   const [page, setPage] = useState(1);
   const limit = 20;
   const fetchIdRef = useRef(0);
+
+  // Ref con filtros actuales para evitar recrear fetchData en cada cambio
+  const filtersRef = useRef({});
 
   // Export column selector
   const [showColumnSelector, setShowColumnSelector] = useState(false);
@@ -87,19 +89,33 @@ export default function ReporteSalidasPage() {
     setDateTo(to.toISOString().slice(0, 10));
   };
 
+  const handleSearch = () => {
+    setCommittedDocumento(documento);
+    setCommittedLote(lote);
+    setPage(1);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleSearch();
+  };
+
+  // Mantener ref actualizada con los filtros (no triggea re-renders)
+  filtersRef.current = { dateFrom, dateTo, selectedProduct, committedDocumento, committedLote, categoriaId, subcategoriaId, motivoId, warehouseId, bodegaDestinoId };
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     const fetchId = ++fetchIdRef.current;
     try {
-      const params = { from: dateFrom, to: dateTo, limit, page };
-      if (debouncedSearch) params.q = debouncedSearch;
-      if (debouncedDocumento) params.documento = debouncedDocumento;
-      if (debouncedLote) params.lote = debouncedLote;
-      if (categoriaId) params.categoria = categoriaId;
-      if (subcategoriaId) params.subcategoria = subcategoriaId;
-      if (motivoId) params.motivo = motivoId;
-      if (warehouseId) params.warehouse = warehouseId;
-      if (bodegaDestinoId) params.warehouse_destino = bodegaDestinoId;
+      const f = filtersRef.current;
+      const params = { from: f.dateFrom, to: f.dateTo, limit, page };
+      if (f.selectedProduct?.id_producto) params.id_producto = f.selectedProduct.id_producto;
+      if (f.committedDocumento) params.documento = f.committedDocumento;
+      if (f.committedLote) params.lote = f.committedLote;
+      if (f.categoriaId) params.categoria = f.categoriaId;
+      if (f.subcategoriaId) params.subcategoria = f.subcategoriaId;
+      if (f.motivoId) params.motivo = f.motivoId;
+      if (f.warehouseId) params.warehouse = f.warehouseId;
+      if (f.bodegaDestinoId) params.warehouse_destino = f.bodegaDestinoId;
 
       const { data } = await api.get('/api/reportes/salidas', { params });
       if (fetchId !== fetchIdRef.current) return;
@@ -122,9 +138,22 @@ export default function ReporteSalidasPage() {
     } finally {
       if (fetchId === fetchIdRef.current) setLoading(false);
     }
-  }, [dateFrom, dateTo, debouncedSearch, debouncedDocumento, debouncedLote, categoriaId, subcategoriaId, motivoId, warehouseId, bodegaDestinoId, page, limit]);
+  }, [page, limit]); // Solo cambia cuando cambia page o limit
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // Re-fetch cuando cambian los filtros (leídos del ref) o la paginación
+  useEffect(() => { fetchData(); }, [
+    fetchData,
+    selectedProduct,
+    dateFrom,
+    dateTo,
+    committedDocumento,
+    committedLote,
+    categoriaId,
+    subcategoriaId,
+    motivoId,
+    warehouseId,
+    bodegaDestinoId,
+  ]);
 
   // Agrupar líneas planas del server por id_movimiento
   const grouped = useMemo(() => {
@@ -238,6 +267,20 @@ export default function ReporteSalidasPage() {
     setShowColumnSelector(false);
   };
 
+    // Helper para mostrar productos en la fila principal
+  const renderProductos = (g) => {
+    const nombres = [...new Set(g.lineas.map((l) => l.nombre_producto).filter(Boolean))];
+    if (nombres.length === 0) return <span className="reporte-salidas__muted">—</span>;
+    return (
+      <div className="reporte-salidas__productos-list">
+        {nombres.slice(0, 2).map((n, i) => (
+          <span key={i} className="reporte-salidas__productos-name">{n}{i === 0 && nombres.length > 2 ? ',' : ''}</span>
+        ))}
+        {nombres.length > 2 && <span className="reporte-salidas__productos-more">+{nombres.length - 2}</span>}
+      </div>
+    );
+  };
+
   const [expandedMovs, setExpandedMovs] = useState(new Set());
   const toggleExpand = (id) => {
     setExpandedMovs((prev) => {
@@ -270,7 +313,11 @@ export default function ReporteSalidasPage() {
       <div className="reporte-salidas">
         <Card>
           <div className="reporte-salidas__filters">
-            <SearchInput value={search} onChange={setSearch} placeholder="Buscar producto o SKU…" />
+            <ProductPicker
+              value={selectedProduct}
+              onChange={(p) => { setSelectedProduct(p); setPage(1); }}
+              placeholder="Buscar producto o SKU…"
+            />
 
             <div className="reporte-salidas__fecha-group">
               <input type="date" className="input reporte-salidas__date-input"
@@ -311,10 +358,10 @@ export default function ReporteSalidasPage() {
             </select>
 
             <input type="text" className="input" placeholder="No. Documento…"
-              value={documento} onChange={(e) => setDocumento(e.target.value)} />
+              value={documento} onChange={(e) => setDocumento(e.target.value)} onKeyDown={handleKeyDown} />
 
             <input type="text" className="input" placeholder="Lote…"
-              value={lote} onChange={(e) => setLote(e.target.value)} />
+              value={lote} onChange={(e) => setLote(e.target.value)} onKeyDown={handleKeyDown} />
 
             <select className="select" value={warehouseId ?? ''} onChange={(e) => setWarehouseId(e.target.value ? Number(e.target.value) : null)}>
               <option value="">Bodega origen</option>
@@ -345,6 +392,7 @@ export default function ReporteSalidasPage() {
                   <th>Fecha</th>
                   {!isMobile && <th>Motivo</th>}
                   <th>B. Origen</th>
+                  <th>Productos</th>
                   {!isMobile && <th>B. Destino</th>}
                   {!isMobile && <th>Usuario</th>}
                   <th style={{ textAlign: 'right', width: 90 }}>Cant.</th>
@@ -370,6 +418,7 @@ export default function ReporteSalidasPage() {
                       </td>
                       {!isMobile && <td>{g.nombre_motivo || '—'}</td>}
                       <td>{g.nombre_bodega_origen || '—'}</td>
+                      <td>{renderProductos(g)}</td>
                       {!isMobile && <td>{g.nombre_bodega_destino || '—'}</td>}
                       {!isMobile && <td className="reporte-salidas__user">{g.usuario_creador || '—'}</td>}
                       <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{sumCant.toFixed(2)}</td>
@@ -378,7 +427,7 @@ export default function ReporteSalidasPage() {
                   );
                   const detailRow = isOpen ? (
                     <tr key={`sal-det-${g.id_movimiento}`} className="reporte-salidas__det-row">
-                      <td colSpan={isMobile ? 6 : 9}>
+                      <td colSpan={isMobile ? 7 : 10}>
                         <div className="reporte-salidas__detalle">
                           <table className="reporte-salidas__det-table">
                             <thead>
@@ -416,7 +465,7 @@ export default function ReporteSalidasPage() {
               </tbody>
               <tfoot>
                 <tr className="reporte-salidas__total-row">
-                  <td colSpan={isMobile ? 5 : 7} style={{ textAlign: 'right', fontWeight: 600 }}>Totales</td>
+                  <td colSpan={isMobile ? 6 : 8} style={{ textAlign: 'right', fontWeight: 600 }}>Totales</td>
                   <td style={{ textAlign: 'right', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{totales.totalCantidad.toFixed(2)}</td>
                   <td style={{ textAlign: 'right', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>Q {totales.totalCosto.toFixed(2)}</td>
                 </tr>

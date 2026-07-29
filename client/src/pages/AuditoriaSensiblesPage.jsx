@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Card } from '@/components/ui/Card';
@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/Badge';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { toast } from '@/components/ui/Toast';
-import { useDebounce } from '@/hooks/useDebounce';
+
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
@@ -46,7 +46,7 @@ export default function AuditoriaSensiblesPage() {
   const [dateFrom, setDateFrom] = useState(() => searchParams.get('from') || hace30);
   const [dateTo, setDateTo] = useState(() => searchParams.get('to') || hoy);
   const [search, setSearch] = useState(() => searchParams.get('q') || '');
-  const debouncedSearch = useDebounce(search, 350);
+  const [committedSearch, setCommittedSearch] = useState(() => searchParams.get('q') || '');
   const [actionKey, setActionKey] = useState(() => searchParams.get('action_key') || '');
 
   // Datos
@@ -59,14 +59,27 @@ export default function AuditoriaSensiblesPage() {
   // Export
   const [showColumnSelector, setShowColumnSelector] = useState(false);
 
+  const handleSearch = () => {
+    setCommittedSearch(search);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleSearch();
+  };
+
+  // Ref con filtros actuales para evitar recrear fetchData
+  const filtersRef = useRef({});
+  filtersRef.current = { dateFrom, dateTo, committedSearch, actionKey };
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      const f = filtersRef.current;
       const params = { limit: 2000 };
-      if (dateFrom) params.from = dateFrom;
-      if (dateTo) params.to = dateTo;
-      if (debouncedSearch) params.q = debouncedSearch;
-      if (actionKey) params.action_key = actionKey;
+      if (f.dateFrom) params.from = f.dateFrom;
+      if (f.dateTo) params.to = f.dateTo;
+      if (f.committedSearch) params.q = f.committedSearch;
+      if (f.actionKey) params.action_key = f.actionKey;
 
       const { data } = await api.get('/api/reportes/auditoria-sensibles', { params });
       setRows(Array.isArray(data) ? data : []);
@@ -76,26 +89,33 @@ export default function AuditoriaSensiblesPage() {
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, debouncedSearch, actionKey]);
+  }, []); // Sin dependencias — los filtros se leen del ref
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // Re-fetch cuando cambian los filtros (leídos del ref)
+  useEffect(() => { fetchData(); }, [
+    dateFrom,
+    dateTo,
+    committedSearch,
+    actionKey,
+  ]);
 
-  const hasActiveFilters = dateFrom || dateTo || debouncedSearch || actionKey;
+  const hasActiveFilters = dateFrom || dateTo || committedSearch || actionKey;
 
   // Sincronizar filtros → URL
   useEffect(() => {
     const params = new URLSearchParams();
     if (dateFrom && dateFrom !== hace30) params.set('from', dateFrom);
     if (dateTo && dateTo !== hoy) params.set('to', dateTo);
-    if (debouncedSearch) params.set('q', debouncedSearch);
+    if (committedSearch) params.set('q', committedSearch);
     if (actionKey) params.set('action_key', actionKey);
     setSearchParams(params, { replace: true });
-  }, [dateFrom, dateTo, debouncedSearch, actionKey, hace30, hoy, setSearchParams]);
+  }, [dateFrom, dateTo, committedSearch, actionKey, hace30, hoy, setSearchParams]);
 
   const handleClearFilters = () => {
     setDateFrom(hace30);
     setDateTo(hoy);
     setSearch('');
+    setCommittedSearch('');
     setActionKey('');
   };
 
@@ -174,7 +194,7 @@ export default function AuditoriaSensiblesPage() {
                 onChange={(e) => setDateTo(e.target.value)} />
             </div>
 
-            <SearchInput value={search} onChange={setSearch} placeholder="Buscar actor, supervisor o acción…" />
+            <SearchInput value={search} onChange={setSearch} onKeyDown={handleKeyDown} onSearch={handleSearch} activeLabel={committedSearch || undefined} placeholder="Buscar actor, supervisor o acción…" />
 
             <select className="select" value={actionKey} onChange={(e) => setActionKey(e.target.value)}>
               <option value="">Todas las acciones</option>

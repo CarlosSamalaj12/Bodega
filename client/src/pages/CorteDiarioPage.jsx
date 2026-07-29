@@ -7,7 +7,7 @@ import { Modal } from '@/components/ui/Modal';
 import { DataList } from '@/components/ui/DataList';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { toast } from '@/components/ui/Toast';
-import { useDebounce } from '@/hooks/useDebounce';
+
 import { useAuthStore } from '@/stores/auth.store';
 import { PinModal } from '@/components/ui/PinModal';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
@@ -20,9 +20,9 @@ import './CorteDiarioPage.scss';
 export default function CorteDiarioPage() {
   const [searchParams] = useSearchParams();
 
-  // Filtros
+  // Filtros — búsqueda diferida (Enter o botón Buscar)
   const [search, setSearch] = useState('');
-  const debouncedSearch = useDebounce(search, 350);
+  const [committedSearch, setCommittedSearch] = useState('');
   const initialWarehouse = searchParams.get('warehouse');
   const [warehouseId, setWarehouseId] = useState(initialWarehouse ? Number(initialWarehouse) : null);
   const [showAll, setShowAll] = useState(false);
@@ -56,11 +56,19 @@ export default function CorteDiarioPage() {
   }, []);
 
   // Cargar reporte
+  const handleSearch = () => {
+    setCommittedSearch(search);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleSearch();
+  };
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const params = { limit: 2000 };
-      if (debouncedSearch) params.q = debouncedSearch;
+      if (committedSearch) params.q = committedSearch;
       if (warehouseId) params.warehouse = warehouseId;
       if (showAll) params.show_all = 1;
 
@@ -72,7 +80,7 @@ export default function CorteDiarioPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, warehouseId, showAll]);
+  }, [committedSearch, warehouseId, showAll]);
 
   // Consultar estado del cierre al montar y tras refrescar
   const fetchCierreStatus = useCallback(async () => {
@@ -149,10 +157,11 @@ export default function CorteDiarioPage() {
     return { exAyer, entHoy, salHoy, exActual };
   }, [rows]);
 
-  const hasActiveFilters = debouncedSearch || warehouseId || showAll;
+  const hasActiveFilters = committedSearch || warehouseId || showAll;
 
   const handleClearFilters = () => {
     setSearch('');
+    setCommittedSearch('');
     setWarehouseId(null);
     setShowAll(false);
   };
@@ -263,7 +272,7 @@ export default function CorteDiarioPage() {
         <Card compact>
           <div className="corte-diario__filters">
             <div className="corte-diario__search-box">
-              <SearchInput value={search} onChange={setSearch} placeholder="Buscar producto o SKU…" />
+              <SearchInput value={search} onChange={setSearch} onKeyDown={handleKeyDown} onSearch={handleSearch} activeLabel={committedSearch || undefined} placeholder="Buscar producto o SKU…" />
             </div>
             <div className="corte-diario__filter-controls">
               <select

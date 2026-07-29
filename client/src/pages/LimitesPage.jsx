@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
 import { SearchInput } from '@/components/ui/SearchInput';
+import { ProductPicker } from '@/components/ui/ProductPicker';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { toast } from '@/components/ui/Toast';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -58,16 +59,17 @@ function DragItem({ row, children, onReorder }) {
 }
 
 // ================== Formulario ==================
-function LimiteForm({ open, onClose, editingKey, editValues, bodegas, productos, onSaved }) {
+function LimiteForm({ open, onClose, editingKey, editValues, bodegas, onSaved }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [productError, setProductError] = useState(null);
 
   const { values, set, errors, handleSubmit } = useForm({
     initial: EMPTY,
     validate: (v) => {
       const e = {};
       if (!editingKey && !v.id_bodega) e.id_bodega = 'Selecciona una bodega';
-      if (!editingKey && !v.id_producto) e.id_producto = 'Selecciona un producto';
       const min = Number(v.minimo);
       const max = Number(v.maximo);
       if (v.minimo !== '' && (isNaN(min) || min < 0)) e.minimo = 'Debe ser >= 0';
@@ -76,12 +78,16 @@ function LimiteForm({ open, onClose, editingKey, editValues, bodegas, productos,
       return e;
     },
     onSubmit: async (vals) => {
+      if (!editingKey && !selectedProduct?.id_producto) {
+        setProductError('Selecciona un producto');
+        return;
+      }
       setSubmitting(true);
       setError(null);
       try {
         const body = {
           id_bodega: editingKey ? editingKey.id_bodega : Number(vals.id_bodega),
-          id_producto: editingKey ? editingKey.id_producto : vals.id_producto,
+          id_producto: editingKey ? editingKey.id_producto : selectedProduct.id_producto,
           minimo: Math.max(0, Number(vals.minimo || 0)),
           maximo: Math.max(0, Number(vals.maximo || 0)),
           activo: Number(vals.activo),
@@ -103,13 +109,25 @@ function LimiteForm({ open, onClose, editingKey, editValues, bodegas, productos,
 
   useEffect(() => {
     if (open) {
+      setProductError(null);
       if (editingKey && editValues) {
         Object.entries(editValues).forEach(([k, v]) => set(k, v));
+        setSelectedProduct({
+          id_producto: editValues.id_producto || editValues.id_producto,
+          nombre_producto: editValues.nombre_producto,
+          sku: editValues.sku,
+        });
       } else {
         Object.entries(EMPTY).forEach(([k, v]) => set(k, v));
+        setSelectedProduct(null);
       }
     }
   }, [open, editingKey]);
+
+  const handleProductChange = (product) => {
+    setSelectedProduct(product);
+    setProductError(null);
+  };
 
   return (
     <Modal open={open} onClose={() => !submitting && onClose()} title={editingKey ? 'Editar límite' : 'Nuevo límite'}>
@@ -130,17 +148,13 @@ function LimiteForm({ open, onClose, editingKey, editValues, bodegas, productos,
                 {errors.id_bodega && <span className="limites-page__field-error">{errors.id_bodega}</span>}
               </div>
               <div className="limites-page__field">
-                <label className="limites-page__label" htmlFor="lim-producto">Producto <span className="limites-page__required">*</span></label>
-                <select id="lim-producto" className="select" value={values.id_producto ?? ''}
-                  onChange={(e) => set('id_producto', Number(e.target.value))}>
-                  <option value="">Seleccionar…</option>
-                  {productos.map((p) => (
-                    <option key={`lim-${p.id_producto}`} value={p.id_producto}>
-                      {p.nombre_producto}{p.sku ? ` (${p.sku})` : ''}
-                    </option>
-                  ))}
-                </select>
-                {errors.id_producto && <span className="limites-page__field-error">{errors.id_producto}</span>}
+                <label className="limites-page__label">Producto <span className="limites-page__required">*</span></label>
+                <ProductPicker
+                  value={selectedProduct}
+                  onChange={handleProductChange}
+                  placeholder="Buscar producto…"
+                />
+                {productError && <span className="limites-page__field-error">{productError}</span>}
               </div>
             </>
           ) : (
@@ -191,7 +205,6 @@ function LimiteForm({ open, onClose, editingKey, editValues, bodegas, productos,
 export default function LimitesPage() {
   const [items, setItems] = useState([]);
   const [bodegas, setBodegas] = useState([]);
-  const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 300);
@@ -202,14 +215,12 @@ export default function LimitesPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [lims, bgs, prods] = await Promise.all([
+      const [lims, bgs] = await Promise.all([
         api.get('/api/limites?all=1').then((r) => r.data || []),
         catalogosService.getBodegas(),
-        api.get('/api/productos?all=1&limit=5000').then((r) => r.data || []),
       ]);
       setItems(Array.isArray(lims) ? lims : []);
       setBodegas(Array.isArray(bgs) ? bgs : []);
-      setProductos(Array.isArray(prods) ? prods : []);
     } catch { setItems([]); }
     finally { setLoading(false); }
   }, []);
@@ -355,7 +366,6 @@ export default function LimitesPage() {
         editingKey={editingKey}
         editValues={editingValues}
         bodegas={bodegas}
-        productos={productos}
         onSaved={loadData}
       />
     </>

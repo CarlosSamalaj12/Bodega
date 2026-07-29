@@ -80,19 +80,23 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+// Nuevo frontend React (build de producción)
+app.use(express.static(path.join(__dirname, "client", "dist")));
+// Assets compartidos: SW, manifest, iconos PWA (todavía en public/)
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/imagenes", express.static(path.join(__dirname, "imagenes")));
 
+// SPA — React Router maneja las rutas del lado del cliente
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "login.html"));
+  res.sendFile(path.join(__dirname, "client", "dist", "index.html"));
 });
 
 app.get("/login", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "login.html"));
+  res.sendFile(path.join(__dirname, "client", "dist", "index.html"));
 });
 
 app.get("/app", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "app.html"));
+  res.sendFile(path.join(__dirname, "client", "dist", "index.html"));
 });
 
 const OPS_ALERT_WINDOW_MS = 5 * 60 * 1000;
@@ -251,10 +255,8 @@ app.use((req, res, next) => {
   });
   next();
 });
-// Back-compat: redirect legacy /public/login.html to the new static root path.
-app.get("/public/login.html", (req, res) => {
-  res.redirect(301, "/login.html");
-});
+// NOTA: el redirect /public/login.html → /login.html se eliminó porque
+// ya no existe el frontend legacy en public/ (reemplazado por React en client/dist).
 
 let printLogoDataUriCache = null;
 async function getPrintLogoDataUri() {
@@ -808,6 +810,46 @@ function buildTokenizedLikeFilter(rawInput, columns = [], paramPrefix = "qtk") {
   const groups = tokens.map((token, idx) => {
     const key = `${paramPrefix}${idx}`;
     params[key] = `%${token}%`;
+    const orCols = safeCols.map((col) => `${normalizedSqlExpr(col)} LIKE :${key}`).join(" OR ");
+    return `(${orCols})`;
+  });
+
+  return {
+    clause: groups.join(" AND "),
+    params,
+    hasTokens: true,
+  };
+}
+
+// Búsqueda por prefijo (solo al inicio de la palabra) para product picker
+function buildTokenizedPrefixFilter(rawInput, columns = [], paramPrefix = "qtk") {
+  const safeCols = Array.isArray(columns) ? columns.filter((c) => typeof c === "string" && c.trim()) : [];
+  const raw = String(rawInput || "").trim();
+  if (!raw || !safeCols.length) {
+    return { clause: "1=1", params: {}, hasTokens: false };
+  }
+  const normalizeSearchToken = (value) =>
+    String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[\u00f1\u00d1]/g, "n")
+      .toLowerCase()
+      .trim();
+  const normalizedSqlExpr = (col) =>
+    `LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${col}, '\u00e1','a'), '\u00e9','e'), '\u00ed','i'), '\u00f3','o'), '\u00fa','u'), '\u00c1','a'), '\u00c9','e'), '\u00cd','i'), '\u00d3','o'), '\u00da','u'), '\u00f1','n'), '\u00d1','n'))`;
+  const tokens = raw
+    .split(/\s+/)
+    .map((t) => normalizeSearchToken(t))
+    .filter(Boolean)
+    .slice(0, 8);
+  if (!tokens.length) {
+    return { clause: "1=1", params: {}, hasTokens: false };
+  }
+
+  const params = {};
+  const groups = tokens.map((token, idx) => {
+    const key = `${paramPrefix}${idx}`;
+    params[key] = `${token}%`;
     const orCols = safeCols.map((col) => `${normalizedSqlExpr(col)} LIKE :${key}`).join(" OR ");
     return `(${orCols})`;
   });
@@ -3147,7 +3189,7 @@ app.get("/api/productos/search", auth, async (req, res) => {
   const q = String(req.query.q || "").trim();
   if (!q) return res.json([]);
   const id_bodega = Number(req.query.warehouse || 0) || null;
-  const qf = buildTokenizedLikeFilter(q, ["nombre_producto", "sku"], "psq");
+  const qf = buildTokenizedPrefixFilter(q, ["nombre_producto", "sku"], "psq");
   const visibilityClause = buildProductWarehouseVisibilityClause("p.id_producto", "id_bodega");
   const [rows] = await pool.query(
     `SELECT p.id_producto, p.nombre_producto, p.sku,
@@ -7009,6 +7051,7 @@ app.get("/api/reportes/entradas", auth, async (req, res) => {
 
     const qRaw = String(req.query.q || "").trim();
     const qf = buildTokenizedLikeFilter(qRaw, ["p.nombre_producto", "p.sku"], "renq");
+    const id_producto = Number(req.query.id_producto || 0) || null;
     const loteRaw = String(req.query.lote || "").trim();
     const lote = loteRaw ? `%${loteRaw}%` : null;
     const documentoRaw = String(req.query.documento || "").trim();
@@ -7029,7 +7072,7 @@ app.get("/api/reportes/entradas", auth, async (req, res) => {
       "me.estado<>'ANULADO'",
       accessFilter ? `me.id_bodega_destino IN (${accessFilter.sql})` : "1=1",
       ":id_bodega IS NULL OR me.id_bodega_destino=:id_bodega",
-      qf.clause,
+      id_producto ? "md.id_producto=:id_producto" : qf.clause,
       ":lote IS NULL OR md.lote LIKE :lote",
       ":documento IS NULL OR me.no_documento LIKE :documento",
       ":from_date IS NULL OR DATE(me.creado_en) >= :from_date",
@@ -7042,10 +7085,10 @@ app.get("/api/reportes/entradas", auth, async (req, res) => {
     const whereSQL = whereClauses.join("\n         AND ");
 
     const params = {
-      id_bodega, lote, documento, from_date, to_date,
+      id_bodega, id_producto, lote, documento, from_date, to_date,
       id_categoria, id_subcategoria, tipo_movimiento, id_motivo,
       ...(accessFilter?.params || {}),
-      ...qf.params,
+      ...(id_producto ? {} : qf.params),
     };
 
     // Count distinct movements
@@ -7081,6 +7124,12 @@ app.get("/api/reportes/entradas", auth, async (req, res) => {
     if (movements.length > 0) {
       const ids = movements.map(function(m) { return m.id_movimiento; });
       const inClause = buildNamedInClause(ids, "entd");
+      const detailWhere = id_producto
+        ? `me.id_movimiento IN (${inClause.sql}) AND md.id_producto=:id_producto_filtro`
+        : `me.id_movimiento IN (${inClause.sql})`;
+      const detailParams = id_producto
+        ? { ...inClause.params, id_producto_filtro: id_producto }
+        : inClause.params;
       const [detailRows] = await pool.query(
         `SELECT me.id_movimiento,
                 me.tipo_movimiento AS tipo_entrada,
@@ -7121,9 +7170,9 @@ app.get("/api/reportes/entradas", auth, async (req, res) => {
          LEFT JOIN motivos_movimiento m ON m.id_motivo=me.id_motivo
          LEFT JOIN usuarios u ON u.id_usuario=me.creado_por
          LEFT JOIN usuarios u_anul ON u_anul.id_usuario=me.anulado_por
-         WHERE me.id_movimiento IN (${inClause.sql})
+         WHERE ${detailWhere}
          ORDER BY me.creado_en DESC, me.id_movimiento DESC, md.id_detalle DESC`,
-        inClause.params
+        detailParams
       );
       rows = detailRows;
     }
@@ -7207,6 +7256,7 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
 
     const qRaw = String(req.query.q || "").trim();
     const qf = buildTokenizedLikeFilter(qRaw, ["p.nombre_producto", "p.sku"], "resq");
+    const id_producto = Number(req.query.id_producto || 0) || null;
     const loteRaw = String(req.query.lote || "").trim();
     const lote = loteRaw ? `%${loteRaw}%` : null;
     const documentoRaw = String(req.query.documento || "").trim();
@@ -7228,7 +7278,7 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
       "me.estado<>'ANULADO'",
       accessFilter ? `me.id_bodega_origen IN (${accessFilter.sql})` : "1=1",
       ":id_bodega IS NULL OR me.id_bodega_origen=:id_bodega",
-      qf.clause,
+      id_producto ? "md.id_producto=:id_producto" : qf.clause,
       ":lote IS NULL OR md.lote LIKE :lote",
       ":documento IS NULL OR me.no_documento LIKE :documento",
       ":from_date IS NULL OR DATE(me.creado_en) >= :from_date",
@@ -7242,11 +7292,11 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
     const whereSQL = whereClauses.join("\n         AND ");
 
     const params = {
-      id_bodega, lote, documento, from_date, to_date,
+      id_bodega, id_producto, lote, documento, from_date, to_date,
       id_categoria, id_subcategoria, id_bodega_destino,
       tipo_movimiento, id_motivo,
       ...(accessFilter?.params || {}),
-      ...qf.params,
+      ...(id_producto ? {} : qf.params),
     };
 
     // Count distinct movements
@@ -7296,6 +7346,12 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
     if (movements.length > 0) {
       const ids = movements.map(function(m) { return m.id_movimiento; });
       const inClause = buildNamedInClause(ids, "sald");
+      const detailWhere = id_producto
+        ? `me.id_movimiento IN (${inClause.sql}) AND md.id_producto=:id_producto_filtro`
+        : `me.id_movimiento IN (${inClause.sql})`;
+      const detailParams = id_producto
+        ? { ...inClause.params, id_producto_filtro: id_producto }
+        : inClause.params;
       const [detailRows] = await pool.query(
         `SELECT me.id_movimiento,
                 me.tipo_movimiento AS tipo_salida,
@@ -7341,9 +7397,9 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
          LEFT JOIN productos p ON p.id_producto=md.id_producto
          LEFT JOIN categorias c ON c.id_categoria=p.id_categoria
          LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
-         WHERE me.id_movimiento IN (${inClause.sql})
+         WHERE ${detailWhere}
          ORDER BY me.creado_en DESC, me.id_movimiento DESC, md.id_detalle DESC`,
-        inClause.params
+        detailParams
       );
       rows = detailRows;
     }
@@ -10989,6 +11045,12 @@ app.use((err, req, res, next) => {
   if (res.writableEnded) return;
   const status = Number(err?.status || 500);
   res.status(status).json({ error: String(err?.message || "Error interno del servidor") });
+});
+
+// ── SPA catch-all: sirve el index.html de React para cualquier ruta no
+//    reconocida por las API o los estáticos (necesario para React Router).
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "client", "dist", "index.html"));
 });
 
 httpServer.listen(PORT, HOST, () => {

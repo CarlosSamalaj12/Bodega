@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Card } from '@/components/ui/Card';
@@ -9,7 +9,6 @@ import { Spinner } from '@/components/ui/Spinner';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { DataList } from '@/components/ui/DataList';
 import { toast } from '@/components/ui/Toast';
-import { useDebounce } from '@/hooks/useDebounce';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
@@ -40,9 +39,9 @@ export default function KardexPage() {
   const navigate = useNavigate();
   const isMobile = !useMediaQuery('(min-width: 768px)');
 
-  // Filtros
+  // Filtros — búsqueda diferida (Enter o botón Buscar)
   const [search, setSearch] = useState('');
-  const debouncedSearch = useDebounce(search, 350);
+  const [committedSearch, setCommittedSearch] = useState('');
   const [tipo, setTipo] = useState('');
   const [categoriaId, setCategoriaId] = useState(null);
   const [fromDate, setFromDate] = useState('');
@@ -65,19 +64,35 @@ export default function KardexPage() {
   // Catálogos
   const [categorias, setCategorias] = useState([]);
 
+  // Ref con filtros actuales para evitar recrear fetchKardex
+  const filtersRef = useRef({});
+
   useEffect(() => {
     catalogosService.getCategorias().then(setCategorias).catch(() => {});
   }, []);
 
+  const handleSearch = () => {
+    setCommittedSearch(search);
+    setPage(1);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleSearch();
+  };
+
+  // Mantener ref actualizada con los filtros (no triggea re-renders)
+  filtersRef.current = { committedSearch, tipo, categoriaId, fromDate, toDate };
+
   const fetchKardex = useCallback(async () => {
     setLoading(true);
     try {
+      const f = filtersRef.current;
       const params = { limit: pageSize, page };
-      if (debouncedSearch) params.q = debouncedSearch;
-      if (tipo) params.tipo = tipo;
-      if (categoriaId) params.categoria = categoriaId;
-      if (fromDate) params.from = fromDate;
-      if (toDate) params.to = toDate;
+      if (f.committedSearch) params.q = f.committedSearch;
+      if (f.tipo) params.tipo = f.tipo;
+      if (f.categoriaId) params.categoria = f.categoriaId;
+      if (f.fromDate) params.from = f.fromDate;
+      if (f.toDate) params.to = f.toDate;
       const result = await kardexService.list(params);
       setRows(result?.rows || []);
       setTotalPages(result?.totalPages || 1);
@@ -87,12 +102,20 @@ export default function KardexPage() {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, tipo, categoriaId, fromDate, toDate, page, pageSize]);
+  }, [page, pageSize]); // Solo cambia cuando cambia page o pageSize
 
-  useEffect(() => { fetchKardex(); }, [fetchKardex]);
+  // Re-fetch cuando cambian los filtros (leídos del ref) o la paginación
+  useEffect(() => { fetchKardex(); }, [
+    fetchKardex,
+    committedSearch,
+    tipo,
+    categoriaId,
+    fromDate,
+    toDate,
+  ]);
 
   // Resetear página cuando cambian filtros o tamaño de página
-  useEffect(() => { setPage(1); }, [debouncedSearch, tipo, categoriaId, fromDate, toDate, pageSize]);
+  useEffect(() => { setPage(1); }, [committedSearch, tipo, categoriaId, fromDate, toDate, pageSize]);
 
   const allExportColumns = [
     { key: 'id_movimiento', label: 'ID Mov.' },
@@ -130,13 +153,14 @@ export default function KardexPage() {
 
   const handleClearFilters = () => {
     setSearch('');
+    setCommittedSearch('');
     setTipo('');
     setCategoriaId(null);
     setFromDate('');
     setToDate('');
   };
 
-  const hasActiveFilters = debouncedSearch || tipo || categoriaId || fromDate || toDate;
+  const hasActiveFilters = committedSearch || tipo || categoriaId || fromDate || toDate;
 
   // Totales
   const totales = useMemo(() => {
@@ -291,6 +315,9 @@ export default function KardexPage() {
               <SearchInput
                 value={search}
                 onChange={setSearch}
+                onKeyDown={handleKeyDown}
+                onSearch={handleSearch}
+                activeLabel={committedSearch || undefined}
                 placeholder="Buscar producto, SKU o usuario…"
               />
             </div>

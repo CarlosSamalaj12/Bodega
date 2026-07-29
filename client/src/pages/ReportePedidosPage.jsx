@@ -8,7 +8,6 @@ import { Pagination } from '@/components/ui/Pagination';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { toast } from '@/components/ui/Toast';
-import { useDebounce } from '@/hooks/useDebounce';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
@@ -39,9 +38,9 @@ const ESTADO_BADGE = {
 export default function ReportePedidosPage() {
   const isMobile = !useMediaQuery('(min-width: 768px)');
 
-  // Filtros
+  // Filtros — búsqueda diferida (Enter o botón Buscar)
   const [search, setSearch] = useState('');
-  const debouncedSearch = useDebounce(search, 350);
+  const [committedSearch, setCommittedSearch] = useState('');
   const [rango, setRango] = useState(30);
   const hoy = new Date().toISOString().slice(0, 10);
   const hace30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -70,6 +69,9 @@ export default function ReportePedidosPage() {
   const limit = 20;
   const fetchIdRef = useRef(0);
 
+  // Ref con filtros actuales para evitar recrear fetchData
+  const filtersRef = useRef({});
+
   // Export
   const [showColumnSelector, setShowColumnSelector] = useState(false);
 
@@ -96,24 +98,37 @@ export default function ReportePedidosPage() {
     setDateTo(to.toISOString().slice(0, 10));
   };
 
+  const handleSearch = () => {
+    setCommittedSearch(search);
+    setPage(1);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleSearch();
+  };
+
+  // Mantener ref actualizada con los filtros (no triggea re-renders)
+  filtersRef.current = { dateFrom, dateTo, dateMode, committedSearch, estado, categoriaId, subcategoriaId, bodegaSolicitaId, bodegaDespachoId };
+
   // Cargar reporte (server-side pagination)
   const fetchData = useCallback(async () => {
     setLoading(true);
     const fetchId = ++fetchIdRef.current;
     try {
+      const f = filtersRef.current;
       const params = {
-        from: dateFrom,
-        to: dateTo,
-        date_mode: dateMode,
+        from: f.dateFrom,
+        to: f.dateTo,
+        date_mode: f.dateMode,
         limit,
         page,
       };
-      if (debouncedSearch) params.q = debouncedSearch;
-      if (estado) params.estado = estado;
-      if (categoriaId) params.categoria = categoriaId;
-      if (subcategoriaId) params.subcategoria = subcategoriaId;
-      if (bodegaSolicitaId) params.warehouse_requester = bodegaSolicitaId;
-      if (bodegaDespachoId) params.warehouse_dispatch = bodegaDespachoId;
+      if (f.committedSearch) params.q = f.committedSearch;
+      if (f.estado) params.estado = f.estado;
+      if (f.categoriaId) params.categoria = f.categoriaId;
+      if (f.subcategoriaId) params.subcategoria = f.subcategoriaId;
+      if (f.bodegaSolicitaId) params.warehouse_requester = f.bodegaSolicitaId;
+      if (f.bodegaDespachoId) params.warehouse_dispatch = f.bodegaDespachoId;
 
       const { data } = await api.get('/api/reportes/pedidos', { params });
       if (fetchId !== fetchIdRef.current) return;
@@ -136,11 +151,23 @@ export default function ReportePedidosPage() {
     } finally {
       if (fetchId === fetchIdRef.current) setLoading(false);
     }
-  }, [dateFrom, dateTo, dateMode, debouncedSearch, estado, categoriaId, subcategoriaId, bodegaSolicitaId, bodegaDespachoId, page, limit]);
+  }, [page, limit]); // Solo cambia cuando cambia page o limit
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // Re-fetch cuando cambian los filtros (leídos del ref) o la paginación
+  useEffect(() => { fetchData(); }, [
+    fetchData,
+    dateFrom,
+    dateTo,
+    dateMode,
+    committedSearch,
+    estado,
+    categoriaId,
+    subcategoriaId,
+    bodegaSolicitaId,
+    bodegaDespachoId,
+  ]);
 
-  useEffect(() => { setPage(1); }, [debouncedSearch, estado, categoriaId, subcategoriaId, bodegaSolicitaId, bodegaDespachoId, dateFrom, dateTo, dateMode]);
+  useEffect(() => { setPage(1); }, [committedSearch, estado, categoriaId, subcategoriaId, bodegaSolicitaId, bodegaDespachoId, dateFrom, dateTo, dateMode]);
 
   // Totales
   const totales = useMemo(() => {
@@ -251,7 +278,7 @@ export default function ReportePedidosPage() {
       <div className="reporte-pedidos">
         <Card>
           <div className="reporte-pedidos__filters">
-            <SearchInput value={search} onChange={setSearch} placeholder="Buscar producto, SKU o solicitante…" />
+            <SearchInput value={search} onChange={setSearch} onKeyDown={handleKeyDown} onSearch={handleSearch} activeLabel={committedSearch || undefined} placeholder="Buscar producto, SKU o solicitante…" />
 
             <div className="reporte-pedidos__fecha-group">
               <input type="date" className="input reporte-pedidos__date-input"

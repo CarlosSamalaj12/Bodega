@@ -7,7 +7,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { toast } from '@/components/ui/Toast';
-import { useDebounce } from '@/hooks/useDebounce';
+
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useAuthStore } from '@/stores/auth.store';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
@@ -88,7 +88,15 @@ export default function CuadreCajaPage() {
   const [fecha, setFecha] = useState(hoy);
   const [warehouseId, setWarehouseId] = useState(null);
   const [responsable, setResponsable] = useState('');
-  const debouncedResponsable = useDebounce(responsable, 350);
+  const [committedResponsable, setCommittedResponsable] = useState('');
+
+  const handleSearchResponsable = () => {
+    setCommittedResponsable(responsable);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') handleSearchResponsable();
+  };
 
   // --- Catálogos ---
   const [bodegas, setBodegas] = useState([]);
@@ -136,7 +144,7 @@ export default function CuadreCajaPage() {
       const params = { limit: 300 };
       if (fecha) params.fecha = fecha;
       if (warehouseId) params.warehouse = warehouseId;
-      if (debouncedResponsable) params.responsable = debouncedResponsable;
+      if (committedResponsable) params.responsable = committedResponsable;
       const { data } = await api.get('/api/reportes/cuadre-caja', { params });
       setRows(data?.rows || []);
     } catch {
@@ -145,7 +153,7 @@ export default function CuadreCajaPage() {
     } finally {
       setLoading(false);
     }
-  }, [fecha, warehouseId, debouncedResponsable]);
+  }, [fecha, warehouseId, committedResponsable]);
 
   useEffect(() => { if (!contextLoading && view === 'list') fetchData(); }, [fetchData, contextLoading, view]);
 
@@ -495,8 +503,8 @@ export default function CuadreCajaPage() {
     setShowColumnSelector(false);
   };
 
-  const hasActiveFilters = fecha || warehouseId || responsable;
-  const handleClearFilters = () => { setFecha(''); setWarehouseId(null); setResponsable(''); };
+  const hasActiveFilters = fecha || warehouseId || committedResponsable;
+  const handleClearFilters = () => { setFecha(''); setWarehouseId(null); setResponsable(''); setCommittedResponsable(''); };
   const fmtMoneda = (val) => `Q ${fmtMoney(val)}`;
 
   // Totales de la lista (DEBE ir antes de cualquier early return)
@@ -870,8 +878,13 @@ export default function CuadreCajaPage() {
             </div>
             <div className="cuadre-caja__filter-group">
               <label className="cuadre-caja__filter-label">Responsable</label>
+              <div className="cuadre-caja__search-wrap">
               <input type="text" className="input" placeholder="Buscar responsable…"
-                value={responsable} onChange={(e) => setResponsable(e.target.value)} />
+                value={responsable} onChange={(e) => setResponsable(e.target.value)} onKeyDown={handleKeyDown} />
+              {responsable && (
+                <button type="button" className="cuadre-caja__search-btn" onClick={handleSearchResponsable} title="Buscar" aria-label="Buscar">⌕</button>
+              )}
+              </div>
             </div>
             {hasActiveFilters && (
               <div className="cuadre-caja__filter-group cuadre-caja__filter-group--action">

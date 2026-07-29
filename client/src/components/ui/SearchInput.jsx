@@ -9,6 +9,9 @@ export function SearchInput({
   delay = 0,
   className = '',
   autoFocus = false,
+  onKeyDown,
+  onSearch,
+  activeLabel,
 }) {
   const id = useId();
   const [local, setLocal] = useState(value || '');
@@ -39,15 +42,22 @@ export function SearchInput({
 
   return (
     <div className={`search-input ${className}`}>
-      <span className="search-input__icon" aria-hidden="true">⌕</span>
+      <span className="search-input__icon" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M21 21l-4.3-4.3" />
+        </svg>
+      </span>
       <input
         id={id}
-        type="search"
+        type="text"
         className="search-input__field"
         value={local}
         onChange={handleChange}
         placeholder={placeholder}
         autoFocus={autoFocus}
+        onKeyDown={onKeyDown}
+        autoComplete="off"
       />
       {local && (
         <button
@@ -55,7 +65,16 @@ export function SearchInput({
           className="search-input__clear"
           onClick={handleClear}
           aria-label="Limpiar"
-        >✕</button>
+          title="Limpiar"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 6L6 18" />
+            <path d="M6 6l12 12" />
+          </svg>
+        </button>
+      )}
+      {activeLabel && (
+        <span className="search-input__badge">{activeLabel}</span>
       )}
     </div>
   );
@@ -68,4 +87,7 @@ SearchInput.propTypes = {
   delay: PropTypes.number,
   className: PropTypes.string,
   autoFocus: PropTypes.bool,
+  onKeyDown: PropTypes.func,
+  onSearch: PropTypes.func,
+  activeLabel: PropTypes.string,
 };
