@@ -106,11 +106,23 @@ export function downloadPDF(rows, opts = {}) {
   if (!rows?.length || !columns?.length) return;
   const { header, data } = prepareData(rows, { columns, format });
 
-  // Import dinámico de jspdf + autotable
+  // Import dinámico de jspdf + jspdf-autotable.
+  // A partir de jspdf-autotable v5, `autoTable` es un named export y ya no
+  // se monta como side-effect en el prototipo de jsPDF. Hay que invocarlo
+  // explícitamente: `autoTable(doc, options)`.
   Promise.all([
     import('jspdf'),
     import('jspdf-autotable'),
-  ]).then(([{ default: jsPDF }]) => {
+  ]).then(([jspdfMod, autotableMod]) => {
+    const jsPDF = jspdfMod.jsPDF || jspdfMod.default;
+    // Soportar tanto `export const autoTable` como `export default autoTable`
+    // según la versión empaquetada.
+    const autoTable = autotableMod.autoTable || autotableMod.default;
+
+    if (!jsPDF || !autoTable) {
+      throw new Error('jsPDF o autoTable no se cargaron correctamente');
+    }
+
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
 
     // Título
@@ -123,8 +135,8 @@ export function downloadPDF(rows, opts = {}) {
     doc.setTextColor(100);
     doc.text(`${rows.length} registros · ${new Date().toLocaleDateString()}`, 14, 24);
 
-    // Tabla
-    doc.autoTable({
+    // Tabla (nueva API: autoTable como función, no como método del doc)
+    autoTable(doc, {
       startY: 28,
       head: [header],
       body: data,
@@ -147,8 +159,10 @@ export function downloadPDF(rows, opts = {}) {
     });
 
     doc.save(`${filename}.pdf`);
-  }).catch(() => {
-    // Fallback a CSV si falla la carga de PDF
+  }).catch((err) => {
+    // Mostrar el error real en consola para diagnóstico, y caer a CSV
+    // como plan B para que el usuario no se quede sin descarga.
+    console.error('Fallo al generar PDF:', err);
     downloadCSV(rows, opts);
   });
 }
