@@ -73,3 +73,9 @@ CVS
 node_modules
 .codegraph
 .vscode
+
+# Backups diarios
+backups/
+
+# Script temporal de generación de cierres
+generar_cierres.js
