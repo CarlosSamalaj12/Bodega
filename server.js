@@ -3028,15 +3028,18 @@ app.post("/api/auth/login", async (req, res) => {
     if (!ok) return res.status(401).json({ error: "Contrasena incorrecta" });
 
     const token = signToken(u);
+    const permisos = await getUserPermissionsMap(u.id_user);
     res.json({
       token,
       user: {
         id_user: u.id_user,
+        username: u.username,
         full_name: u.full_name,
         id_role: u.id_role,
         id_warehouse: u.id_warehouse,
         no_auto_logout: Number(u.no_auto_logout || 0),
         avatar_url: u.avatar_url || "",
+        permisos,
       },
     });
   } catch (e) {
@@ -4155,7 +4158,7 @@ app.get("/api/bodegas", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.get("/api/bodegas/:id", auth, async (req, res) => {
+app.get("/api/bodegas/:id", auth, requirePermission("section.view.ajustes", "ver modulo de ajustes"), async (req, res) => {
   const id_bodega = Number(req.params.id);
   if (!id_bodega) return res.status(400).json({ error: "Falta bodega" });
   const [rows] = await pool.query(
@@ -4180,7 +4183,7 @@ app.get("/api/bodegas/:id", auth, async (req, res) => {
   res.json(rows[0]);
 });
 
-app.get("/api/bodegas/:id/logo", auth, async (req, res) => {
+app.get("/api/bodegas/:id/logo", auth, requirePermission("section.view.ajustes", "ver modulo de ajustes"), async (req, res) => {
   try {
     const id_bodega = Number(req.params.id || 0);
     if (!id_bodega) return res.status(400).json({ error: "Bodega invalida" });
@@ -4592,7 +4595,6 @@ app.post("/api/ajustes", auth, requirePermission("action.create_update", "regist
 app.post("/api/salidas", auth, requirePermission("action.create_update", "registrar salidas"), enforceDailyCloseBeforeMutations, async (req, res) => {
   const { id_motivo = null, id_bodega_destino = null, observaciones = null, lines = [] } = req.body || {};
 
-  if (!id_bodega_destino) return res.status(400).json({ error: "Falta bodega destino" });
   if (!Array.isArray(lines) || !lines.length) return res.status(400).json({ error: "Sin lineas" });
 
   const id_bodega_origen = Number(req.user.id_warehouse || 0);
@@ -4600,7 +4602,11 @@ app.post("/api/salidas", auth, requirePermission("action.create_update", "regist
   if (!beginIdempotentRequest(req, res, { pathKey: "/api/salidas" })) {
     return res.status(409).json({ error: "Solicitud duplicada detectada. Espera unos segundos e intenta de nuevo." });
   }
-  const idDestino = Number(id_bodega_destino || 0);
+  // id_bodega_destino es opcional. Si no se envía, se asume la misma bodega
+  // del usuario como destino => salida normal (consumo interno, merma, etc.).
+  // La lógica useTransfer más abajo ya detecta transferencias cuando
+  // destino != origen y el destino puede recibir stock.
+  const idDestino = Number(id_bodega_destino || id_bodega_origen || 0);
   if (!idDestino) return res.status(400).json({ error: "Bodega destino invalida" });
 
   const conn = await pool.getConnection();

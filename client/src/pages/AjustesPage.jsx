@@ -1,16 +1,24 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { toast } from '@/components/ui/Toast';
 import { useAuthStore } from '@/stores/auth.store';
+import { usePermission } from '@/components/shared/PermissionGuard';
 import api from '@/services/api';
 import './AjustesPage.scss';
 
 export default function AjustesPage() {
   const user = useAuthStore((s) => s.user);
   const id_warehouse = Number(user?.id_warehouse || 0);
+
+  // Defensa en profundidad: si el usuario no tiene el permiso de la sección,
+  // lo sacamos al inicio aunque el guard de ruta no se haya aplicado.
+  // Importante: este hook debe ir antes de cualquier return condicional para
+  // cumplir con las reglas de los hooks de React.
+  const { has: canView } = usePermission();
 
   // Estado general
   const [loading, setLoading] = useState(true);
@@ -135,6 +143,11 @@ export default function AjustesPage() {
   };
 
   const hasLogoChanges = logoApp !== logoAppPreview || logoPrint !== logoPrintPreview;
+
+  // Defensa en profundidad: si el guard de ruta no se aplicó, salir al inicio.
+  if (!canView('section.view.ajustes')) {
+    return <Navigate to="/" replace />;
+  }
 
   if (!id_warehouse) {
     return (

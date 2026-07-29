@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
+import { PermissionGuard } from '@/components/shared/PermissionGuard';
 
 // Carga diferida de todas las páginas
 const LoginPage = lazy(() => import('@/pages/LoginPage'));
@@ -107,7 +108,14 @@ export const router = createBrowserRouter([
       { path: 'corte-diario', element: wrap(<CorteDiarioPage />) },
       { path: 'cuadre-caja', element: wrap(<CuadreCajaPage />) },
       { path: 'reporte-pedidos', element: wrap(<ReportePedidosPage />) },
-      { path: 'ajustes', element: wrap(<AjustesPage />) },
+      {
+        path: 'ajustes',
+        element: (
+          <PermissionGuard permissionKey="section.view.ajustes">
+            <AjustesPage />
+          </PermissionGuard>
+        ),
+      },
       { path: 'transferencias', element: wrap(<TransferenciasPage />) },
       { path: 'conteo-ciclico', element: wrap(<ConteoCiclicoPage />) },
       { path: 'tendencia-producto', element: wrap(<TendenciaProductoPage />) },
