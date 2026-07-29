@@ -1,5 +1,5 @@
-const STATIC_CACHE = "bodega-static-v4";
-const API_CACHE = "bodega-api-v4";
+const STATIC_CACHE = "bodega-static-v9";
+const API_CACHE = "bodega-api-v9";
 
 const STATIC_ASSETS = [
   "./app.html",

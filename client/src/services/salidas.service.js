@@ -93,9 +93,12 @@ export const salidasService = {
 
   /**
    * Revertir una salida (crea movimiento inverso y anula el original).
+   * Requiere PIN de supervisor.
    */
-  async revert(id) {
-    const { data } = await api.post(`/api/movimientos/${Number(id)}/revert`);
+  async revert(id, supervisorPin) {
+    const { data } = await api.post(`/api/movimientos/${Number(id)}/revert`, {
+      supervisor_pin: supervisorPin,
+    });
     return data;
   },
 };

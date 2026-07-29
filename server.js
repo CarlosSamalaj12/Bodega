@@ -1,4 +1,5 @@
 import express from "express";
+import ExpressLayer from "express/lib/router/layer.js";
 import cors from "cors";
 import { createServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
@@ -22,6 +23,32 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 }
 
 const app = express();
+
+// ── Parche Express 4: reenviar rechazos async al middleware de errores ──
+// Express 4 no captura promesas rechazadas dentro de handlers async: sin este
+// parche un error async puede tumbar el proceso y dejar al cliente colgado.
+// Envuelve cada handler (menos los error-handlers de 4 args) y reenvia el
+// rechazo a next(err), llegando al app.use((err, req, res, next)) global.
+{
+  const wrapAsync = (fn) =>
+    function wrappedAsyncHandler(req, res, next) {
+      const ret = fn.apply(this, arguments);
+      if (ret && typeof ret.catch === "function") ret.catch(next);
+      return ret;
+    };
+  Object.defineProperty(ExpressLayer.prototype, "handle", {
+    enumerable: true,
+    configurable: true,
+    get() {
+      return this.__handle;
+    },
+    set(fn) {
+      if (typeof fn === "function" && fn.length <= 3) fn = wrapAsync(fn);
+      this.__handle = fn;
+    },
+  });
+}
+
 const httpServer = createServer(app);
 const HOST = String(process.env.HOST || "0.0.0.0").trim() || "0.0.0.0";
 const PORT = Number(process.env.PORT || 3001) || 3001;
@@ -581,6 +608,9 @@ function emitPedidoChanged(payload) {
 async function pickLotsFEFO(conn, id_bodega, id_producto, qtyNeeded, opts = {}) {
   const allowExpired = opts.allowExpired !== false;
   const whereVenc = allowExpired ? "" : "AND (fecha_vencimiento IS NULL OR fecha_vencimiento >= CURDATE())";
+  // Serializa los consumos de stock por producto: evita race conditions entre
+  // transacciones concurrentes que leerian el mismo snapshot de la vista.
+  await conn.query(`SELECT id_producto FROM productos WHERE id_producto=:id_producto FOR UPDATE`, { id_producto });
   const [lots] = await conn.query(
     `
     SELECT lote, fecha_vencimiento, stock
@@ -595,11 +625,14 @@ async function pickLotsFEFO(conn, id_bodega, id_producto, qtyNeeded, opts = {}) 
   const picks = [];
   let remaining = Number(qtyNeeded);
   for (const l of lots) {
-    if (remaining <= 0) break;
-    const take = Math.min(remaining, Number(l.stock));
+    if (remaining <= 1e-9) break;
+    const lotStock = Number(l.stock);
+    if (!(lotStock > 0)) continue; // evita picks negativos/cero que corrompen el kardex
+    const take = Math.min(remaining, lotStock);
     picks.push({ lote: l.lote, fecha_vencimiento: l.fecha_vencimiento, qty: take });
     remaining -= take;
   }
+  if (remaining <= 1e-9) remaining = 0;
 
   if (!picks.length && allowExpired) {
     const [[r]] = await conn.query(
@@ -620,7 +653,7 @@ async function getLastUnitCost(conn, id_bodega, id_producto, lote) {
   const [rows] = await conn.query(
     `SELECT costo_unitario
      FROM kardex
-     WHERE id_bodega=:id_bodega AND id_producto=:id_producto AND lote=:lote AND delta_cantidad > 0
+     WHERE id_bodega=:id_bodega AND id_producto=:id_producto AND lote <=> :lote AND delta_cantidad > 0
      ORDER BY creado_en DESC
      LIMIT 1`,
     { id_bodega, id_producto, lote }
@@ -1630,6 +1663,17 @@ function ymd(value) {
   } catch {
     return null;
   }
+}
+
+// Fecha local en formato YYYY-MM-DD (consistente con CURDATE() de MySQL).
+// Las columnas DATE llegan como objetos Date; usar toISOString mezclaria UTC.
+function localYmd(value) {
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
 }
 
 function normalizeYmdInput(value) {
@@ -2991,7 +3035,7 @@ app.get("/api/auth/users", async (req, res) => {
       }))
     );
   } catch (e) {
-    res.status(500).json({ error: "No se pudo cargar usuarios para login" });
+    return res.status(500).json({ error: "No se pudo cargar usuarios para login" });
   }
 });
 
@@ -3021,21 +3065,9 @@ app.get("/api/session-policy", auth, async (req, res) => {
       by_user_policy: userNoAutoLogout,
     });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
-
-/* =========================
-   HELPERS CRUD
-========================= */
-async function listActive(table, nameField) {
-  const [rows] = await pool.query(`SELECT * FROM ${table} ORDER BY ${nameField} ASC`);
-  return rows;
-}
-
-async function softDelete(table, idField, id) {
-  await pool.query(`UPDATE ${table} SET active=0 WHERE ${idField}=:id`, { id });
-}
 
 async function resolveStockScope(user) {
   const userId = Number(user?.id_user || 0);
@@ -3106,13 +3138,6 @@ async function resolveStockScope(user) {
     allowed_warehouse_ids: allowedWarehouseIds,
   };
 }
-
-/* =========================
-   CATALOG CRUD (ejemplo: categorias)
-========================= */
-app.get("/api/categories", auth, async (req, res) => {
-  res.json(await listActive("categories", "category_name"));
-});
 
 /* =========================
    PRODUCTOS (BUSQUEDA)
@@ -3188,7 +3213,7 @@ app.get("/api/productos", auth, async (req, res) => {
   });
 });
 
-app.post("/api/productos", auth, async (req, res) => {
+app.post("/api/productos", auth, requirePermission("action.create_update", "crear productos"), async (req, res) => {
   const conn = await pool.getConnection();
   try {
     const {
@@ -3241,7 +3266,7 @@ app.post("/api/productos", auth, async (req, res) => {
   }
 });
 
-app.patch("/api/productos/:id", auth, async (req, res) => {
+app.patch("/api/productos/:id", auth, requirePermission("action.create_update", "editar productos"), async (req, res) => {
   const conn = await pool.getConnection();
   try {
     const id_producto = Number(req.params.id || 0);
@@ -3321,7 +3346,7 @@ app.get("/api/productos/:id/bodegas-visibles", auth, async (req, res) => {
       bodegas: bodegas || [],
     });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -3384,7 +3409,7 @@ app.patch("/api/medidas/:id", auth, requirePermission("action.create_update", "a
     );
     res.json({ ok: true, id_medida: id });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -3400,7 +3425,7 @@ app.get("/api/categorias", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/categorias", auth, async (req, res) => {
+app.post("/api/categorias", auth, requirePermission("action.create_update", "crear categorias"), async (req, res) => {
   try {
     const nombre_categoria = String(req.body?.nombre_categoria || "").trim();
     const activo = Number(req.body?.activo) ? 1 : 0;
@@ -3420,7 +3445,7 @@ app.post("/api/categorias", auth, async (req, res) => {
   }
 });
 
-app.patch("/api/categorias/:id_categoria", auth, async (req, res) => {
+app.patch("/api/categorias/:id_categoria", auth, requirePermission("action.create_update", "editar categorias"), async (req, res) => {
   try {
     const id_categoria = Number(req.params.id_categoria || 0);
     const rawNombre = req.body?.nombre_categoria;
@@ -3453,7 +3478,7 @@ app.patch("/api/categorias/:id_categoria", auth, async (req, res) => {
   }
 });
 
-app.post("/api/categorias/:id_categoria/deactivate", auth, async (req, res) => {
+app.post("/api/categorias/:id_categoria/deactivate", auth, requirePermission("action.delete", "desactivar categorias"), async (req, res) => {
   try {
     const id_categoria = Number(req.params.id_categoria || 0);
     if (!id_categoria) return res.status(400).json({ error: "Falta categoria" });
@@ -3461,6 +3486,37 @@ app.post("/api/categorias/:id_categoria/deactivate", auth, async (req, res) => {
       `UPDATE categorias
        SET activo=0
        WHERE id_categoria=:id_categoria`,
+      { id_categoria }
+    );
+    if (!r.affectedRows) return res.status(404).json({ error: "Categoria no existe" });
+    res.json({ ok: true });
+  } catch (e) {
+    return res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+app.delete("/api/categorias/:id_categoria", auth, requirePermission("action.delete", "eliminar categorias"), async (req, res) => {
+  try {
+    const id_categoria = Number(req.params.id_categoria || 0);
+    if (!id_categoria) return res.status(400).json({ error: "Falta categoria" });
+
+    const [[inUseProd]] = await pool.query(
+      `SELECT COUNT(*) AS n FROM productos WHERE id_categoria=:id_categoria`,
+      { id_categoria }
+    );
+    if (Number(inUseProd?.n || 0) > 0) {
+      return res.status(409).json({ error: "No se puede eliminar: la categoria tiene productos asociados. Desactivala en su lugar." });
+    }
+    const [[inUseSub]] = await pool.query(
+      `SELECT COUNT(*) AS n FROM subcategorias WHERE id_categoria=:id_categoria`,
+      { id_categoria }
+    );
+    if (Number(inUseSub?.n || 0) > 0) {
+      return res.status(409).json({ error: "No se puede eliminar: la categoria tiene subcategorias asociadas. Elimina o reasigna las subcategorias primero." });
+    }
+
+    const [r] = await pool.query(
+      `DELETE FROM categorias WHERE id_categoria=:id_categoria`,
       { id_categoria }
     );
     if (!r.affectedRows) return res.status(404).json({ error: "Categoria no existe" });
@@ -3489,7 +3545,7 @@ app.get("/api/subcategorias", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/subcategorias", auth, async (req, res) => {
+app.post("/api/subcategorias", auth, requirePermission("action.create_update", "crear subcategorias"), async (req, res) => {
   try {
     const id_categoria = Number(req.body?.id_categoria || 0);
     const nombre_subcategoria = String(req.body?.nombre_subcategoria || "").trim();
@@ -3511,7 +3567,7 @@ app.post("/api/subcategorias", auth, async (req, res) => {
   }
 });
 
-app.patch("/api/subcategorias/:id_subcategoria", auth, async (req, res) => {
+app.patch("/api/subcategorias/:id_subcategoria", auth, requirePermission("action.create_update", "editar subcategorias"), async (req, res) => {
   try {
     const id_subcategoria = Number(req.params.id_subcategoria || 0);
     const id_categoria =
@@ -3550,7 +3606,7 @@ app.patch("/api/subcategorias/:id_subcategoria", auth, async (req, res) => {
   }
 });
 
-app.post("/api/subcategorias/:id_subcategoria/deactivate", auth, async (req, res) => {
+app.post("/api/subcategorias/:id_subcategoria/deactivate", auth, requirePermission("action.delete", "desactivar subcategorias"), async (req, res) => {
   try {
     const id_subcategoria = Number(req.params.id_subcategoria || 0);
     if (!id_subcategoria) return res.status(400).json({ error: "Falta subcategoria" });
@@ -3558,6 +3614,30 @@ app.post("/api/subcategorias/:id_subcategoria/deactivate", auth, async (req, res
       `UPDATE subcategorias
        SET activo=0
        WHERE id_subcategoria=:id_subcategoria`,
+      { id_subcategoria }
+    );
+    if (!r.affectedRows) return res.status(404).json({ error: "Subcategoria no existe" });
+    res.json({ ok: true });
+  } catch (e) {
+    return res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+app.delete("/api/subcategorias/:id_subcategoria", auth, requirePermission("action.delete", "eliminar subcategorias"), async (req, res) => {
+  try {
+    const id_subcategoria = Number(req.params.id_subcategoria || 0);
+    if (!id_subcategoria) return res.status(400).json({ error: "Falta subcategoria" });
+
+    const [[inUseProd]] = await pool.query(
+      `SELECT COUNT(*) AS n FROM productos WHERE id_subcategoria=:id_subcategoria`,
+      { id_subcategoria }
+    );
+    if (Number(inUseProd?.n || 0) > 0) {
+      return res.status(409).json({ error: "No se puede eliminar: la subcategoria tiene productos asociados. Desactivala en su lugar." });
+    }
+
+    const [r] = await pool.query(
+      `DELETE FROM subcategorias WHERE id_subcategoria=:id_subcategoria`,
       { id_subcategoria }
     );
     if (!r.affectedRows) return res.status(404).json({ error: "Subcategoria no existe" });
@@ -3590,7 +3670,7 @@ app.get("/api/limites", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/limites", auth, async (req, res) => {
+app.post("/api/limites", auth, requirePermission("action.create_update", "crear limites"), async (req, res) => {
   try {
     const { id_bodega, id_producto, minimo = 0, maximo = 0, activo = 1 } = req.body || {};
     const idB = Number(id_bodega || 0);
@@ -3619,7 +3699,7 @@ app.post("/api/limites", auth, async (req, res) => {
   }
 });
 
-app.patch("/api/limites/:id_bodega/:id_producto", auth, async (req, res) => {
+app.patch("/api/limites/:id_bodega/:id_producto", auth, requirePermission("action.create_update", "editar limites"), async (req, res) => {
   try {
     const idB = Number(req.params.id_bodega || 0);
     const idP = Number(req.params.id_producto || 0);
@@ -3643,7 +3723,7 @@ app.patch("/api/limites/:id_bodega/:id_producto", auth, async (req, res) => {
   }
 });
 
-app.post("/api/limites/:id_bodega/:id_producto/deactivate", auth, async (req, res) => {
+app.post("/api/limites/:id_bodega/:id_producto/deactivate", auth, requirePermission("action.delete", "desactivar limites"), async (req, res) => {
   try {
     const idB = Number(req.params.id_bodega || 0);
     const idP = Number(req.params.id_producto || 0);
@@ -3680,7 +3760,7 @@ app.get("/api/reglas-subcategorias", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/reglas-subcategorias", auth, async (req, res) => {
+app.post("/api/reglas-subcategorias", auth, requirePermission("action.create_update", "crear reglas de subcategorias"), async (req, res) => {
   try {
     const { id_subcategoria, max_dias_vida = 0, dias_alerta_antes = 0, activo = 1 } = req.body || {};
     const idSub = Number(id_subcategoria || 0);
@@ -3704,7 +3784,7 @@ app.post("/api/reglas-subcategorias", auth, async (req, res) => {
   }
 });
 
-app.patch("/api/reglas-subcategorias/:id_subcategoria", auth, async (req, res) => {
+app.patch("/api/reglas-subcategorias/:id_subcategoria", auth, requirePermission("action.create_update", "editar reglas de subcategorias"), async (req, res) => {
   try {
     const idSub = Number(req.params.id_subcategoria || 0);
     const max = Math.max(0, Number(req.body?.max_dias_vida || 0));
@@ -3724,7 +3804,7 @@ app.patch("/api/reglas-subcategorias/:id_subcategoria", auth, async (req, res) =
   }
 });
 
-app.post("/api/reglas-subcategorias/:id_subcategoria/deactivate", auth, async (req, res) => {
+app.post("/api/reglas-subcategorias/:id_subcategoria/deactivate", auth, requirePermission("action.delete", "desactivar reglas de subcategorias"), async (req, res) => {
   try {
     const idSub = Number(req.params.id_subcategoria || 0);
     if (!idSub) return res.status(400).json({ error: "Falta subcategoria" });
@@ -3756,7 +3836,7 @@ app.get("/api/proveedores", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/proveedores", auth, async (req, res) => {
+app.post("/api/proveedores", auth, requirePermission("action.create_update", "crear proveedores"), async (req, res) => {
   try {
     const nombre_proveedor = String(req.body?.nombre_proveedor || "").trim();
     const telefonoRaw = String(req.body?.telefono || "").trim();
@@ -3784,7 +3864,7 @@ app.post("/api/proveedores", auth, async (req, res) => {
   }
 });
 
-app.patch("/api/proveedores/:id_proveedor", auth, async (req, res) => {
+app.patch("/api/proveedores/:id_proveedor", auth, requirePermission("action.create_update", "editar proveedores"), async (req, res) => {
   try {
     const id_proveedor = Number(req.params.id_proveedor || 0);
     const rawNombre = req.body?.nombre_proveedor;
@@ -3833,7 +3913,7 @@ app.patch("/api/proveedores/:id_proveedor", auth, async (req, res) => {
   }
 });
 
-app.post("/api/proveedores/:id_proveedor/deactivate", auth, async (req, res) => {
+app.post("/api/proveedores/:id_proveedor/deactivate", auth, requirePermission("action.delete", "desactivar proveedores"), async (req, res) => {
   try {
     const id_proveedor = Number(req.params.id_proveedor || 0);
     if (!id_proveedor) return res.status(400).json({ error: "Falta proveedor" });
@@ -3868,7 +3948,7 @@ app.get("/api/motivos", auth, async (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/motivos", auth, async (req, res) => {
+app.post("/api/motivos", auth, requirePermission("action.create_update", "crear motivos"), async (req, res) => {
   try {
     const nombre_motivo = String(req.body?.nombre_motivo || "").trim();
     const tipo_movimiento = String(req.body?.tipo_movimiento || "").trim().toUpperCase();
@@ -3894,7 +3974,7 @@ app.post("/api/motivos", auth, async (req, res) => {
   }
 });
 
-app.patch("/api/motivos/:id_motivo", auth, async (req, res) => {
+app.patch("/api/motivos/:id_motivo", auth, requirePermission("action.create_update", "editar motivos"), async (req, res) => {
   const conn = await pool.getConnection();
   try {
     const id_motivo = Number(req.params.id_motivo || 0);
@@ -3948,7 +4028,7 @@ app.patch("/api/motivos/:id_motivo", auth, async (req, res) => {
   }
 });
 
-app.post("/api/motivos/:id_motivo/deactivate", auth, async (req, res) => {
+app.post("/api/motivos/:id_motivo/deactivate", auth, requirePermission("action.delete", "desactivar motivos"), async (req, res) => {
   const conn = await pool.getConnection();
   try {
     const id_motivo = Number(req.params.id_motivo || 0);
@@ -4072,7 +4152,7 @@ app.get("/api/bodegas/:id/logo", auth, async (req, res) => {
       effective_logo_data,
     });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -4112,7 +4192,7 @@ app.put("/api/bodegas/:id/logo", auth, requirePermission("action.create_update",
 
     res.json({ ok: true, id_bodega });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -4590,7 +4670,7 @@ app.post("/api/salidas", auth, requirePermission("action.create_update", "regist
         .toUpperCase();
     const motNameNorm = normalize(mot?.nombre_motivo || "");
     const allowExpiredWriteoff = motNameNorm.includes("MERMA") || motNameNorm.includes("DESCOMPOSICION");
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = localYmd(new Date());
     const requierePrecioSalida = Number(cfg?.requiere_precio_salida || 0) === 1;
 
     for (const ln of lines) {
@@ -4611,13 +4691,21 @@ app.post("/api/salidas", auth, requirePermission("action.create_update", "regist
         return res.status(400).json({ error: `El producto #${id_producto} no esta habilitado para la bodega destino` });
       }
 
-      const { picks, remaining } = await pickLotsFEFO(conn, id_bodega_origen, id_producto, qtyRequested);
+      // Si el motivo NO es merma/descomposicion, FEFO excluye lotes vencidos.
+      const { picks, remaining } = await pickLotsFEFO(conn, id_bodega_origen, id_producto, qtyRequested, {
+        allowExpired: allowExpiredWriteoff,
+      });
       if (!picks.length || remaining > 0) {
         await conn.rollback();
-        return res.status(400).json({ error: `Stock insuficiente para producto #${id_producto}` });
+        return res.status(400).json({
+          error: allowExpiredWriteoff
+            ? `Stock insuficiente para producto #${id_producto}`
+            : `Stock insuficiente (vigente) para producto #${id_producto}. Si es merma usa un motivo de Merma o Descomposicion.`,
+        });
       }
 
-      const hasExpiredPick = picks.some((p) => p.fecha_vencimiento && String(p.fecha_vencimiento).slice(0, 10) < todayStr);
+      // Red de seguridad: nunca despachar lotes vencidos salvo merma/descomposicion.
+      const hasExpiredPick = picks.some((p) => p.fecha_vencimiento && localYmd(p.fecha_vencimiento) < todayStr);
       if (hasExpiredPick && !allowExpiredWriteoff) {
         await conn.rollback();
         return res.status(400).json({
@@ -4922,7 +5010,7 @@ app.post("/api/salidas/conteo-final", auth, requirePermission("action.create_upd
 /* =========================
    BODEGAS (CREAR)
 ========================= */
-app.post("/api/bodegas", auth, async (req, res) => {
+app.post("/api/bodegas", auth, requirePermission("action.manage_permissions", "crear bodegas"), async (req, res) => {
   const {
     nombre_bodega,
     tipo_bodega,
@@ -4984,71 +5072,56 @@ app.post("/api/bodegas", auth, async (req, res) => {
   }
 });
 
-app.post("/api/categories", auth, async (req, res) => {
-  const { category_name } = req.body || {};
-  if (!category_name) return res.status(400).json({ error: "Falta nombre" });
-  await pool.query("INSERT INTO categories(category_name, active) VALUES(:category_name, 1)", { category_name });
-  res.json({ ok: true });
-});
-
-app.put("/api/categories/:id", auth, async (req, res) => {
-  const id = Number(req.params.id);
-  const { category_name, active } = req.body || {};
-  await pool.query(
-    "UPDATE categories SET category_name=COALESCE(:category_name, category_name), active=COALESCE(:active, active) WHERE id_category=:id",
-    { id, category_name: category_name ?? null, active: typeof active === "number" ? active : null }
-  );
-  res.json({ ok: true });
-});
-
-app.delete("/api/categories/:id", auth, async (req, res) => {
-  await softDelete("categories", "id_category", Number(req.params.id));
-  res.json({ ok: true });
-});
-
 /* =========================
    STOCK (solo con stock + no vencido opcional)
 ========================= */
 app.get("/api/stock", auth, async (req, res) => {
-  const id_warehouse = Number(req.query.warehouse || req.user.id_warehouse || 0);
-  const onlyWithStock = String(req.query.onlyWithStock || "1") === "1";
-  const includeLots = String(req.query.includeLots || "1") === "1";
-  const notExpiredOnly = String(req.query.notExpiredOnly || "1") === "1";
+  try {
+    const id_warehouse = Number(req.query.warehouse || req.user.id_warehouse || 0);
+    const onlyWithStock = String(req.query.onlyWithStock || "1") === "1";
+    const includeLots = String(req.query.includeLots || "1") === "1";
+    const notExpiredOnly = String(req.query.notExpiredOnly || "1") === "1";
 
-  if (!id_warehouse) return res.status(400).json({ error: "Falta bodega" });
+    if (!id_warehouse) return res.status(400).json({ error: "Falta bodega" });
 
-  if (includeLots) {
+    if (includeLots) {
+      const [rows] = await pool.query(
+        `SELECT v.id_bodega,
+                v.id_producto,
+                p.nombre_producto,
+                p.sku,
+                v.lote,
+                v.fecha_vencimiento,
+                v.stock
+         FROM v_stock_por_lote v
+         JOIN productos p ON p.id_producto=v.id_producto
+         WHERE v.id_bodega=:id_warehouse
+           ${onlyWithStock ? "AND v.stock > 0" : ""}
+           ${notExpiredOnly ? "AND (v.fecha_vencimiento IS NULL OR v.fecha_vencimiento >= CURDATE())" : ""}
+         ORDER BY p.nombre_producto ASC, (v.fecha_vencimiento IS NULL), v.fecha_vencimiento ASC`,
+        { id_warehouse }
+      );
+      return res.json(rows);
+    }
+
     const [rows] = await pool.query(
-      `
-      SELECT
-        v.id_product, p.product_name, p.sku,
-        v.lot_code, v.expiration_date,
-        v.qty_on_hand
-      FROM v_stock_by_lot v
-      JOIN products p ON p.id_product=v.id_product
-      WHERE v.id_warehouse=:id_warehouse
-        ${onlyWithStock ? "AND v.qty_on_hand > 0" : ""}
-        ${notExpiredOnly ? "AND (v.expiration_date IS NULL OR v.expiration_date >= CURDATE())" : ""}
-      ORDER BY p.product_name ASC, (v.expiration_date IS NULL), v.expiration_date ASC
-      `,
+      `SELECT v.id_bodega,
+              v.id_producto,
+              p.nombre_producto,
+              p.sku,
+              SUM(v.stock) AS stock
+       FROM v_stock_por_lote v
+       JOIN productos p ON p.id_producto=v.id_producto
+       WHERE v.id_bodega=:id_warehouse
+         ${notExpiredOnly ? "AND (v.fecha_vencimiento IS NULL OR v.fecha_vencimiento >= CURDATE())" : ""}
+       GROUP BY v.id_bodega, v.id_producto, p.nombre_producto, p.sku
+       ${onlyWithStock ? "HAVING SUM(v.stock) > 0" : ""}
+       ORDER BY p.nombre_producto ASC`,
       { id_warehouse }
     );
     return res.json(rows);
-  } else {
-    const [rows] = await pool.query(
-      `
-      SELECT
-        s.id_product, p.product_name, p.sku,
-        s.qty_on_hand
-      FROM v_stock_summary s
-      JOIN products p ON p.id_product=s.id_product
-      WHERE s.id_warehouse=:id_warehouse
-        ${onlyWithStock ? "AND s.qty_on_hand > 0" : ""}
-      ORDER BY p.product_name ASC
-      `,
-      { id_warehouse }
-    );
-    return res.json(rows);
+  } catch (e) {
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -5099,7 +5172,7 @@ app.get("/api/reportes/existencias", auth, async (req, res) => {
      LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
      LEFT JOIN limites_producto_bodega lpb ON lpb.id_producto=v.id_producto AND lpb.id_bodega=v.id_bodega
      WHERE ${show_zero ? "v.stock >= 0" : "v.stock > 0"}
-       ${accessFilter ? `v.id_bodega IN (${accessFilter.sql})` : "1=1"}
+       AND ${accessFilter ? `v.id_bodega IN (${accessFilter.sql})` : "1=1"}
        AND (:id_bodega IS NULL OR v.id_bodega=:id_bodega)
        AND ${qf.clause}
        AND (:from_date IS NULL OR v.fecha_vencimiento IS NULL OR v.fecha_vencimiento >= :from_date)
@@ -5215,7 +5288,7 @@ const [rows] = await pool.query(
        AND (:id_categoria IS NULL OR p.id_categoria=:id_categoria)
        AND (:id_subcategoria IS NULL OR p.id_subcategoria=:id_subcategoria)
      ORDER BY b.nombre_bodega ASC, p.nombre_producto ASC, (v.fecha_vencimiento IS NULL), v.fecha_vencimiento ASC
-     LIMIT ${limit} OFFSET ${offset} OFFSET ${offset}`,
+     LIMIT ${limit} OFFSET ${offset}`,
     { id_bodega, from_date, to_date, id_categoria, id_subcategoria, ...(accessFilter?.params || {}), ...qf.params }
   );
     res.json({
@@ -5368,7 +5441,7 @@ app.get("/api/reportes/existencias/stock-minimo", auth, async (req, res) => {
     );
     res.json(rows);
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -6363,7 +6436,7 @@ app.get("/api/cierre-dia/estado", auth, async (req, res) => {
         : null,
     });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -6558,7 +6631,7 @@ app.get("/api/cierre-dia", auth, async (req, res) => {
       rows,
     });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -6610,7 +6683,7 @@ app.get("/api/cierre-dia/:fecha", auth, async (req, res) => {
       rows,
     });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -6660,7 +6733,7 @@ app.get("/api/reportes/stock-scope", auth, async (req, res) => {
       bodegas: rows,
     });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -6745,7 +6818,7 @@ app.get("/api/dashboard/resumen", auth, async (req, res) => {
       cache: { hit: false, stale: false, warming: false, age_sec: 0, generado_en: new Date() },
     });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -6915,7 +6988,7 @@ app.get("/api/dashboard/detalle", auth, async (req, res) => {
 
     return res.status(400).json({ error: "Tipo de detalle no valido" });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -7063,9 +7136,59 @@ app.get("/api/reportes/entradas", auth, async (req, res) => {
       totalPages: Math.ceil(totalMovements / Math.max(1, limit)),
     });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
+
+app.post(
+  "/api/entradas/:id_movimiento/dashboard-flag",
+  auth,
+  requirePermission("action.manage_permissions", "administrar exclusion del panel principal en entradas"),
+  async (req, res) => {
+    let conn = null;
+    try {
+      await ensureMovimientoDashboardColumn();
+      await ensureMovimientoPastUpdateTrigger();
+      const id_movimiento = Number(req.params.id_movimiento || 0);
+      if (!id_movimiento) return res.status(400).json({ error: "Movimiento invalido" });
+      const scope = await resolveStockScope(req.user);
+      if (!scope?.is_admin_role) {
+        return res.status(403).json({ error: "Solo un administrador puede excluir entradas antiguas del panel principal." });
+      }
+
+      const no_contar_dashboard = Number(req.body?.no_contar_dashboard) === 1 ? 1 : 0;
+      conn = await pool.getConnection();
+      const [[row]] = await conn.query(
+        `SELECT id_movimiento, tipo_movimiento, id_bodega_destino, id_bodega_origen
+         FROM movimiento_encabezado
+         WHERE id_movimiento=:id_movimiento
+         LIMIT 1`,
+        { id_movimiento }
+      );
+      if (!row) return res.status(404).json({ error: "Movimiento no encontrado" });
+      if (String(row.tipo_movimiento || "").toUpperCase() !== "ENTRADA") {
+        return res.status(400).json({ error: "Solo las entradas pueden excluirse del panel principal." });
+      }
+
+      await conn.query(`SET @allow_dashboard_flag_past_update = 1`);
+      await conn.query(
+        `UPDATE movimiento_encabezado
+         SET no_contar_dashboard=:no_contar_dashboard
+         WHERE id_movimiento=:id_movimiento`,
+        { id_movimiento, no_contar_dashboard }
+      );
+      await conn.query(`SET @allow_dashboard_flag_past_update = 0`);
+
+      await pool.query(`DELETE FROM dashboard_cache_resumen`);
+
+      return res.json({ ok: true, id_movimiento, no_contar_dashboard });
+    } catch (e) {
+      return res.status(500).json({ error: String(e.message || e) });
+    } finally {
+      if (conn) conn.release();
+    }
+  }
+);
 
 app.get("/api/reportes/salidas", auth, async (req, res) => {
   try {
@@ -7233,7 +7356,7 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
       totalPages: Math.ceil(totalMovements / Math.max(1, limit)),
     });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -7441,13 +7564,75 @@ app.get("/api/reportes/pedidos", auth, async (req, res) => {
       totalPages: Math.ceil(totalMovements / Math.max(1, limit)),
     });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
 /* =========================
    PEDIDOS (/api/orders)
 ========================= */
+app.get(
+  "/api/reportes/auditoria-sensibles",
+  auth,
+  requirePermission("section.view.r-auditoria-sensibles", "ver reporte de auditoria sensible"),
+  async (req, res) => {
+    try {
+      const from = String(req.query.from || "").trim() || null;
+      const to = String(req.query.to || "").trim() || null;
+      const action_key = String(req.query.action_key || "").trim() || null;
+      const qRaw = String(req.query.q || "").trim();
+      const qf = buildTokenizedLikeFilter(
+        qRaw,
+        ["actor_nombre", "supervisor_nombre", "supervisor_usuario", "action_label"],
+        "rauq"
+      );
+      const limit = Math.max(1, Math.min(2000, Number(req.query.limit || 500)));
+
+      if (from && !/^\d{4}-\d{2}-\d{2}$/.test(from)) {
+        return res.status(400).json({ error: "Fecha 'from' invalida. Formato esperado: YYYY-MM-DD" });
+      }
+      if (to && !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+        return res.status(400).json({ error: "Fecha 'to' invalida. Formato esperado: YYYY-MM-DD" });
+      }
+
+      const canSeeAll = await canManageUserPermissions(Number(req.user?.id_user || 0));
+      const id_bodega_actor = canSeeAll ? null : Number(req.user?.id_warehouse || 0) || null;
+
+      const [rows] = await pool.query(
+        `SELECT id_auditoria,
+                action_key,
+                action_label,
+                endpoint,
+                http_method,
+                id_usuario_actor,
+                actor_nombre,
+                id_bodega_actor,
+                id_usuario_supervisor,
+                supervisor_usuario,
+                supervisor_nombre,
+                approval_method,
+                reference_type,
+                reference_id,
+                detail_json,
+                creado_en
+         FROM auditoria_accion_sensible
+         WHERE (:from IS NULL OR DATE(creado_en) >= :from)
+           AND (:to IS NULL OR DATE(creado_en) <= :to)
+           AND (:action_key IS NULL OR action_key = :action_key)
+           AND ${qf.clause}
+           AND (:id_bodega_actor IS NULL OR id_bodega_actor=:id_bodega_actor)
+         ORDER BY creado_en DESC, id_auditoria DESC
+         LIMIT ${limit}`,
+        { from, to, action_key, id_bodega_actor, ...qf.params }
+      );
+
+      res.json(rows || []);
+    } catch (e) {
+      res.status(500).json({ error: String(e.message || e) });
+    }
+  }
+);
+
 app.post("/api/orders", auth, requirePermission("action.create_update", "crear pedidos"), enforceDailyCloseBeforeMutations, async (req, res) => {
   const { requested_from_warehouse_id, notes, lines } = req.body || {};
   const requester_user_id = Number(req.body?.requester_user_id || 0);
@@ -7572,7 +7757,7 @@ app.get("/api/pedidos/correlativo-actual", auth, async (req, res) => {
     );
     res.json({ correlativo: Number(r?.correlativo || 0) });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -7722,11 +7907,16 @@ app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "
     await conn.beginTransaction();
 
     const [[pe]] = await conn.query("SELECT * FROM pedido_encabezado WHERE id_pedido=:id_pedido FOR UPDATE", { id_pedido });
-    if (!pe) return res.status(404).json({ error: "Pedido no existe" });
+    if (!pe) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Pedido no existe" });
+    }
     if (Number(pe.id_bodega_surtidor || 0) !== actorWarehouse) {
+      await conn.rollback();
       return res.status(403).json({ error: "No puedes despachar pedidos de otra bodega" });
     }
     if (pe.estado === "CANCELADO" || pe.estado === "COMPLETADO" || pe.estado === "COMPLETADO_JUSTIFICADO") {
+      await conn.rollback();
       return res.status(400).json({ error: "Pedido no despachable" });
     }
 
@@ -7757,7 +7947,10 @@ app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "
        LIMIT 1`,
       { tipo: tipo_mov }
     );
-    if (!mot) return res.status(400).json({ error: "No existe motivo para el movimiento" });
+    if (!mot) {
+      await conn.rollback();
+      return res.status(400).json({ error: "No existe motivo para el movimiento" });
+    }
 
     const [mhRes] = await conn.query(
       `INSERT INTO movimiento_encabezado
@@ -7796,7 +7989,8 @@ app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "
 
       const remainingToFill = Number(line.cantidad_solicitada) - Number(line.cantidad_surtida);
       if (remainingToFill <= 0) continue;
-      const requested = qtyToFill;
+      // Nunca despachar mas de lo pendiente por linea.
+      const requested = Math.min(qtyToFill, remainingToFill);
       if (requested < remainingToFill) requiresJustificacion = true;
 
       const { picks } = await pickLotsFEFO(conn, pe.id_bodega_surtidor, line.id_producto, requested, {
@@ -7946,11 +8140,15 @@ app.post("/api/orders/:id/revert", auth, requirePermission("action.dispatch", "r
     await conn.beginTransaction();
 
     const [[pe]] = await conn.query(
-      "SELECT id_bodega_solicita, id_bodega_surtidor FROM pedido_encabezado WHERE id_pedido=:id_pedido",
+      "SELECT id_bodega_solicita, id_bodega_surtidor FROM pedido_encabezado WHERE id_pedido=:id_pedido FOR UPDATE",
       { id_pedido }
     );
-    if (!pe) return res.status(404).json({ error: "Pedido no existe" });
+    if (!pe) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Pedido no existe" });
+    }
     if (Number(pe.id_bodega_surtidor || 0) !== actorWarehouse) {
+      await conn.rollback();
       return res.status(403).json({ error: "No puedes revertir pedidos de otra bodega" });
     }
 
@@ -7965,9 +8163,35 @@ app.post("/api/orders/:id/revert", auth, requirePermission("action.dispatch", "r
        AND DATE(me.creado_en)=CURDATE()`,
       { id_pedido }
     );
-    if (!links.length) return res.status(400).json({ error: "No hay movimientos reversibles hoy" });
+    if (!links.length) {
+      await conn.rollback();
+      return res.status(400).json({ error: "No hay movimientos reversibles hoy" });
+    }
 
     const movIds = [...new Set(links.map((x) => x.id_movimiento))];
+
+    // Validar que la bodega receptora aun tenga el stock que se va a retirar.
+    const [posRows] = await conn.query(
+      `SELECT id_bodega, id_producto, lote, SUM(delta_cantidad) AS qty
+       FROM kardex
+       WHERE id_movimiento IN (${movIds.map(() => "?").join(",")}) AND delta_cantidad > 0
+       GROUP BY id_bodega, id_producto, lote`,
+      movIds
+    );
+    for (const r of posRows) {
+      await conn.query(`SELECT id_producto FROM productos WHERE id_producto=? FOR UPDATE`, [r.id_producto]);
+      const [[st]] = await conn.query(
+        `SELECT COALESCE(SUM(delta_cantidad),0) AS stock FROM kardex
+         WHERE id_bodega=? AND id_producto=? AND lote <=> ?`,
+        [r.id_bodega, r.id_producto, r.lote]
+      );
+      if (Number(st?.stock || 0) < Number(r.qty || 0) - 1e-9) {
+        await conn.rollback();
+        return res.status(400).json({
+          error: `No se puede revertir: la bodega destino ya consumio el producto #${r.id_producto} (lote ${r.lote ?? "sin lote"}).`,
+        });
+      }
+    }
 
     for (const ln of links) {
       await conn.query(
@@ -8082,11 +8306,15 @@ app.post("/api/orders/:id/revert-line", auth, requirePermission("action.dispatch
     await conn.beginTransaction();
 
     const [[pe]] = await conn.query(
-      "SELECT id_bodega_solicita, id_bodega_surtidor FROM pedido_encabezado WHERE id_pedido=:id_pedido",
+      "SELECT id_bodega_solicita, id_bodega_surtidor FROM pedido_encabezado WHERE id_pedido=:id_pedido FOR UPDATE",
       { id_pedido }
     );
-    if (!pe) return res.status(404).json({ error: "Pedido no existe" });
+    if (!pe) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Pedido no existe" });
+    }
     if (Number(pe.id_bodega_surtidor || 0) !== actorWarehouse) {
+      await conn.rollback();
       return res.status(403).json({ error: "No puedes revertir pedidos de otra bodega" });
     }
 
@@ -8099,10 +8327,37 @@ app.post("/api/orders/:id/revert-line", auth, requirePermission("action.dispatch
          AND DATE(me.creado_en)=CURDATE()`,
       { id_pedido_detalle }
     );
-    if (!links.length) return res.status(400).json({ error: "No hay movimientos reversibles hoy" });
+    if (!links.length) {
+      await conn.rollback();
+      return res.status(400).json({ error: "No hay movimientos reversibles hoy" });
+    }
 
     const movIds = [...new Set(links.map((x) => x.id_movimiento))];
+    const detalleIds = [...new Set(links.map((x) => x.id_detalle))];
     const reverted_qty = links.reduce((a, b) => a + Number(b.cantidad || 0), 0);
+
+    // Validar que la bodega receptora aun tenga el stock que se va a retirar.
+    const [posRows] = await conn.query(
+      `SELECT id_bodega, id_producto, lote, SUM(delta_cantidad) AS qty
+       FROM kardex
+       WHERE id_detalle IN (${detalleIds.map(() => "?").join(",")}) AND delta_cantidad > 0
+       GROUP BY id_bodega, id_producto, lote`,
+      detalleIds
+    );
+    for (const r of posRows) {
+      await conn.query(`SELECT id_producto FROM productos WHERE id_producto=? FOR UPDATE`, [r.id_producto]);
+      const [[st]] = await conn.query(
+        `SELECT COALESCE(SUM(delta_cantidad),0) AS stock FROM kardex
+         WHERE id_bodega=? AND id_producto=? AND lote <=> ?`,
+        [r.id_bodega, r.id_producto, r.lote]
+      );
+      if (Number(st?.stock || 0) < Number(r.qty || 0) - 1e-9) {
+        await conn.rollback();
+        return res.status(400).json({
+          error: `No se puede revertir: la bodega destino ya consumio el producto #${r.id_producto} (lote ${r.lote ?? "sin lote"}).`,
+        });
+      }
+    }
 
     await conn.query(
       `UPDATE pedido_detalle
@@ -8116,20 +8371,24 @@ app.post("/api/orders/:id/revert-line", auth, requirePermission("action.dispatch
       { qty: reverted_qty, id: id_pedido_detalle }
     );
 
+    // Borrar SOLO las filas de esta linea (no todo el movimiento).
     await conn.query(
-      `DELETE FROM kardex WHERE id_movimiento IN (${movIds.map(() => "?").join(",")})`,
-      movIds
+      `DELETE FROM kardex WHERE id_detalle IN (${detalleIds.map(() => "?").join(",")})`,
+      detalleIds
     );
     await conn.query(
-      `DELETE FROM pedido_movimiento_vinculo WHERE id_movimiento IN (${movIds.map(() => "?").join(",")})`,
-      movIds
+      `DELETE FROM pedido_movimiento_vinculo WHERE id_detalle IN (${detalleIds.map(() => "?").join(",")})`,
+      detalleIds
     );
     await conn.query(
-      `DELETE FROM movimiento_detalle WHERE id_movimiento IN (${movIds.map(() => "?").join(",")})`,
-      movIds
+      `DELETE FROM movimiento_detalle WHERE id_detalle IN (${detalleIds.map(() => "?").join(",")})`,
+      detalleIds
     );
+    // Eliminar encabezados que quedaron sin detalles.
     await conn.query(
-      `DELETE FROM movimiento_encabezado WHERE id_movimiento IN (${movIds.map(() => "?").join(",")})`,
+      `DELETE me FROM movimiento_encabezado me
+       LEFT JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
+       WHERE me.id_movimiento IN (${movIds.map(() => "?").join(",")}) AND md.id_detalle IS NULL`,
       movIds
     );
 
@@ -8184,8 +8443,12 @@ app.post("/api/orders/:id/cancel-line", auth, requirePermission("action.dispatch
        FOR UPDATE`,
       { id_pedido }
     );
-    if (!pe) return res.status(404).json({ error: "Pedido no existe" });
+    if (!pe) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Pedido no existe" });
+    }
     if (Number(pe.id_bodega_surtidor || 0) !== actorWarehouse) {
+      await conn.rollback();
       return res.status(403).json({ error: "No puedes anular lineas de otra bodega" });
     }
 
@@ -8197,12 +8460,17 @@ app.post("/api/orders/:id/cancel-line", auth, requirePermission("action.dispatch
        FOR UPDATE`,
       { id_pedido_detalle, id_pedido }
     );
-    if (!line) return res.status(404).json({ error: "Linea no encontrada" });
+    if (!line) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Linea no encontrada" });
+    }
     if (String(line.estado_linea || "").toUpperCase() === "ANULADO") {
+      await conn.rollback();
       return res.status(400).json({ error: "La linea ya esta anulada." });
     }
     const pendiente = Math.max(0, Number(line.cantidad_solicitada || 0) - Number(line.cantidad_surtida || 0));
     if (pendiente <= 0) {
+      await conn.rollback();
       return res.status(400).json({ error: "La linea ya fue despachada completamente." });
     }
 
@@ -8265,8 +8533,12 @@ app.post("/api/orders/:id/uncancel-line", auth, requirePermission("action.dispat
        FOR UPDATE`,
       { id_pedido }
     );
-    if (!pe) return res.status(404).json({ error: "Pedido no existe" });
+    if (!pe) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Pedido no existe" });
+    }
     if (Number(pe.id_bodega_surtidor || 0) !== actorWarehouse) {
+      await conn.rollback();
       return res.status(403).json({ error: "No puedes modificar lineas de otra bodega" });
     }
 
@@ -8278,8 +8550,12 @@ app.post("/api/orders/:id/uncancel-line", auth, requirePermission("action.dispat
        FOR UPDATE`,
       { id_pedido_detalle, id_pedido }
     );
-    if (!line) return res.status(404).json({ error: "Linea no encontrada" });
+    if (!line) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Linea no encontrada" });
+    }
     if (String(line.estado_linea || "").toUpperCase() !== "ANULADO") {
+      await conn.rollback();
       return res.status(400).json({ error: "La linea no esta anulada." });
     }
 
@@ -8470,18 +8746,23 @@ app.get("/api/reportes/tendencia-producto", auth, async (req, res) => {
       demand_peak_dates,
     });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
 app.get("/api/reportes/kardex", auth, async (req, res) => {
   try {
+    // Compatibilidad: el cliente React (que envía ?page=) recibe
+    // {rows,total,page,limit,totalPages}; el cliente legacy recibe array plano.
+    const pageParam = req.query.page != null && req.query.page !== "" ? Math.max(1, Number(req.query.page || 1)) : null;
+    const emptyPayload = pageParam ? { rows: [], total: 0, page: pageParam, limit: 100, totalPages: 1 } : [];
+
     const scope = await resolveStockScope(req.user);
     if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
-    if (!scope.can_view_existencias) return res.json([]);
+    if (!scope.can_view_existencias) return res.json(emptyPayload);
 
     const warehouseScope = getScopedWarehouseFilter(scope, req.query.warehouse);
-    if (warehouseScope.denied) return res.json([]);
+    if (warehouseScope.denied) return res.json(emptyPayload);
     let id_bodega = warehouseScope.selected;
     if (!scope.can_all_bodegas) id_bodega = scope.id_bodega;
     const accessFilter =
@@ -8510,8 +8791,61 @@ app.get("/api/reportes/kardex", auth, async (req, res) => {
       ? (id_bodega || null)
       : scope.id_bodega;
 
-    const [rows] = await pool.query(
-      `SELECT k.id_movimiento,
+    const queryParams = {
+      id_bodega,
+      id_bodega_stock,
+      tipo,
+      id_movimiento,
+      id_producto,
+      id_usuario,
+      id_solicitante,
+      lote,
+      documento,
+      from_date,
+      to_date,
+      id_categoria,
+      id_subcategoria,
+      ...(accessFilter?.params || {}),
+      ...qf.params,
+    };
+
+    const fromWhereSQL = `FROM kardex k
+       JOIN movimiento_encabezado me ON me.id_movimiento=k.id_movimiento
+       LEFT JOIN bodegas bk ON bk.id_bodega=k.id_bodega
+       LEFT JOIN bodegas bo ON bo.id_bodega=me.id_bodega_origen
+       LEFT JOIN bodegas bd ON bd.id_bodega=me.id_bodega_destino
+       JOIN productos p ON p.id_producto=k.id_producto
+       LEFT JOIN categorias c ON c.id_categoria=p.id_categoria
+       LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
+       LEFT JOIN usuarios ui ON ui.id_usuario=me.creado_por
+       LEFT JOIN (
+         SELECT pmv.id_detalle,
+                MIN(pd.id_pedido) AS id_pedido,
+                MIN(pe.id_usuario_solicita) AS id_usuario_solicita,
+                MIN(us.nombre_completo) AS solicitante_pedido
+         FROM pedido_movimiento_vinculo pmv
+         JOIN pedido_detalle pd ON pd.id_pedido_detalle=pmv.id_pedido_detalle
+         JOIN pedido_encabezado pe ON pe.id_pedido=pd.id_pedido
+         LEFT JOIN usuarios us ON us.id_usuario=pe.id_usuario_solicita
+         GROUP BY pmv.id_detalle
+       ) pm ON pm.id_detalle=k.id_detalle
+       WHERE me.estado<>'ANULADO'
+         AND ${accessFilter ? `k.id_bodega IN (${accessFilter.sql})` : "1=1"}
+         AND (:id_bodega IS NULL OR k.id_bodega=:id_bodega)
+         AND (:tipo IS NULL OR me.tipo_movimiento=:tipo)
+         AND (:id_movimiento IS NULL OR k.id_movimiento=:id_movimiento)
+         AND (:id_producto IS NULL OR k.id_producto=:id_producto)
+         AND (:id_usuario IS NULL OR me.creado_por=:id_usuario)
+         AND (:id_solicitante IS NULL OR pm.id_usuario_solicita=:id_solicitante)
+         AND ${qf.clause}
+         AND (:lote IS NULL OR k.lote LIKE :lote)
+         AND (:documento IS NULL OR me.no_documento LIKE :documento)
+         AND (:from_date IS NULL OR DATE(COALESCE(k.creado_en, me.creado_en)) >= :from_date)
+         AND (:to_date IS NULL OR DATE(COALESCE(k.creado_en, me.creado_en)) <= :to_date)
+         AND (:id_categoria IS NULL OR p.id_categoria=:id_categoria)
+         AND (:id_subcategoria IS NULL OR p.id_subcategoria=:id_subcategoria)`;
+
+    const selectSQL = `SELECT k.id_movimiento,
               k.id_detalle,
               DATE(COALESCE(k.creado_en, me.creado_en)) AS fecha,
               TIME(COALESCE(k.creado_en, me.creado_en)) AS hora,
@@ -8550,42 +8884,9 @@ app.get("/api/reportes/kardex", auth, async (req, res) => {
               pm.id_pedido,
               pm.id_usuario_solicita,
               pm.solicitante_pedido
-       FROM kardex k
-       JOIN movimiento_encabezado me ON me.id_movimiento=k.id_movimiento
-       LEFT JOIN bodegas bk ON bk.id_bodega=k.id_bodega
-       LEFT JOIN bodegas bo ON bo.id_bodega=me.id_bodega_origen
-       LEFT JOIN bodegas bd ON bd.id_bodega=me.id_bodega_destino
-       JOIN productos p ON p.id_producto=k.id_producto
-       LEFT JOIN categorias c ON c.id_categoria=p.id_categoria
-       LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
-       LEFT JOIN usuarios ui ON ui.id_usuario=me.creado_por
-       LEFT JOIN (
-         SELECT pmv.id_detalle,
-                MIN(pd.id_pedido) AS id_pedido,
-                MIN(pe.id_usuario_solicita) AS id_usuario_solicita,
-                MIN(us.nombre_completo) AS solicitante_pedido
-         FROM pedido_movimiento_vinculo pmv
-         JOIN pedido_detalle pd ON pd.id_pedido_detalle=pmv.id_pedido_detalle
-         JOIN pedido_encabezado pe ON pe.id_pedido=pd.id_pedido
-         LEFT JOIN usuarios us ON us.id_usuario=pe.id_usuario_solicita
-         GROUP BY pmv.id_detalle
-       ) pm ON pm.id_detalle=k.id_detalle
-       WHERE me.estado<>'ANULADO'
-         AND ${accessFilter ? `k.id_bodega IN (${accessFilter.sql})` : "1=1"}
-         AND (:id_bodega IS NULL OR k.id_bodega=:id_bodega)
-         AND (:tipo IS NULL OR me.tipo_movimiento=:tipo)
-         AND (:id_movimiento IS NULL OR k.id_movimiento=:id_movimiento)
-         AND (:id_producto IS NULL OR k.id_producto=:id_producto)
-         AND (:id_usuario IS NULL OR me.creado_por=:id_usuario)
-         AND (:id_solicitante IS NULL OR pm.id_usuario_solicita=:id_solicitante)
-         AND ${qf.clause}
-         AND (:lote IS NULL OR k.lote LIKE :lote)
-         AND (:documento IS NULL OR me.no_documento LIKE :documento)
-         AND (:from_date IS NULL OR DATE(COALESCE(k.creado_en, me.creado_en)) >= :from_date)
-         AND (:to_date IS NULL OR DATE(COALESCE(k.creado_en, me.creado_en)) <= :to_date)
-         AND (:id_categoria IS NULL OR p.id_categoria=:id_categoria)
-         AND (:id_subcategoria IS NULL OR p.id_subcategoria=:id_subcategoria)
-       ORDER BY CASE me.tipo_movimiento
+       ${fromWhereSQL}`;
+
+    const orderSQL = `ORDER BY CASE me.tipo_movimiento
                   WHEN 'ENTRADA' THEN 1
                   WHEN 'SALIDA' THEN 2
                   WHEN 'TRANSFERENCIA' THEN 3
@@ -8593,30 +8894,42 @@ app.get("/api/reportes/kardex", auth, async (req, res) => {
                 END ASC,
                 COALESCE(k.creado_en, me.creado_en) ASC,
                 k.id_movimiento ASC,
-                k.id_detalle ASC
-       LIMIT ${limit}`,
-      {
-        id_bodega,
-        id_bodega_stock,
-        tipo,
-        id_movimiento,
-        id_producto,
-        id_usuario,
-        id_solicitante,
-        lote,
-        documento,
-        from_date,
-        to_date,
-        id_categoria,
-        id_subcategoria,
-        ...(accessFilter?.params || {}),
-        ...qf.params,
-      }
+                k.id_detalle ASC`;
+
+    // Cliente React: paginado real con total/totalPages
+    if (pageParam) {
+      const offset = (pageParam - 1) * limit;
+      const [[{ total }]] = await pool.query(
+        `SELECT COUNT(*) AS total ${fromWhereSQL}`,
+        queryParams
+      );
+      const totalRows = Number(total || 0);
+      const [rows] = await pool.query(
+        `${selectSQL}
+        ${orderSQL}
+        LIMIT ${limit} OFFSET ${offset}`,
+        queryParams
+      );
+      return res.json({
+        rows,
+        total: totalRows,
+        page: pageParam,
+        limit,
+        totalPages: Math.ceil(totalRows / Math.max(1, limit)) || 1,
+      });
+    }
+
+    // Cliente legacy: array plano
+    const [rows] = await pool.query(
+      `${selectSQL}
+        ${orderSQL}
+        LIMIT ${limit}`,
+      queryParams
     );
 
     res.json(rows);
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -8625,54 +8938,116 @@ app.get("/api/reportes/transferencias", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
     if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
-    if (!scope.can_view_existencias) return res.json([]);
+    if (!scope.can_view_existencias) return res.json({ rows: [], total: 0, page: 1, limit: 50, totalPages: 1 });
 
     const from_date = String(req.query.from || "").trim() || null;
     const to_date = String(req.query.to || "").trim() || null;
-    const limit = Math.max(1, Math.min(5000, Number(req.query.limit || 1000)));
+    const limit = Math.max(1, Math.min(200, Number(req.query.limit || 50)));
+    const page = Math.max(1, Number(req.query.page || 1));
+    const offset = (page - 1) * limit;
 
-    const [rows] = await pool.query(
-      `SELECT me.id_movimiento,
-              me.tipo_movimiento,
-              DATE(me.creado_en) AS fecha,
-              TIME(me.creado_en) AS hora,
-              me.creado_en,
-              me.no_documento,
-              me.observaciones,
-              bo.id_bodega AS id_bodega_origen,
-              bo.nombre_bodega AS bodega_origen,
-              bd.id_bodega AS id_bodega_destino,
-              bd.nombre_bodega AS bodega_destino,
-              u.nombre_completo AS usuario_creador,
-              md.id_detalle,
-              md.id_producto,
-              p.nombre_producto,
-              p.sku,
-              md.lote,
-              md.fecha_vencimiento,
-              md.cantidad,
-              md.costo_unitario,
-              (md.cantidad * md.costo_unitario) AS total_linea
-       FROM movimiento_encabezado me
-       JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
-       LEFT JOIN bodegas bo ON bo.id_bodega=me.id_bodega_origen
-       LEFT JOIN bodegas bd ON bd.id_bodega=me.id_bodega_destino
-       JOIN productos p ON p.id_producto=md.id_producto
-       LEFT JOIN usuarios u ON u.id_usuario=me.creado_por
-       WHERE me.tipo_movimiento='TRANSFERENCIA'
+    const params = { from_date, to_date };
+    const whereSQL = `me.tipo_movimiento='TRANSFERENCIA'
          AND me.estado<>'ANULADO'
          AND (:from_date IS NULL OR DATE(me.creado_en) >= :from_date)
-         AND (:to_date IS NULL OR DATE(me.creado_en) <= :to_date)
-       ORDER BY me.creado_en DESC
-       LIMIT ${limit}`,
-      {
-        from_date,
-        to_date,
-      }
+         AND (:to_date IS NULL OR DATE(me.creado_en) <= :to_date)`;
+
+    // Paginado por MOVIMIENTO (no por línea)
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(*) AS total
+       FROM movimiento_encabezado me
+       WHERE ${whereSQL}`,
+      params
     );
-    res.json(rows || []);
+    const totalMovements = Number(total || 0);
+
+    const [movements] = await pool.query(
+      `SELECT me.id_movimiento
+       FROM movimiento_encabezado me
+       WHERE ${whereSQL}
+       ORDER BY me.creado_en DESC, me.id_movimiento DESC
+       LIMIT ${limit} OFFSET ${offset}`,
+      params
+    );
+
+    // Encabezados de la página actual
+    const movMap = new Map();
+    if (movements.length) {
+      const ids = movements.map((m) => m.id_movimiento);
+      const inClause = buildNamedInClause(ids, "tranm");
+      const [headerRows] = await pool.query(
+        `SELECT me.id_movimiento,
+                me.tipo_movimiento,
+                DATE(me.creado_en) AS fecha,
+                TIME(me.creado_en) AS hora,
+                me.creado_en,
+                me.no_documento,
+                me.observaciones,
+                bo.nombre_bodega AS bodega_origen,
+                bd.nombre_bodega AS bodega_destino,
+                u.nombre_completo AS usuario_creador
+         FROM movimiento_encabezado me
+         LEFT JOIN bodegas bo ON bo.id_bodega=me.id_bodega_origen
+         LEFT JOIN bodegas bd ON bd.id_bodega=me.id_bodega_destino
+         LEFT JOIN usuarios u ON u.id_usuario=me.creado_por
+         WHERE me.id_movimiento IN (${inClause.sql})`,
+        inClause.params
+      );
+      for (const h of headerRows) {
+        movMap.set(h.id_movimiento, { ...h, lineas: [] });
+      }
+
+      // Líneas de los movimientos de la página
+      const lineClause = buildNamedInClause(ids, "trand");
+      const [lineRows] = await pool.query(
+        `SELECT md.id_movimiento,
+                md.id_detalle,
+                md.id_producto,
+                p.nombre_producto,
+                p.sku,
+                md.lote,
+                md.fecha_vencimiento,
+                md.cantidad,
+                md.costo_unitario,
+                (md.cantidad * md.costo_unitario) AS total_linea
+         FROM movimiento_detalle md
+         JOIN productos p ON p.id_producto=md.id_producto
+         WHERE md.id_movimiento IN (${lineClause.sql})
+         ORDER BY md.id_detalle ASC`,
+        lineClause.params
+      );
+      for (const l of lineRows) {
+        const g = movMap.get(l.id_movimiento);
+        if (g) {
+          g.lineas.push({
+            id_detalle: l.id_detalle,
+            id_producto: l.id_producto,
+            nombre_producto: l.nombre_producto,
+            sku: l.sku,
+            lote: l.lote,
+            fecha_vencimiento: l.fecha_vencimiento,
+            cantidad: Number(l.cantidad || 0),
+            costo_unitario: Number(l.costo_unitario || 0),
+            total_linea: Number(l.total_linea || 0),
+          });
+        }
+      }
+    }
+
+    // Mantener el orden de la paginación (creado_en DESC)
+    const rows = movements
+      .map((m) => movMap.get(m.id_movimiento))
+      .filter(Boolean);
+
+    res.json({
+      rows,
+      total: totalMovements,
+      page,
+      limit,
+      totalPages: Math.ceil(totalMovements / Math.max(1, limit)),
+    });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -8690,7 +9065,7 @@ app.get("/api/roles", auth, async (req, res) => {
 });
 
 
-app.post("/api/usuarios", auth, async (req, res) => {
+app.post("/api/usuarios", auth, requirePermission("action.manage_permissions", "crear usuarios"), async (req, res) => {
   try {
     const {
       username,
@@ -8785,7 +9160,7 @@ app.post("/api/usuarios", auth, async (req, res) => {
 /* =========================
    BODEGAS (EDITAR)
 ========================= */
-app.patch("/api/bodegas/:id", auth, async (req, res) => {
+app.patch("/api/bodegas/:id", auth, requirePermission("action.manage_permissions", "editar bodegas"), async (req, res) => {
   const id_bodega = Number(req.params.id || 0);
   const {
     nombre_bodega,
@@ -8872,7 +9247,7 @@ app.patch("/api/bodegas/:id", auth, async (req, res) => {
 /* =========================
    USUARIOS (RESET PASSWORD)
 ========================= */
-app.post("/api/usuarios/:id/reset-password", auth, async (req, res) => {
+app.post("/api/usuarios/:id/reset-password", auth, requirePermission("action.manage_permissions", "restablecer contrasenas"), async (req, res) => {
   try {
     const id_user = Number(req.params.id || 0);
     const pass = String(req.body?.password || "");
@@ -8931,7 +9306,7 @@ app.post("/api/usuarios/:id/reset-order-pin", auth, requirePermission("action.ma
 /* =========================
    USUARIOS (EDITAR)
 ========================= */
-app.patch("/api/usuarios/:id", auth, async (req, res) => {
+app.patch("/api/usuarios/:id", auth, requirePermission("action.manage_permissions", "editar usuarios"), async (req, res) => {
   try {
     const id_user = Number(req.params.id || 0);
     const username = String(req.body?.username || "").trim();
@@ -9006,7 +9381,7 @@ app.patch("/api/usuarios/:id", auth, async (req, res) => {
 /* =========================
    USUARIOS (DESACTIVAR)
 ========================= */
-app.post("/api/usuarios/:id/deactivate", auth, async (req, res) => {
+app.post("/api/usuarios/:id/deactivate", auth, requirePermission("action.manage_permissions", "desactivar usuarios"), async (req, res) => {
   try {
     const id_user = Number(req.params.id || 0);
     if (!id_user) return res.status(400).json({ error: "Falta usuario" });
@@ -9112,7 +9487,7 @@ app.get("/api/me/permisos", auth, async (req, res) => {
       is_admin_role: Number(scope?.is_admin_role ? 1 : 0),
     });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -9128,7 +9503,7 @@ app.get("/api/usuarios/:id/permisos", auth, async (req, res) => {
     const map = await getUserPermissionsMap(id_usuario);
     res.json({ id_usuario, permisos: map, catalogo: PERM_CATALOG });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -9157,11 +9532,11 @@ app.get("/api/usuarios/:id/bodegas-acceso", auth, async (req, res) => {
       ids: normalizeWarehouseIdList((rows || []).map((r) => r.id_bodega)),
     });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
-app.put("/api/usuarios/:id/bodegas-acceso", auth, async (req, res) => {
+app.put("/api/usuarios/:id/bodegas-acceso", auth, requirePermission("action.manage_permissions", "asignar bodegas a usuarios"), async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await ensureUserWarehouseAccessTable();
@@ -9311,7 +9686,7 @@ app.get("/api/ops/metrics", auth, requirePermission("action.manage_permissions",
       alerts,
     });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -9338,7 +9713,7 @@ app.get("/api/ops/backup/status", auth, requirePermission("action.manage_permiss
       last_recovery_test: lastRecovery || null,
     });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -9349,7 +9724,7 @@ app.post("/api/ops/backup/run", auth, requirePermission("action.manage_permissio
     if (!r.ok) return res.status(500).json({ error: r.error || "No se pudo generar backup" });
     res.json(r);
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -9360,7 +9735,7 @@ app.post("/api/ops/backup/recovery-test", auth, requirePermission("action.manage
     if (!r.ok) return res.status(500).json({ error: r.error || "No se pudo ejecutar prueba de recovery" });
     res.json(r);
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -9383,6 +9758,13 @@ app.post("/api/transferencias", auth, requirePermission("action.create_update", 
 
   const id_origen = Number(id_bodega_origen);
   const id_destino = Number(id_bodega_destino);
+
+  // Solo puedes sacar stock de TU bodega (salvo roles admin).
+  const stockScope = await resolveStockScope(req.user);
+  const actorWarehouse = Number(req.user?.id_warehouse || 0);
+  if (!stockScope.is_admin_role && id_origen !== actorWarehouse) {
+    return res.status(403).json({ error: "Solo puedes transferir desde tu propia bodega" });
+  }
 
   const conn = await pool.getConnection();
   try {
@@ -9453,12 +9835,12 @@ app.post("/api/transferencias", auth, requirePermission("action.create_update", 
     for (const line of lines) {
       const id_producto = Number(line.id_producto || 0);
       const cantidad = Number(line.cantidad || 0);
-      const lote = String(line.lote || "").trim() || null;
+      const loteSolicitado = String(line.lote || "").trim() || null;
       const precio = Number(line.precio || 0) || 0;
 
       if (!id_producto || cantidad <= 0) continue;
 
-      // Validar producto
+      // Validar producto y visibilidad en ambas bodegas
       const [[prod]] = await conn.query(
         `SELECT id_producto FROM productos WHERE id_producto=:id_producto LIMIT 1`,
         { id_producto }
@@ -9467,67 +9849,96 @@ app.post("/api/transferencias", auth, requirePermission("action.create_update", 
         await conn.rollback();
         return res.status(400).json({ error: `Producto #${id_producto} no existe` });
       }
-
-      // Validar stock disponible en origen
-      const [[stockRow]] = await conn.query(
-        `SELECT COALESCE(SUM(delta_cantidad), 0) AS disponible
-         FROM kardex
-         WHERE id_bodega=:id_bodega AND id_producto=:id_producto`,
-        { id_bodega: id_origen, id_producto }
-      );
-      const disponible = Number(stockRow?.disponible || 0);
-      if (disponible < cantidad) {
+      if (!(await isProductVisibleInWarehouse(conn, id_producto, id_origen))) {
         await conn.rollback();
-        return res.status(400).json({
-          error: `Stock insuficiente en origen para producto #${id_producto}: disponible ${disponible}, solicitado ${cantidad}`,
-        });
+        return res.status(400).json({ error: `El producto #${id_producto} no esta habilitado para la bodega origen` });
+      }
+      if (!(await isProductVisibleInWarehouse(conn, id_producto, id_destino))) {
+        await conn.rollback();
+        return res.status(400).json({ error: `El producto #${id_producto} no esta habilitado para la bodega destino` });
       }
 
-      // Determinar costo unitario
-      const cost = precio > 0 ? precio : await getLastUnitCost(id_origen, id_producto, lote);
-
-      // Insertar movimiento_detalle
-      await conn.query(
-        `INSERT INTO movimiento_detalle (id_movimiento, id_producto, lote, cantidad, costo_unitario)
-         VALUES (:id_movimiento, :id_producto, :lote, :cantidad, :costo_unitario)`,
-        {
-          id_movimiento,
-          id_producto,
-          lote,
-          cantidad,
-          costo_unitario: cost,
+      // Seleccionar lotes: FEFO si no se especifica lote; validar el lote pedido si viene.
+      let picks = [];
+      if (loteSolicitado) {
+        await conn.query(`SELECT id_producto FROM productos WHERE id_producto=:id_producto FOR UPDATE`, { id_producto });
+        const [[lotRow]] = await conn.query(
+          `SELECT lote, fecha_vencimiento, stock
+           FROM v_stock_disponible
+           WHERE id_bodega=:id_bodega AND id_producto=:id_producto AND lote=:lote
+           LIMIT 1`,
+          { id_bodega: id_origen, id_producto, lote: loteSolicitado }
+        );
+        const stockLote = Number(lotRow?.stock || 0);
+        if (!lotRow || stockLote < cantidad) {
+          await conn.rollback();
+          return res.status(400).json({
+            error: `Stock insuficiente del lote "${loteSolicitado}" para producto #${id_producto}: disponible ${stockLote}, solicitado ${cantidad}`,
+          });
         }
-      );
-
-      // Kardex: salida de origen
-      await conn.query(
-        `INSERT INTO kardex (id_bodega, id_producto, id_movimiento, lote, delta_cantidad, delta_costo, tipo, referencia)
-         VALUES (:id_bodega, :id_producto, :id_movimiento, :lote, :delta_cantidad, :delta_costo, 'SALIDA', :referencia)`,
-        {
-          id_bodega: id_origen,
-          id_producto,
-          id_movimiento,
-          lote,
-          delta_cantidad: -cantidad,
-          delta_costo: -(cantidad * cost),
-          referencia: `Transferencia #${id_movimiento} a bodega #${id_destino}`,
+        picks = [{ lote: loteSolicitado, fecha_vencimiento: lotRow.fecha_vencimiento, qty: cantidad }];
+      } else {
+        const r = await pickLotsFEFO(conn, id_origen, id_producto, cantidad, { allowExpired: false });
+        if (!r.picks.length || r.remaining > 0) {
+          await conn.rollback();
+          return res.status(400).json({
+            error: `Stock insuficiente (vigente) en origen para producto #${id_producto}: solicitado ${cantidad}`,
+          });
         }
-      );
+        picks = r.picks;
+      }
 
-      // Kardex: entrada en destino
-      await conn.query(
-        `INSERT INTO kardex (id_bodega, id_producto, id_movimiento, lote, delta_cantidad, delta_costo, tipo, referencia)
-         VALUES (:id_bodega, :id_producto, :id_movimiento, :lote, :delta_cantidad, :delta_costo, 'ENTRADA', :referencia)`,
-        {
-          id_bodega: id_destino,
-          id_producto,
-          id_movimiento,
-          lote,
-          delta_cantidad: cantidad,
-          delta_costo: cantidad * cost,
-          referencia: `Transferencia #${id_movimiento} desde bodega #${id_origen}`,
-        }
-      );
+      for (const p of picks) {
+        // Determinar costo unitario (ultimo costo de entrada del lote en origen)
+        const cost = precio > 0 ? precio : await getLastUnitCost(conn, id_origen, id_producto, p.lote);
+
+        // Insertar movimiento_detalle
+        const [d] = await conn.query(
+          `INSERT INTO movimiento_detalle (id_movimiento, id_producto, lote, fecha_vencimiento, cantidad, costo_unitario)
+           VALUES (:id_movimiento, :id_producto, :lote, :fecha, :cantidad, :costo_unitario)`,
+          {
+            id_movimiento,
+            id_producto,
+            lote: p.lote || null,
+            fecha: p.fecha_vencimiento || null,
+            cantidad: p.qty,
+            costo_unitario: cost,
+          }
+        );
+        const id_detalle = d.insertId;
+
+        // Kardex: salida de origen
+        await conn.query(
+          `INSERT INTO kardex (id_movimiento, id_detalle, id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, costo_unitario)
+           VALUES (:id_movimiento, :id_detalle, :id_bodega, :id_producto, :lote, :fecha, :delta, :costo)`,
+          {
+            id_movimiento,
+            id_detalle,
+            id_bodega: id_origen,
+            id_producto,
+            lote: p.lote || null,
+            fecha: p.fecha_vencimiento || null,
+            delta: -p.qty,
+            costo: cost,
+          }
+        );
+
+        // Kardex: entrada en destino (conserva lote y fecha de vencimiento)
+        await conn.query(
+          `INSERT INTO kardex (id_movimiento, id_detalle, id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, costo_unitario)
+           VALUES (:id_movimiento, :id_detalle, :id_bodega, :id_producto, :lote, :fecha, :delta, :costo)`,
+          {
+            id_movimiento,
+            id_detalle,
+            id_bodega: id_destino,
+            id_producto,
+            lote: p.lote || null,
+            fecha: p.fecha_vencimiento || null,
+            delta: +p.qty,
+            costo: cost,
+          }
+        );
+      }
 
       totalLineas++;
     }
@@ -9550,7 +9961,7 @@ app.post("/api/transferencias", auth, requirePermission("action.create_update", 
 
 // ---------- Revertir una transferencia ----------
 // ── Revertir cualquier movimiento (entrada, salida, ajuste) ──
-app.post("/api/movimientos/:id/revert", auth, requirePermission("action.create_update", "revertir movimientos"), enforceDailyCloseBeforeMutations, async (req, res) => {
+app.post("/api/movimientos/:id/revert", auth, requirePermission("action.create_update", "revertir movimientos"), requireSensitiveApproval("reversa de movimiento"), enforceDailyCloseBeforeMutations, async (req, res) => {
   const id_movimiento = Number(req.params.id);
   if (!id_movimiento) return res.status(400).json({ error: "ID de movimiento invalido" });
   if (!beginIdempotentRequest(req, res, { pathKey: `/api/movimientos/${id_movimiento}/revert` })) {
@@ -9579,6 +9990,12 @@ app.post("/api/movimientos/:id/revert", auth, requirePermission("action.create_u
     if (String(mov.estado || "").toUpperCase() === "ANULADO") {
       await conn.rollback();
       return res.status(400).json({ error: "El movimiento ya fue anulado previamente" });
+    }
+
+    // Regla de negocio: solo se puede revertir el mismo dia (mensaje claro, no error de trigger).
+    if (localYmd(mov.creado_en) !== localYmd(new Date())) {
+      await conn.rollback();
+      return res.status(400).json({ error: "Solo se pueden revertir movimientos del mismo dia" });
     }
 
     const tipo = String(mov.tipo_movimiento || "").toUpperCase();
@@ -9643,16 +10060,12 @@ app.post("/api/movimientos/:id/revert", auth, requirePermission("action.create_u
     );
     const id_reversion = Number(mhRes.insertId || 0);
 
-    // 6. Insertar líneas inversas en kardex (cantidad negativa para entradas, positiva para salidas)
-    const isEntrada = tipo === "ENTRADA";
+    // 6. Insertar en kardex el INVERSO EXACTO de cada fila original.
+    //    Así se revierten bien ENTRADA, SALIDA y AJUSTE (de entrada o de salida).
     let totalLineas = 0;
 
     for (const ln of lines) {
-      const cantidadInversa = isEntrada
-        ? -Math.abs(Number(ln.cantidad || 0))
-        : Math.abs(Number(ln.cantidad || 0));
-
-      if (cantidadInversa === 0) continue;
+      if (Math.abs(Number(ln.cantidad || 0)) === 0) continue;
 
       const [d] = await conn.query(
         `INSERT INTO movimiento_detalle
@@ -9668,22 +10081,54 @@ app.post("/api/movimientos/:id/revert", auth, requirePermission("action.create_u
           observacion_linea: `REVERSIÓN #${id_movimiento}`,
         }
       );
+      const id_detalle_rev = Number(d.insertId || 0);
 
-      await conn.query(
-        `INSERT INTO kardex
-         (id_movimiento, id_detalle, id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, costo_unitario)
-         VALUES (:id_movimiento, :id_detalle, :id_bodega, :id_producto, :lote, :fecha_vencimiento, :delta_cantidad, :costo_unitario)`,
-        {
-          id_movimiento: id_reversion,
-          id_detalle: Number(d.insertId || 0),
-          id_bodega: id_bodega,
-          id_producto: ln.id_producto,
-          lote: ln.lote || null,
-          fecha_vencimiento: ln.fecha_vencimiento || null,
-          delta_cantidad: cantidadInversa,
-          costo_unitario: ln.costo_unitario || 0,
-        }
+      // Invertir cada fila de kardex original de este detalle (puede tocar varias bodegas).
+      const [kx] = await conn.query(
+        `SELECT id_bodega, lote, fecha_vencimiento, SUM(delta_cantidad) AS delta, costo_unitario
+         FROM kardex
+         WHERE id_detalle=:id_detalle
+         GROUP BY id_bodega, lote, fecha_vencimiento, costo_unitario`,
+        { id_detalle: ln.id_detalle }
       );
+
+      for (const row of kx) {
+        const deltaInv = -Number(row.delta || 0);
+        if (deltaInv === 0) continue;
+
+        // Si la reversa retira stock, validar que la bodega aun lo tenga.
+        if (deltaInv < 0) {
+          await conn.query(`SELECT id_producto FROM productos WHERE id_producto=? FOR UPDATE`, [ln.id_producto]);
+          const [[st]] = await conn.query(
+            `SELECT COALESCE(SUM(delta_cantidad),0) AS stock
+             FROM kardex
+             WHERE id_bodega=? AND id_producto=? AND lote <=> ?`,
+            [row.id_bodega, ln.id_producto, row.lote]
+          );
+          if (Number(st?.stock || 0) < Math.abs(deltaInv) - 1e-9) {
+            await conn.rollback();
+            return res.status(400).json({
+              error: `No se puede revertir: stock insuficiente del producto #${ln.id_producto} (lote ${row.lote ?? "sin lote"}) en bodega #${row.id_bodega}. Ya fue consumido.`,
+            });
+          }
+        }
+
+        await conn.query(
+          `INSERT INTO kardex
+           (id_movimiento, id_detalle, id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, costo_unitario)
+           VALUES (:id_movimiento, :id_detalle, :id_bodega, :id_producto, :lote, :fecha_vencimiento, :delta_cantidad, :costo_unitario)`,
+          {
+            id_movimiento: id_reversion,
+            id_detalle: id_detalle_rev,
+            id_bodega: row.id_bodega,
+            id_producto: ln.id_producto,
+            lote: row.lote || null,
+            fecha_vencimiento: row.fecha_vencimiento || null,
+            delta_cantidad: deltaInv,
+            costo_unitario: row.costo_unitario || 0,
+          }
+        );
+      }
 
       totalLineas++;
     }
@@ -9698,6 +10143,16 @@ WHERE id_movimiento=:id_movimiento`,
 
     await conn.commit();
 
+    await writeSensitiveActionAudit({
+      req,
+      action_key: "REVERSA_MOVIMIENTO",
+      action_label: "Reversa de movimiento",
+      approval: req.sensitive_approval,
+      reference_type: "MOVIMIENTO",
+      reference_id: id_movimiento,
+      detail: { id_reversion, tipo, lineas: totalLineas },
+    });
+
     // 8. Notificar en tiempo real
     emitStockChanged(id_bodega, {
       action: tipo === "ENTRADA" ? "reversion_entrada" : "reversion_salida",
@@ -9709,6 +10164,7 @@ WHERE id_movimiento=:id_movimiento`,
       ok: true,
       id_movimiento: id_reversion,
       mensaje: `Movimiento #${id_movimiento} revertido. Se creó el movimiento #${id_reversion}.`,
+      sensitive_approval: toSensitiveApprovalPayload(req.sensitive_approval),
     });
   } catch (e) {
     await conn.rollback();
@@ -9723,7 +10179,7 @@ app.post("/api/transferencias/:id/revert", auth, requirePermission("action.creat
   if (!id_movimiento_original) {
     return res.status(400).json({ error: "ID de movimiento invalido" });
   }
-  if (!beginIdempotentRequest(req, res, { pathKey: "/api/transferencias/:id/revert" })) {
+  if (!beginIdempotentRequest(req, res, { pathKey: `/api/transferencias/${id_movimiento_original}/revert` })) {
     return res.status(409).json({ error: "Solicitud duplicada detectada." });
   }
 
@@ -9733,10 +10189,11 @@ app.post("/api/transferencias/:id/revert", auth, requirePermission("action.creat
 
     // Leer encabezado original
     const [[original]] = await conn.query(
-      `SELECT id_movimiento, tipo_movimiento, id_bodega_origen, id_bodega_destino, creado_en
+      `SELECT id_movimiento, tipo_movimiento, id_bodega_origen, id_bodega_destino, creado_en, estado
        FROM movimiento_encabezado
        WHERE id_movimiento=:id_movimiento
-       LIMIT 1`,
+       LIMIT 1
+       FOR UPDATE`,
       { id_movimiento: id_movimiento_original }
     );
     if (!original) {
@@ -9746,6 +10203,15 @@ app.post("/api/transferencias/:id/revert", auth, requirePermission("action.creat
     if (String(original.tipo_movimiento || "").toUpperCase() !== "TRANSFERENCIA") {
       await conn.rollback();
       return res.status(400).json({ error: "El movimiento no es una transferencia" });
+    }
+    if (String(original.estado || "").toUpperCase() === "ANULADO") {
+      await conn.rollback();
+      return res.status(400).json({ error: "La transferencia ya esta anulada" });
+    }
+    // Regla de negocio: solo se puede revertir el mismo dia.
+    if (localYmd(original.creado_en) !== localYmd(new Date())) {
+      await conn.rollback();
+      return res.status(400).json({ error: "Solo se pueden revertir transferencias del mismo dia" });
     }
 
     // Verificar que no se haya revertido ya (buscar transferencia que referencia a la original)
@@ -9779,7 +10245,7 @@ app.post("/api/transferencias/:id/revert", auth, requirePermission("action.creat
 
     // Leer detalles originales
     const [detalles] = await conn.query(
-      `SELECT id_producto, lote, cantidad, costo_unitario
+      `SELECT id_producto, lote, fecha_vencimiento, cantidad, costo_unitario
        FROM movimiento_detalle
        WHERE id_movimiento=:id_movimiento`,
       { id_movimiento: id_movimiento_original }
@@ -9827,66 +10293,79 @@ app.post("/api/transferencias/:id/revert", auth, requirePermission("action.creat
 
       if (!id_producto || cantidad <= 0) continue;
 
-      // Verificar stock en la bodega destino (ahora origen de la reversión)
+      // Verificar stock en la bodega destino (ahora origen de la reversión), por lote
+      await conn.query(`SELECT id_producto FROM productos WHERE id_producto=:id_producto FOR UPDATE`, { id_producto });
       const [[stockRow]] = await conn.query(
         `SELECT COALESCE(SUM(delta_cantidad), 0) AS disponible
          FROM kardex
-         WHERE id_bodega=:id_bodega AND id_producto=:id_producto`,
-        { id_bodega: id_destino, id_producto }
+         WHERE id_bodega=:id_bodega AND id_producto=:id_producto AND lote <=> :lote`,
+        { id_bodega: id_destino, id_producto, lote }
       );
       const disponible = Number(stockRow?.disponible || 0);
       if (disponible < cantidad) {
         await conn.rollback();
         return res.status(400).json({
-          error: `Stock insuficiente en bodega destino para revertir producto #${id_producto}: disponible ${disponible}, requerido ${cantidad}`,
+          error: `Stock insuficiente en bodega destino para revertir producto #${id_producto} (lote ${lote ?? "sin lote"}): disponible ${disponible}, requerido ${cantidad}`,
         });
       }
 
       // Insertar detalle
-      await conn.query(
-        `INSERT INTO movimiento_detalle (id_movimiento, id_producto, lote, cantidad, costo_unitario)
-         VALUES (:id_movimiento, :id_producto, :lote, :cantidad, :costo_unitario)`,
+      const [d] = await conn.query(
+        `INSERT INTO movimiento_detalle (id_movimiento, id_producto, lote, fecha_vencimiento, cantidad, costo_unitario)
+         VALUES (:id_movimiento, :id_producto, :lote, :fecha, :cantidad, :costo_unitario)`,
         {
           id_movimiento: id_movimiento_nuevo,
           id_producto,
           lote,
+          fecha: det.fecha_vencimiento || null,
           cantidad,
           costo_unitario: cost,
         }
       );
+      const id_detalle_rev = d.insertId;
 
       // Kardex: salida de destino (ahora origen en reversión)
       await conn.query(
-        `INSERT INTO kardex (id_bodega, id_producto, id_movimiento, lote, delta_cantidad, delta_costo, tipo, referencia)
-         VALUES (:id_bodega, :id_producto, :id_movimiento, :lote, :delta_cantidad, :delta_costo, 'SALIDA', :referencia)`,
+        `INSERT INTO kardex (id_movimiento, id_detalle, id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, costo_unitario)
+         VALUES (:id_movimiento, :id_detalle, :id_bodega, :id_producto, :lote, :fecha, :delta, :costo)`,
         {
+          id_movimiento: id_movimiento_nuevo,
+          id_detalle: id_detalle_rev,
           id_bodega: id_destino,
           id_producto,
-          id_movimiento: id_movimiento_nuevo,
           lote,
-          delta_cantidad: -cantidad,
-          delta_costo: -(cantidad * cost),
-          referencia: `Reversión de transferencia #${id_movimiento_original} a bodega #${id_origen}`,
+          fecha: det.fecha_vencimiento || null,
+          delta: -cantidad,
+          costo: cost,
         }
       );
 
       // Kardex: entrada en origen (ahora destino en reversión)
       await conn.query(
-        `INSERT INTO kardex (id_bodega, id_producto, id_movimiento, lote, delta_cantidad, delta_costo, tipo, referencia)
-         VALUES (:id_bodega, :id_producto, :id_movimiento, :lote, :delta_cantidad, :delta_costo, 'ENTRADA', :referencia)`,
+        `INSERT INTO kardex (id_movimiento, id_detalle, id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, costo_unitario)
+         VALUES (:id_movimiento, :id_detalle, :id_bodega, :id_producto, :lote, :fecha, :delta, :costo)`,
         {
+          id_movimiento: id_movimiento_nuevo,
+          id_detalle: id_detalle_rev,
           id_bodega: id_origen,
           id_producto,
-          id_movimiento: id_movimiento_nuevo,
           lote,
-          delta_cantidad: cantidad,
-          delta_costo: cantidad * cost,
-          referencia: `Reversión de transferencia #${id_movimiento_original} desde bodega #${id_destino}`,
+          fecha: det.fecha_vencimiento || null,
+          delta: +cantidad,
+          costo: cost,
         }
       );
 
       totalLineas++;
     }
+
+    // Marcar la transferencia original como ANULADA para evitar doble reversa
+    await conn.query(
+      `UPDATE movimiento_encabezado
+       SET estado='ANULADO', anulado_por=:anulado_por, anulado_en=NOW()
+       WHERE id_movimiento=:id_movimiento`,
+      { id_movimiento: id_movimiento_original, anulado_por: Number(req.user?.id_user || 0) }
+    );
 
     await conn.commit();
     res.json({
@@ -9939,7 +10418,7 @@ app.get("/api/conteo-ciclico", auth, async (req, res) => {
     res.json(rows || []);
   } catch (e) {
     console.error("Error GET /api/conteo-ciclico:", e);
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -10035,7 +10514,7 @@ app.get("/api/conteo-ciclico/:id", auth, async (req, res) => {
     res.json({ conteo, detalles: detalles || [] });
   } catch (e) {
     console.error("Error GET /api/conteo-ciclico/:id:", e);
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -10085,7 +10564,7 @@ app.patch("/api/conteo-ciclico/:id/detalle/:id_detalle", auth, requirePermission
     res.json({ ok: true });
   } catch (e) {
     console.error("Error PATCH /api/conteo-ciclico/:id/detalle/:id_detalle:", e);
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -10113,12 +10592,12 @@ app.post("/api/conteo-ciclico/:id/completar", auth, requirePermission("action.cr
     res.json({ ok: true, id_conteo });
   } catch (e) {
     console.error("Error POST /api/conteo-ciclico/:id/completar:", e);
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
 // Ajustar inventario desde conteo (crea movimientos de ajuste por diferencias)
-app.post("/api/conteo-ciclico/:id/ajustar", auth, requirePermission("action.create_update", "ajustar inventario desde conteo"), async (req, res) => {
+app.post("/api/conteo-ciclico/:id/ajustar", auth, requirePermission("action.create_update", "ajustar inventario desde conteo"), requireSensitiveApproval("ajuste de inventario por conteo ciclico"), async (req, res) => {
   try {
     const id_conteo = Number(req.params.id || 0);
     if (!id_conteo) return res.status(400).json({ error: "ID invalido" });
@@ -10198,20 +10677,22 @@ app.post("/api/conteo-ciclico/:id/ajustar", auth, requirePermission("action.crea
 
         for (const d of entradas) {
           const dif = Number(d.diferencia || 0);
-          await conn.query(
+          const costo = await getLastUnitCost(conn, conteo.id_bodega, d.id_producto, null);
+          const [det] = await conn.query(
             `INSERT INTO movimiento_detalle (id_movimiento, id_producto, lote, cantidad, costo_unitario)
-             VALUES (:id_movimiento, :id_producto, NULL, :cantidad, 0)`,
-            { id_movimiento: id_mov, id_producto: d.id_producto, cantidad: dif }
+             VALUES (:id_movimiento, :id_producto, NULL, :cantidad, :costo)`,
+            { id_movimiento: id_mov, id_producto: d.id_producto, cantidad: dif, costo }
           );
           await conn.query(
-            `INSERT INTO kardex (id_bodega, id_producto, id_movimiento, lote, delta_cantidad, delta_costo, tipo, referencia)
-             VALUES (:id_bodega, :id_producto, :id_movimiento, NULL, :delta_cantidad, 0, 'ENTRADA', :referencia)`,
+            `INSERT INTO kardex (id_movimiento, id_detalle, id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, costo_unitario)
+             VALUES (:id_movimiento, :id_detalle, :id_bodega, :id_producto, NULL, NULL, :delta_cantidad, :costo)`,
             {
+              id_movimiento: id_mov,
+              id_detalle: det.insertId,
               id_bodega: conteo.id_bodega,
               id_producto: d.id_producto,
-              id_movimiento: id_mov,
               delta_cantidad: dif,
-              referencia: `Ajuste conteo #${id_conteo} - ${d.nombre_producto}`,
+              costo,
             }
           );
         }
@@ -10235,22 +10716,43 @@ app.post("/api/conteo-ciclico/:id/ajustar", auth, requirePermission("action.crea
 
         for (const d of salidas) {
           const dif = Math.abs(Number(d.diferencia || 0));
-          await conn.query(
-            `INSERT INTO movimiento_detalle (id_movimiento, id_producto, lote, cantidad, costo_unitario)
-             VALUES (:id_movimiento, :id_producto, NULL, :cantidad, 0)`,
-            { id_movimiento: id_mov, id_producto: d.id_producto, cantidad: dif }
-          );
-          await conn.query(
-            `INSERT INTO kardex (id_bodega, id_producto, id_movimiento, lote, delta_cantidad, delta_costo, tipo, referencia)
-             VALUES (:id_bodega, :id_producto, :id_movimiento, NULL, :delta_cantidad, 0, 'SALIDA', :referencia)`,
-            {
-              id_bodega: conteo.id_bodega,
-              id_producto: d.id_producto,
-              id_movimiento: id_mov,
-              delta_cantidad: -dif,
-              referencia: `Ajuste conteo #${id_conteo} - ${d.nombre_producto}`,
-            }
-          );
+          // Descargar faltantes por lote (FEFO, incluye vencidos: es una baja de inventario)
+          const { picks, remaining } = await pickLotsFEFO(conn, conteo.id_bodega, d.id_producto, dif, { allowExpired: true });
+          if (!picks.length || remaining > 0) {
+            await conn.rollback();
+            return res.status(400).json({
+              error: `Stock insuficiente para ajustar faltante de "${d.nombre_producto}" (#${d.id_producto}). El stock cambio desde el conteo; repite el conteo.`,
+            });
+          }
+          for (const p of picks) {
+            const costo = await getLastUnitCost(conn, conteo.id_bodega, d.id_producto, p.lote);
+            const [det] = await conn.query(
+              `INSERT INTO movimiento_detalle (id_movimiento, id_producto, lote, fecha_vencimiento, cantidad, costo_unitario)
+               VALUES (:id_movimiento, :id_producto, :lote, :fecha, :cantidad, :costo)`,
+              {
+                id_movimiento: id_mov,
+                id_producto: d.id_producto,
+                lote: p.lote || null,
+                fecha: p.fecha_vencimiento || null,
+                cantidad: p.qty,
+                costo,
+              }
+            );
+            await conn.query(
+              `INSERT INTO kardex (id_movimiento, id_detalle, id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, costo_unitario)
+               VALUES (:id_movimiento, :id_detalle, :id_bodega, :id_producto, :lote, :fecha, :delta_cantidad, :costo)`,
+              {
+                id_movimiento: id_mov,
+                id_detalle: det.insertId,
+                id_bodega: conteo.id_bodega,
+                id_producto: d.id_producto,
+                lote: p.lote || null,
+                fecha: p.fecha_vencimiento || null,
+                delta_cantidad: -p.qty,
+                costo,
+              }
+            );
+          }
         }
         movimientos.push({ tipo: 'SALIDA', id_movimiento: id_mov, lineas: salidas.length });
       }
@@ -10262,7 +10764,16 @@ app.post("/api/conteo-ciclico/:id/ajustar", auth, requirePermission("action.crea
       );
 
       await conn.commit();
-      res.json({ ok: true, id_conteo, movimientos });
+      await writeSensitiveActionAudit({
+        req,
+        action_key: "AJUSTE_CONTEO_CICLICO",
+        action_label: "Ajuste de inventario por conteo ciclico",
+        approval: req.sensitive_approval,
+        reference_type: "CONTEO_CICLICO",
+        reference_id: id_conteo,
+        detail: { movimientos },
+      });
+      res.json({ ok: true, id_conteo, movimientos, sensitive_approval: toSensitiveApprovalPayload(req.sensitive_approval) });
     } catch (e) {
       await conn.rollback().catch(() => {});
       throw e;
@@ -10271,7 +10782,7 @@ app.post("/api/conteo-ciclico/:id/ajustar", auth, requirePermission("action.crea
     }
   } catch (e) {
     console.error("Error POST /api/conteo-ciclico/:id/ajustar:", e);
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -10345,6 +10856,17 @@ app.post("/api/push/subscribe", auth, async (req, res) => {
       return res.status(400).json({ error: "Suscripcion incompleta" });
     }
 
+    // Seguridad: solo puedes suscribirte a alertas de tu propia bodega
+    // o de bodegas a las que tienes acceso explicito.
+    const idBodegaReq = Number(id_bodega || 0) || null;
+    if (idBodegaReq) {
+      const ownWarehouse = Number(req.user?.id_warehouse || 0);
+      const accessIds = await getUserWarehouseAccessIds(idUsuario);
+      if (idBodegaReq !== ownWarehouse && !accessIds.includes(idBodegaReq)) {
+        return res.status(403).json({ error: "No puedes suscribirte a alertas de otra bodega" });
+      }
+    }
+
     // Evitar duplicados por endpoint
     await pool.query(
       `DELETE FROM push_subscriptions WHERE endpoint=:endpoint`,
@@ -10359,7 +10881,7 @@ app.post("/api/push/subscribe", auth, async (req, res) => {
         endpoint,
         auth: keys.auth,
         p256dh: keys.p256dh,
-        id_bodega: Number(id_bodega || 0) || null,
+        id_bodega: idBodegaReq,
         user_agent: String(req.headers['user-agent'] || '').slice(0, 250),
       }
     );
@@ -10367,7 +10889,7 @@ app.post("/api/push/subscribe", auth, async (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     console.error('[push] subscribe error:', e.message || e);
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -10384,7 +10906,7 @@ app.post("/api/push/unsubscribe", auth, async (req, res) => {
 
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -10395,8 +10917,21 @@ app.post("/api/push/send-alertas", auth, async (req, res) => {
     if (!Array.isArray(alertas) || !alertas.length) {
       return res.json({ ok: true });
     }
+
+    // Seguridad: solo se pueden disparar alertas de las bodegas del propio
+    // usuario (su bodega asignada o bodegas con acceso explicito). Nunca
+    // broadcast (id_bodega nulo) desde este endpoint.
+    const idUsuario = Number(req.user?.id_user || 0);
+    const ownWarehouse = Number(req.user?.id_warehouse || 0);
+    const accessIds = await getUserWarehouseAccessIds(idUsuario);
+    const allowedWarehouses = new Set([ownWarehouse, ...accessIds].filter((x) => Number(x) > 0));
+
     // Enviar push para hasta 10 alertas (evitar sobrecarga)
     for (const a of alertas.slice(0, 10)) {
+      const alertWarehouse = Number(a?.id_bodega || 0);
+      if (!alertWarehouse || !allowedWarehouses.has(alertWarehouse)) {
+        continue; // Saltar alertas de bodegas ajenas o broadcast
+      }
       const isMinimo = a.minimo != null && Number(a.stock) < Number(a.minimo);
       const isVencido = a.dias_para_vencer != null && a.dias_para_vencer <= 0;
       const isProximo = a.dias_para_vencer != null && a.dias_para_vencer <= 3;
@@ -10419,15 +10954,15 @@ app.post("/api/push/send-alertas", auth, async (req, res) => {
         type: 'alerta',
         title,
         body,
-        tag: `alerta-${a.id_bodega || 0}-${a.id_producto || 0}-${a.lote || 'nolote'}`,
+        tag: `alerta-${alertWarehouse}-${a.id_producto || 0}-${a.lote || 'nolote'}`,
         url: '/alertas',
       };
-      await sendPushToWarehouse(a.id_bodega || null, pushPayload);
+      await sendPushToWarehouse(alertWarehouse, pushPayload);
     }
     res.json({ ok: true });
   } catch (e) {
     console.error('[push] Error sending alertas push:', e.message || e);
-    res.status(500).json({ error: String(e.message || e) });
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -10440,12 +10975,20 @@ app.get("/api/health", async (req, res) => {
     const alerts = buildOperationalAlerts();
     res.json({ ok: true, db_ping_ms, alerts });
   } catch (e) {
-    res.status(500).json({
+    return res.status(500).json({
       ok: false,
       error: String(e.message || e),
       alerts: buildOperationalAlerts(),
     });
   }
+});
+
+// ── Global async error handler (must be registered BEFORE listen) ─
+app.use((err, req, res, next) => {
+  console.error("[unhandled]", err?.message || err);
+  if (res.writableEnded) return;
+  const status = Number(err?.status || 500);
+  res.status(status).json({ error: String(err?.message || "Error interno del servidor") });
 });
 
 httpServer.listen(PORT, HOST, () => {

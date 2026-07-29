@@ -6,9 +6,15 @@
   <title>Bodega - Principal</title>
   <link rel="manifest" href="./manifest.webmanifest"/>
   <meta name="theme-color" content="#0f172a"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Bodega"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
   <link rel="icon" type="image/x-icon" href="./pw.ico"/>
   <link rel="shortcut icon" type="image/x-icon" href="./pw.ico"/>
   <link rel="apple-touch-icon" href="./pw.ico"/>
+  <link rel="apple-touch-icon" sizes="192x192" href="./icon-192x192.png"/>
+  <link rel="apple-touch-icon" sizes="512x512" href="./icon-512x512.png"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css"/>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"/>
@@ -2786,23 +2792,21 @@
 <div id="repExistResume">
 </div>
 <div class="tableWrap repTableScroll" style="margin-top:10px;">
-<table class="tbl grid">
+<table class="tbl grid alertTbl">
 <thead>
 <tr>
 <th>Bodega</th>
 <th>Producto</th>
-<th>SKU</th>
 <th>Stock</th>
-<th>Nivel</th>
-<th>Total dinero</th>
-<th>Estado fecha vencimiento</th>
-<th>Regla rotacion</th>
+<th>Caducidad</th>
+<th>Total $</th>
+<th>Estado</th>
 <th>Lotes</th>
 </tr>
 </thead>
 <tbody id="repExistList">
 <tr>
-<td colspan="9">Sin datos</td>
+<td colspan="7">Sin datos</td>
 </tr>
 </tbody>
 </table>
@@ -2870,22 +2874,19 @@
 <div id="repAlertResume">
 </div>
 <div class="tableWrap repTableScroll" style="margin-top:10px;">
-<table class="tbl grid">
+<table class="tbl grid alertTbl">
 <thead>
 <tr>
 <th>Bodega</th>
 <th>Producto</th>
-<th>SKU</th>
-<th>Lote</th>
-<th>Caducidad</th>
-<th>Dias</th>
 <th>Stock</th>
+<th>Caducidad</th>
 <th>Estado</th>
 </tr>
 </thead>
 <tbody id="repAlertList">
 <tr>
-<td colspan="8">Sin alertas</td>
+<td colspan="5">Sin alertas</td>
 </tr>
 </tbody>
 </table>
@@ -3272,6 +3273,99 @@
         enhanceReportFilters();
       });
       observer.observe(targetNode, { childList: true, subtree: true });
+    }
+  })();
+</script>
+
+<!-- ─── PWA Install Banner ────────────────────────────────────── -->
+<div id="pwaInstallBanner" class="pwaInstallBanner hidden" role="region" aria-label="Instalar aplicación">
+  <div class="pwaInstallIcon">
+    <span class="material-symbols-outlined">install_mobile</span>
+  </div>
+  <div class="pwaInstallText">
+    <div class="pwaInstallTitle">Instalar Bodega Jardines</div>
+    <div class="pwaInstallSub">Acceso rápido desde tu pantalla de inicio</div>
+  </div>
+  <div class="pwaInstallActions">
+    <button class="pwaInstallBtn" id="pwaInstallBtn" type="button">Instalar</button>
+    <button class="pwaInstallDismiss" id="pwaInstallDismiss" type="button" aria-label="Cerrar">×</button>
+  </div>
+</div>
+
+<script>
+  (function() {
+    var DISMISS_KEY = 'pwa_install_dismissed_v1';
+    var banner = document.getElementById('pwaInstallBanner');
+    var btn = document.getElementById('pwaInstallBtn');
+    var dismissBtn = document.getElementById('pwaInstallDismiss');
+    if (!banner || !btn) return;
+
+    // Hide if user already dismissed recently (14 days)
+    try {
+      var dismissedAt = Number(localStorage.getItem(DISMISS_KEY) || 0);
+      if (dismissedAt && (Date.now() - dismissedAt) < 14 * 24 * 60 * 60 * 1000) {
+        return;
+      }
+    } catch (_) {}
+
+    // Hide if app is already running in standalone (installed)
+    var isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true
+      || document.referrer.includes('android-app://');
+    if (isStandalone) return;
+
+    var deferredPrompt = null;
+
+    // Pick up a prompt captured earlier (e.g. on login.html in this session)
+    if (window.__deferredInstallPrompt) {
+      deferredPrompt = window.__deferredInstallPrompt;
+      window.__deferredInstallPrompt = null;
+      // Show the banner on next tick so the page is fully ready
+      setTimeout(function() { banner.classList.remove('hidden'); }, 0);
+    }
+
+    window.addEventListener('beforeinstallprompt', function(e) {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      deferredPrompt = e;
+      banner.classList.remove('hidden');
+    });
+
+    btn.addEventListener('click', function() {
+      if (!deferredPrompt) {
+        // Fallback: iOS / browsers that don't support prompt()
+        showIOSHint();
+        return;
+      }
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function(result) {
+        if (result && result.outcome === 'accepted') {
+          banner.classList.add('hidden');
+        }
+        deferredPrompt = null;
+      }).catch(function() {
+        deferredPrompt = null;
+      });
+    });
+
+    if (dismissBtn) {
+      dismissBtn.addEventListener('click', function() {
+        banner.classList.add('hidden');
+        try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch (_) {}
+      });
+    }
+
+    window.addEventListener('appinstalled', function() {
+      banner.classList.add('hidden');
+      deferredPrompt = null;
+    });
+
+    function showIOSHint() {
+      var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      if (isIOS) {
+        banner.querySelector('.pwaInstallSub').textContent =
+          'Toca Compartir → Añadir a pantalla de inicio';
+      }
     }
   })();
 </script>

@@ -4740,51 +4740,87 @@ function renderExistenciasGrouped(moveDays) {
   });
 
   if (!groups.length) {
-    tb.innerHTML = `<tr><td colspan="9">Sin resultados con esos filtros.</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="7">Sin resultados con esos filtros.</td></tr>`;
     return;
   }
 
   tb.innerHTML = groups
     .map((g) => {
       const expanded = repExistExpanded.has(g.key);
+      const minDias = g.min_dias;
+      let sev = "ok";
+      if (minDias !== null && minDias !== undefined && minDias < 0) sev = "vencido";
+      else if (minDias !== null && minDias !== undefined && minDias <= 3) sev = "critico";
+      else if (minDias !== null && minDias !== undefined && minDias <= 15) sev = "proximo";
+      else if (g.min_dias_regla !== null && g.min_dias_regla !== undefined && Number(g.min_dias_regla) <= 0) sev = "regla";
+      const dRel = minDias === null || minDias === undefined ? ""
+        : (minDias < 0 ? `Vencio hace ${Math.abs(minDias)}d` : (minDias === 0 ? "Vence hoy" : `Vence en ${minDias}d`));
+      const dStr = (() => {
+        // Find earliest vencimiento date from any lot
+        const all = g.lotes || [];
+        if (!all.length) return "—";
+        const sorted = all.filter(l => l.fecha_vencimiento).sort((a, b) => String(a.fecha_vencimiento).localeCompare(String(b.fecha_vencimiento)));
+        return fmtDateOnly(sorted[0]?.fecha_vencimiento) || "—";
+      })();
       const lotesHtml = g.lotes
         .sort((a, b) => {
           const ax = a.fecha_vencimiento || "9999-12-31";
           const bx = b.fecha_vencimiento || "9999-12-31";
           return ax.localeCompare(bx);
         })
-        .map(
-          (lt) => `
-          <tr>
-            <td>${lt.lote || "-"}</td>
-            <td>${fmtDateOnly(lt.fecha_vencimiento) || "-"}</td>
-            <td>${lt.dias_para_vencer ?? "-"}</td>
+        .map((lt) => {
+          const ld = lt.dias_para_vencer === null || lt.dias_para_vencer === undefined ? null : Number(lt.dias_vencer = lt.dias_para_vencer);
+          let lSev = "ok";
+          if (ld !== null && ld < 0) lSev = "vencido";
+          else if (ld !== null && ld <= 3) lSev = "critico";
+          else if (ld !== null && ld <= 15) lSev = "proximo";
+          const lRel = ld === null ? "" : (ld < 0 ? `Vencio hace ${Math.abs(ld)}d` : (ld === 0 ? "Vence hoy" : `Vence en ${ld}d`));
+          return `
+          <tr class="alertRow alert-${lSev}">
+            <td>${escapeHtml(lt.lote || "-")}</td>
+            <td class="alertColFecha">
+              <div class="alertFecha">${fmtDateOnly(lt.fecha_vencimiento) || "-"}</div>
+              <div class="alertFechaRel">${lRel}</div>
+            </td>
+            <td>${ld ?? "-"}</td>
             <td>${reglaBadge(lt.dias_restantes_regla, lt.dias_alerta_antes, lt.max_dias_vida)}</td>
-            <td>${lt.stock}</td>
-          </tr>
-        `
-        )
+            <td class="alertColStock"><span class="alertStockQty">${fmtQty(lt.stock)}</span></td>
+          </tr>`;
+        })
         .join("");
       return `
-        <tr>
-          <td>${g.nombre_bodega}</td>
-          <td>${g.nombre_producto}</td>
-          <td>${g.sku || ""}</td>
-          <td>${g.stock_total}</td>
-          <td>${stockNivelBadge(g.stock_total, g.minimo_stock, g.maximo_stock)}</td>
+        <tr class="alertRow alert-${sev}">
+          <td class="alertColBodega"><div class="alertBodega" title="${escapeHtml(g.nombre_bodega || "")}">${escapeHtml(g.nombre_bodega || "")}</div></td>
+          <td class="alertColProd">
+            <div class="alertProdName" title="${escapeHtml(g.nombre_producto || "")}">${escapeHtml(g.nombre_producto || "")}</div>
+            <div class="alertProdMeta">
+              ${g.sku ? `<span class="alertSku">${escapeHtml(g.sku)}</span>` : ""}
+              ${g.nombre_subcategoria ? `<span class="alertSubcat">${escapeHtml(g.nombre_subcategoria)}</span>` : ""}
+              ${stockNivelBadge(g.stock_total, g.minimo_stock, g.maximo_stock)}
+            </div>
+          </td>
+          <td class="alertColStock">
+            <span class="alertStockQty">${fmtQty(g.stock_total)}</span>
+            <span class="alertStockUnit">und</span>
+          </td>
+          <td class="alertColFecha">
+            <div class="alertFecha">${dStr}</div>
+            <div class="alertFechaRel">${dRel}</div>
+          </td>
           <td>${fmtMoney(g.total_dinero)}</td>
-          <td>${existenciaBadge(g.min_dias, moveDays)}</td>
-          <td>${reglaBadge(g.min_dias_regla, g.dias_alerta_antes, g.max_dias_vida)}</td>
+          <td class="alertColEstado">
+            <div class="statusGroup">${existenciaBadge(g.min_dias, moveDays)}${reglaBadge(g.min_dias_regla, g.dias_alerta_antes, g.max_dias_vida)}</div>
+          </td>
           <td>
-            <button class="dispatchBtn dispatchBtn-neutral repExpandBtn" data-expkey="${g.key}">
+            <button class="dispatchBtn dispatchBtn-neutral repExpandBtn" data-expkey="${escapeHtml(g.key)}">
               ${expanded ? "Ocultar lotes" : "Ver lotes"} (${g.lotes.length})
             </button>
           </td>
         </tr>
-        <tr class="repLotRow ${expanded ? "" : "hidden"}" data-lotrow="${g.key}">
-          <td colspan="9">
+        <tr class="repLotRow ${expanded ? "" : "hidden"}" data-lotrow="${escapeHtml(g.key)}">
+          <td colspan="7">
             <div class="tableWrap" style="margin:0">
-              <table class="tbl grid" style="min-width:520px">
+              <table class="tbl grid alertTbl" style="min-width:520px">
                 <thead>
                   <tr>
                     <th>Lote</th>
@@ -4845,8 +4881,8 @@ async function loadReporteExistencias() {
   const repExistResume = $("#repExistResume");
   if (!tb || !alertTb) return;
   if (!repExistCanView) {
-    tb.innerHTML = `<tr><td colspan="9">Sin permiso para ver existencias.</td></tr>`;
-    alertTb.innerHTML = `<tr><td colspan="8">Sin permiso para ver alertas.</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="7">Sin permiso para ver existencias.</td></tr>`;
+    alertTb.innerHTML = `<tr><td colspan="5">Sin permiso para ver alertas.</td></tr>`;
     if (resume) resume.textContent = "Sin permiso";
     if (repExistResume) repExistResume.innerHTML = `<span class="pill ghost">Sin permiso</span>`;
     return;
@@ -4873,8 +4909,8 @@ async function loadReporteExistencias() {
   if (from) qs.set("from", from);
   if (to) qs.set("to", to);
 
-  tb.innerHTML = `<tr><td colspan="9">Cargando...</td></tr>`;
-  alertTb.innerHTML = `<tr><td colspan="8">Cargando...</td></tr>`;
+  tb.innerHTML = `<tr><td colspan="7">Cargando...</td></tr>`;
+  alertTb.innerHTML = `<tr><td colspan="5">Cargando...</td></tr>`;
   if (resume) resume.textContent = "Cargando...";
   if (repExistResume) repExistResume.innerHTML = `<span class="pill ghost">Cargando...</span>`;
 
@@ -4891,11 +4927,11 @@ async function loadReporteExistencias() {
     const alertRows = await alertR.json().catch(() => []);
 
     if (!existR.ok) {
-      tb.innerHTML = `<tr><td colspan="9">Error al cargar existencias</td></tr>`;
+      tb.innerHTML = `<tr><td colspan="7">Error al cargar existencias</td></tr>`;
       if (repExistResume) repExistResume.innerHTML = `<span class="pill ghost">Error</span>`;
     } else if (!existRows.length) {
       repExistRowsCache = [];
-      tb.innerHTML = `<tr><td colspan="9">Sin resultados con esos filtros.</td></tr>`;
+      tb.innerHTML = `<tr><td colspan="7">Sin resultados con esos filtros.</td></tr>`;
       if (repExistResume) repExistResume.innerHTML = `<span class="pill ghost">Sin datos</span>`;
     } else {
       repExistRowsCache = existRows;
@@ -4914,10 +4950,10 @@ async function loadReporteExistencias() {
     }
 
     if (!alertR.ok) {
-      alertTb.innerHTML = `<tr><td colspan="8">Error al cargar alertas</td></tr>`;
+      alertTb.innerHTML = `<tr><td colspan="5">Error al cargar alertas</td></tr>`;
       if (resume) resume.textContent = "Error";
     } else if (!alertRows.length) {
-      alertTb.innerHTML = `<tr><td colspan="8">Sin alertas para esos filtros.</td></tr>`;
+      alertTb.innerHTML = `<tr><td colspan="5">Sin alertas para esos filtros.</td></tr>`;
       if (resume) resume.textContent = "Sin alertas";
     } else {
       const vencidos = alertRows.filter((x) => Number(x.dias_para_vencer) < 0).length;
@@ -4927,25 +4963,44 @@ async function loadReporteExistencias() {
         resume.textContent = `Alertas: ${alertRows.length} (Vencidos: ${vencidos} | Proximos: ${proximos} | Vigentes: ${vigentes})`;
       }
       alertTb.innerHTML = alertRows
-        .map(
-          (x) => `
-          <tr>
-            <td>${x.nombre_bodega || ""}</td>
-            <td>${x.nombre_producto || ""}</td>
-            <td>${x.sku || ""}</td>
-            <td>${x.lote || ""}</td>
-            <td>${fmtDateOnly(x.fecha_vencimiento)}</td>
-            <td>${x.dias_para_vencer ?? ""}</td>
-            <td>${x.stock ?? 0}</td>
-            <td>${alertIndicadores(x)}</td>
-          </tr>
-        `
-        )
+        .map((x) => {
+          const d = x.dias_para_vencer === null || x.dias_para_vencer === undefined ? null : Number(x.dias_para_vencer);
+          // Severity buckets: vencido (<0), critico (0..3), proximo (4..15), regla (resto)
+          let sev = "ok";
+          if (d !== null && d < 0) sev = "vencido";
+          else if (d !== null && d <= 3) sev = "critico";
+          else if (d !== null && d <= 15) sev = "proximo";
+          else if (x.dias_restantes_regla !== null && x.dias_restantes_regla !== undefined && Number(x.dias_restantes_regla) <= 0) sev = "regla";
+          const dStr = fmtDateOnly(x.fecha_vencimiento) || "—";
+          const dRel = d === null ? "" : (d < 0 ? `Vencio hace ${Math.abs(d)}d` : (d === 0 ? "Vence hoy" : `Vence en ${d}d`));
+          const stockTxt = fmtQty(x.stock);
+          return `
+          <tr class="alertRow alert-${sev}">
+            <td class="alertColBodega"><div class="alertBodega" title="${escapeHtml(x.nombre_bodega || "")}">${escapeHtml(x.nombre_bodega || "")}</div></td>
+            <td class="alertColProd">
+              <div class="alertProdName" title="${escapeHtml(x.nombre_producto || "")}">${escapeHtml(x.nombre_producto || "")}</div>
+              <div class="alertProdMeta">
+                ${x.sku ? `<span class="alertSku">${escapeHtml(x.sku)}</span>` : ""}
+                ${x.lote ? `<span class="alertLote">Lote: ${escapeHtml(x.lote)}</span>` : ""}
+                ${x.nombre_subcategoria ? `<span class="alertSubcat">${escapeHtml(x.nombre_subcategoria)}</span>` : ""}
+              </div>
+            </td>
+            <td class="alertColStock">
+              <span class="alertStockQty">${stockTxt}</span>
+              <span class="alertStockUnit">und</span>
+            </td>
+            <td class="alertColFecha">
+              <div class="alertFecha">${dStr}</div>
+              <div class="alertFechaRel">${dRel}</div>
+            </td>
+            <td class="alertColEstado">${alertIndicadores(x)}</td>
+          </tr>`;
+        })
         .join("");
     }
   } catch {
-    tb.innerHTML = `<tr><td colspan="9">Error de red</td></tr>`;
-    alertTb.innerHTML = `<tr><td colspan="8">Error de red</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="7">Error de red</td></tr>`;
+    alertTb.innerHTML = `<tr><td colspan="5">Error de red</td></tr>`;
     if (resume) resume.textContent = "Error de red";
     if (repExistResume) repExistResume.innerHTML = `<span class="pill ghost">Error de red</span>`;
   }
@@ -6181,8 +6236,8 @@ if ($("#repExistClear")) {
     refreshRepExistMultiFilters();
     repExistRowsCache = [];
     repExistExpanded.clear();
-    if ($("#repExistList")) $("#repExistList").innerHTML = `<tr><td colspan="9">Usa los filtros y presiona Buscar.</td></tr>`;
-    if ($("#repAlertList")) $("#repAlertList").innerHTML = `<tr><td colspan="8">Usa los filtros y presiona Buscar.</td></tr>`;
+    if ($("#repExistList")) $("#repExistList").innerHTML = `<tr><td colspan="7">Usa los filtros y presiona Buscar.</td></tr>`;
+    if ($("#repAlertList")) $("#repAlertList").innerHTML = `<tr><td colspan="5">Usa los filtros y presiona Buscar.</td></tr>`;
     if ($("#repAlertResume")) $("#repAlertResume").textContent = "Sin datos";
     if ($("#repExistResume")) $("#repExistResume").innerHTML = `<span class="pill ghost">Sin datos</span>`;
   };

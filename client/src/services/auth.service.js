@@ -33,4 +33,9 @@ export const authService = {
     const { data } = await api.get('/api/auth/me');
     return data;
   },
+
+  async listLoginUsers() {
+    const { data } = await api.get('/api/auth/users');
+    return Array.isArray(data) ? data : [];
+  },
 };

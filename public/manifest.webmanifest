@@ -1,11 +1,14 @@
 {
   "name": "Bodega Jardines",
   "short_name": "Bodega",
+  "id": "/app.html",
   "start_url": "./app.html",
   "scope": "./",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "./pw.ico",

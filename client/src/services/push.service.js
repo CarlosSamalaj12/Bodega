@@ -19,6 +19,10 @@ let vapidPublicKey = null;
  * Debe llamarse después del login.
  */
 export async function initPushService() {
+  // En dev (Vite, puerto 5173) no existe SW propio: vive en el build de
+  // producción servido por Express. Suscribirse aquí solo genera AbortError.
+  if (import.meta.env.DEV) return false;
+
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     console.log('[push] Push API no disponible');
     return false;

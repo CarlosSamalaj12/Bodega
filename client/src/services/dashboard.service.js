@@ -27,7 +27,9 @@ function aggregateDaily(movements, days, tipo) {
     map[key] = 0;
   }
   for (const m of movements) {
-    const raw = m.creado_en || m.fecha;
+    // Preferir `fecha` (DATE() calculado por MySQL en hora local) sobre
+    // `creado_en` (datetime serializado a UTC: desfasa el día después de las 6pm).
+    const raw = m.fecha || m.creado_en;
     if (!raw) continue;
     const key = String(raw).slice(0, 10);
     if (map[key] !== undefined) {
@@ -67,8 +69,8 @@ export const dashboardService = {
       api.get('/api/reportes/salidas', { params }),
     ]);
 
-    const entradas = Array.isArray(entradasRes.data) ? entradasRes.data : [];
-    const salidas = Array.isArray(salidasRes.data) ? salidasRes.data : [];
+    const entradas = Array.isArray(entradasRes.data) ? entradasRes.data : (entradasRes.data?.rows || []);
+    const salidas = Array.isArray(salidasRes.data) ? salidasRes.data : (salidasRes.data?.rows || []);
 
     const entradasByDay = aggregateDaily(entradas, days, 'ENTRADA');
     const salidasByDay = aggregateDaily(salidas, days, 'SALIDA');

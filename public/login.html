@@ -6,9 +6,15 @@
   <title>Bodega - Iniciar sesion</title>
   <link rel="manifest" href="./manifest.webmanifest"/>
   <meta name="theme-color" content="#0f172a"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Bodega"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
   <link rel="icon" type="image/x-icon" href="./pw.ico"/>
   <link rel="shortcut icon" type="image/x-icon" href="./pw.ico"/>
   <link rel="apple-touch-icon" href="./pw.ico"/>
+  <link rel="apple-touch-icon" sizes="192x192" href="./icon-192x192.png"/>
+  <link rel="apple-touch-icon" sizes="512x512" href="./icon-512x512.png"/>
   <link rel="stylesheet" href="./styles.css"/>
 </head>
 <body class="loginPage">
@@ -18,23 +24,31 @@
         <img class="loginLogo" src="/imagenes/Oficial_JDL_blanco.png" alt="Logo JDL" />
       </div>
       <div class="loginTitle">BODEGA JARDINES</div>
-      <div class="loginAvatarPreviewWrap">
+      <div class="loginAvatarPreviewWrap" id="loginAvatarPreviewWrap">
+        <svg id="loginAvatarPlaceholder" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="8" r="4"></circle>
+          <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"></path>
+        </svg>
         <img class="loginAvatarPreviewImg hidden" id="loginUserAvatar" alt="Avatar usuario seleccionado" />
-        <div class="loginAvatarPreviewFallback" id="loginUserAvatarFallback">SIN AVATAR</div>
+        <div class="loginAvatarPreviewFallback hidden" id="loginUserAvatarFallback">?</div>
       </div>
-      <div class="loginPickTitle">Selecciona usuario</div>
-      <input id="userPick" class="loginPickInput" list="loginUserOptions" placeholder="Buscar usuario..." autocomplete="off"/>
-      <datalist id="loginUserOptions"></datalist>
-      <div id="loginUserSuggest" class="loginPickSuggest hidden"></div>
+      <div class="loginSelectedName" id="loginSelectedName">Selecciona tu usuario</div>
 
-      <div class="loginField">
-        <span class="loginFieldIcon" aria-hidden="true">
+      <div class="loginPickHeader">
+        <div class="loginPickTitle">Usuarios</div>
+        <div class="loginPickCount" id="loginPickCount"></div>
+      </div>
+      <div class="loginPickSearch">
+        <span class="loginPickSearchIcon" aria-hidden="true">
           <svg viewBox="0 0 24 24" role="img">
-            <path d="M4 7h16v10H4z"></path>
-            <path d="M4 8l8 6 8-6"></path>
+            <circle cx="11" cy="11" r="7"></circle>
+            <path d="m20 20-3.5-3.5"></path>
           </svg>
         </span>
-        <input id="user" class="loginInput" placeholder="Usuario" autocomplete="username"/>
+        <input id="userPick" class="loginPickInput" placeholder="Buscar por nombre..." autocomplete="off"/>
+      </div>
+      <div id="loginUserGrid" class="loginUserGrid" role="listbox" aria-label="Lista de usuarios">
+        <div class="loginUserGridEmpty">Cargando usuarios...</div>
       </div>
 
       <div class="loginField">
@@ -46,9 +60,21 @@
           </svg>
         </span>
         <input id="pass" class="loginInput" type="password" placeholder="Contrasena" autocomplete="current-password"/>
+        <button id="togglePass" class="loginTogglePass" type="button" aria-label="Mostrar contrasena" title="Mostrar/ocultar contrasena">
+          <svg class="iconEye" viewBox="0 0 24 24" role="img" aria-hidden="true">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+          <svg class="iconEyeOff" viewBox="0 0 24 24" role="img" aria-hidden="true">
+            <path d="M3 3l18 18"></path>
+            <path d="M10.6 6.1A10.7 10.7 0 0 1 12 6c6.5 0 10 6 10 6a17.6 17.6 0 0 1-3.2 3.9"></path>
+            <path d="M6.1 6.2A17.4 17.4 0 0 0 2 12s3.5 6 10 6a10.6 10.6 0 0 0 4.4-1"></path>
+            <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"></path>
+          </svg>
+        </button>
       </div>
 
-      <button id="btn" class="loginBtn" type="button">INICIAR SESION</button>
+      <button id="btn" class="loginBtn" type="button" disabled>INICIAR SESION</button>
       <div id="msg" class="loginMsg"></div>
     </div>
   </div>
@@ -71,18 +97,15 @@ const APP_BASE_PATH = (() => {
 const API_ORIGIN = `${location.origin}${APP_BASE_PATH}`;
 const loginUsers = [];
 const userOptionsMap = new Map();
+let selectedUser = null;
+let currentFilter = "";
 
 async function fetchLoginApi(path, init) {
   return fetch(`${API_ORIGIN}${path}`, init);
 }
 
-
 function focusLoginPassword() {
-  const pick = $("#userPick");
   const pass = $("#pass");
-  if (pick && document.activeElement === pick && typeof pick.blur === "function") {
-    pick.blur();
-  }
   if (!pass) return;
   requestAnimationFrame(() => {
     pass.focus();
@@ -90,156 +113,149 @@ function focusLoginPassword() {
   });
 }
 
-function useCustomLoginSuggest() {
-  const smallViewport = window.matchMedia?.("(max-width: 980px)")?.matches;
-  const touchPointer = window.matchMedia?.("(pointer: coarse)")?.matches;
-  const touchFallback = "ontouchstart" in window || Number(navigator.maxTouchPoints || 0) > 0;
-  return Boolean(smallViewport && (touchPointer || touchFallback));
+function getInitials(name) {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function syncLoginPickerMode() {
-  const pick = $("#userPick");
-  if (!pick) return;
-  if (useCustomLoginSuggest()) {
-    pick.removeAttribute("list");
-  } else {
-    pick.setAttribute("list", "loginUserOptions");
-    hideLoginUserSuggest();
-  }
-}
-
-function setLoginAvatar(avatar) {
+function setLoginAvatar(avatar, fallbackText) {
   const img = $("#loginUserAvatar");
   const fallback = $("#loginUserAvatarFallback");
-  if (!img || !fallback) return;
-  if (typeof avatar === "string" && avatar.startsWith("data:image/")) {
+  const placeholder = $("#loginAvatarPlaceholder");
+  const wrap = $("#loginAvatarPreviewWrap");
+  if (!img || !fallback || !wrap) return;
+  const hasImage = typeof avatar === "string" && avatar.startsWith("data:image/");
+  const hasInitials = !hasImage && typeof fallbackText === "string" && fallbackText.length > 0;
+  if (hasImage) {
     img.src = avatar;
     img.classList.remove("hidden");
     fallback.classList.add("hidden");
-  } else {
+    if (placeholder) placeholder.style.display = "none";
+    wrap.classList.add("hasUser");
+  } else if (hasInitials) {
     img.removeAttribute("src");
     img.classList.add("hidden");
     fallback.classList.remove("hidden");
+    fallback.textContent = fallbackText;
+    if (placeholder) placeholder.style.display = "none";
+    wrap.classList.add("hasUser");
+  } else {
+    img.removeAttribute("src");
+    img.classList.add("hidden");
+    fallback.classList.add("hidden");
+    if (placeholder) placeholder.style.display = "";
+    wrap.classList.remove("hasUser");
   }
+}
+
+function updateLoginUserCount(visible) {
+  const el = $("#loginPickCount");
+  if (!el) return;
+  if (!loginUsers.length) {
+    el.textContent = "";
+  } else {
+    el.textContent = `${visible}/${loginUsers.length}`;
+  }
+}
+
+function updateLoginSubmitState() {
+  const btn = $("#btn");
+  if (!btn) return;
+  const hasUser = Boolean(selectedUser);
+  const hasPass = Boolean(String($("#pass")?.value || "").trim());
+  btn.disabled = !(hasUser && hasPass);
 }
 
 async function loadLoginUsers() {
-  const pick = $("#userPick");
-  const list = $("#loginUserOptions");
-  if (!pick || !list) return;
+  const grid = $("#loginUserGrid");
+  if (!grid) return;
   try {
     const r = await fetchLoginApi(`/api/auth/users`);
     const rows = await r.json().catch(() => []);
-    if (!r.ok || !Array.isArray(rows)) return;
-
+    if (!r.ok || !Array.isArray(rows)) {
+      grid.innerHTML = `<div class="loginUserGridEmpty">No se pudieron cargar usuarios</div>`;
+      return;
+    }
     userOptionsMap.clear();
     loginUsers.length = 0;
-    list.innerHTML = rows
-      .map((u) => {
-        const username = String(u.username || "").trim();
-        if (!username) return "";
-        const item = {
-          username,
-          full_name: String(u.full_name || ""),
-          avatar_url: String(u.avatar_url || ""),
-        };
-        userOptionsMap.set(username.toLowerCase(), item);
-        loginUsers.push(item);
-        return `<option value="${username}" label="${u.full_name || username}"></option>`;
-      })
-      .join("");
-  } catch {}
+    rows.forEach((u) => {
+      const username = String(u.username || "").trim();
+      if (!username) return;
+      const item = {
+        username,
+        full_name: String(u.full_name || ""),
+        avatar_url: String(u.avatar_url || ""),
+      };
+      userOptionsMap.set(username.toLowerCase(), item);
+      loginUsers.push(item);
+    });
+    renderUserGrid();
+  } catch {
+    grid.innerHTML = `<div class="loginUserGridEmpty">Error de conexion</div>`;
+  }
 }
 
-function syncPickedUserToForm() {
-  const pick = $("#userPick");
-  const user = $("#user");
-  if (!pick || !user) return;
-  const typed = String(pick.value || "").trim();
-  const found = userOptionsMap.get(typed.toLowerCase());
-  if (!found) {
-    user.value = typed;
-    setLoginAvatar("");
-    return;
-  }
-  user.value = found.username;
-  pick.value = found.username;
-  setLoginAvatar(found.avatar_url);
-}
-
-function renderLoginUserSuggest(q = "") {
-  const box = $("#loginUserSuggest");
-  if (!box) return;
-  if (!useCustomLoginSuggest()) {
-    box.innerHTML = "";
-    box.classList.add("hidden");
-    return;
-  }
-  const query = String(q || "").trim().toLowerCase();
-  const list = loginUsers
-    .filter((u) => {
-      if (!query) return true;
-      return (
-        u.username.toLowerCase().includes(query) ||
-        u.full_name.toLowerCase().includes(query)
-      );
-    })
-    .slice(0, 20);
-
+function renderUserGrid() {
+  const grid = $("#loginUserGrid");
+  if (!grid) return;
+  const query = currentFilter.toLowerCase().trim();
+  const list = loginUsers.filter((u) => {
+    if (!query) return true;
+    return (
+      u.username.toLowerCase().includes(query) ||
+      u.full_name.toLowerCase().includes(query)
+    );
+  });
+  updateLoginUserCount(list.length);
   if (!list.length) {
-    box.innerHTML = "";
-    box.classList.add("hidden");
+    grid.innerHTML = `<div class="loginUserGridEmpty">Sin resultados</div>`;
     return;
   }
-
-  box.innerHTML = list
-    .map(
-      (u) => `
-      <button type="button" class="loginPickItem" data-user="${u.username}">
-        <span class="loginPickUser">${u.username}</span>
-        <span class="loginPickName">${u.full_name || u.username}</span>
-      </button>
-    `
-    )
+  grid.innerHTML = list
+    .map((u) => {
+      const init = getInitials(u.full_name || u.username);
+      const sel = selectedUser && selectedUser.username === u.username ? "selected" : "";
+      const avatarHtml = u.avatar_url
+        ? `<img class="loginUserCardAvatar" src="${u.avatar_url}" alt=""/><span class="loginUserCardInitials" style="display:none">${init}</span>`
+        : `<span class="loginUserCardInitials">${init}</span>`;
+      return `
+      <button type="button" class="loginUserCard ${sel}" data-user="${u.username}" role="option" aria-selected="${sel ? "true" : "false"}">
+        <div class="loginUserCardAvatarWrap">${avatarHtml}</div>
+        <div class="loginUserCardName">${u.full_name || u.username}</div>
+        <div class="loginUserCardUser">@${u.username}</div>
+      </button>`;
+    })
     .join("");
-  box.classList.remove("hidden");
 }
 
-function hideLoginUserSuggest() {
-  const box = $("#loginUserSuggest");
-  if (!box) return;
-  box.classList.add("hidden");
-}
-
-function hasExactLoginUserMatch() {
-  const pick = $("#userPick");
-  const typed = String(pick?.value || "").trim();
-  return Boolean(typed && userOptionsMap.get(typed.toLowerCase()));
-}
-
-function selectLoginUser(username, { focusPassword = false } = {}) {
-  const pick = $("#userPick");
-  const user = $("#user");
-  if (!pick || !user) return;
+function selectLoginUser(username, { focusPassword = true } = {}) {
   const key = String(username || "").trim();
   const found = userOptionsMap.get(key.toLowerCase());
+  const selectedName = $("#loginSelectedName");
   if (!found) {
-    pick.value = key;
-    user.value = key;
-    setLoginAvatar("");
-    hideLoginUserSuggest();
-    if (focusPassword) focusLoginPassword();
+    selectedUser = null;
+    setLoginAvatar("", "?");
+    if (selectedName) selectedName.textContent = "Selecciona tu usuario";
+    updateLoginSubmitState();
     return;
   }
-  pick.value = found.username;
-  user.value = found.username;
-  setLoginAvatar(found.avatar_url);
-  hideLoginUserSuggest();
-  if (focusPassword) {
-    focusLoginPassword();
-  } else if (typeof pick.blur === "function") {
-    pick.blur();
+  selectedUser = found;
+  setLoginAvatar(found.avatar_url, getInitials(found.full_name || found.username));
+  if (selectedName) {
+    selectedName.textContent = found.full_name || found.username;
   }
+  // Update grid selection state
+  document.querySelectorAll(".loginUserCard").forEach((el) => {
+    const isSel = el.dataset.user === found.username;
+    el.classList.toggle("selected", isSel);
+    el.setAttribute("aria-selected", isSel ? "true" : "false");
+  });
+  if (focusPassword) {
+    setTimeout(focusLoginPassword, 60);
+  }
+  updateLoginSubmitState();
 }
 
 $("#btn").onclick = async () => {
@@ -248,10 +264,10 @@ $("#btn").onclick = async () => {
   msg.textContent = "";
   msg.className = "loginMsg";
 
-  const username = $("#user").value.trim();
+  const username = selectedUser ? selectedUser.username : "";
   const password = $("#pass").value.trim();
   if (!username || !password) {
-    msg.textContent = "Falta usuario o contrasena";
+    msg.textContent = "Selecciona usuario y escribe contrasena";
     msg.className = "loginMsg bad";
     return;
   }
@@ -270,6 +286,7 @@ $("#btn").onclick = async () => {
     if (!r.ok) {
       msg.textContent = j.error || "No se pudo iniciar sesion";
       msg.className = "loginMsg bad";
+      $("#pass").select();
       return;
     }
 
@@ -280,72 +297,55 @@ $("#btn").onclick = async () => {
     msg.textContent = "Error de conexion con el servidor";
     msg.className = "loginMsg bad";
   } finally {
-    btn.disabled = false;
+    updateLoginSubmitState();
   }
 };
 
+// Password show/hide toggle
+const toggleBtn = $("#togglePass");
+if (toggleBtn) {
+  toggleBtn.addEventListener("click", () => {
+    const pass = $("#pass");
+    if (!pass) return;
+    const showing = pass.type === "text";
+    pass.type = showing ? "password" : "text";
+    toggleBtn.classList.toggle("showing", !showing);
+    toggleBtn.setAttribute("aria-label", !showing ? "Ocultar contrasena" : "Mostrar contrasena");
+    pass.focus();
+  });
+}
+
+// Search filter
+const userPickInput = $("#userPick");
+if (userPickInput) {
+  userPickInput.addEventListener("input", (e) => {
+    currentFilter = e.target.value || "";
+    renderUserGrid();
+  });
+}
+
+// User grid click handler
+const userGrid = $("#loginUserGrid");
+if (userGrid) {
+  userGrid.addEventListener("click", (e) => {
+    const card = e.target.closest(".loginUserCard");
+    if (!card) return;
+    selectLoginUser(card.dataset.user || "", { focusPassword: true });
+  });
+}
+
+// Submit on Enter from password field
 $("#pass").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") $("#btn").click();
-});
-$("#userPick").addEventListener("focus", () => {
-  syncLoginPickerMode();
-  if (hasExactLoginUserMatch()) {
-    hideLoginUserSuggest();
-    return;
-  }
-  renderLoginUserSuggest($("#userPick").value || "");
-});
-$("#userPick").addEventListener("change", () => {
-  syncPickedUserToForm();
-  syncLoginPickerMode();
-  if (hasExactLoginUserMatch()) {
-    hideLoginUserSuggest();
-    focusLoginPassword();
-    return;
-  }
-  renderLoginUserSuggest($("#userPick").value || "");
-});
-$("#userPick").addEventListener("input", () => {
-  syncPickedUserToForm();
-  syncLoginPickerMode();
-  if (hasExactLoginUserMatch()) {
-    hideLoginUserSuggest();
-    return;
-  }
-  renderLoginUserSuggest($("#userPick").value || "");
-});
-$("#userPick").addEventListener("blur", () => {
-  setTimeout(hideLoginUserSuggest, 140);
-});
-$("#userPick").addEventListener("keydown", (e) => {
-  if (e.key !== "Enter") return;
-  if (!hasExactLoginUserMatch()) return;
-  e.preventDefault();
-  syncPickedUserToForm();
-  hideLoginUserSuggest();
-  focusLoginPassword();
-});
-$("#loginUserSuggest").addEventListener("pointerdown", (e) => {
-  const btn = e.target?.closest ? e.target.closest(".loginPickItem") : null;
-  if (!btn) return;
-  e.preventDefault();
-  selectLoginUser(btn.dataset.user || "", { focusPassword: true });
-});
-document.addEventListener("pointerdown", (e) => {
-  const pick = $("#userPick");
-  const box = $("#loginUserSuggest");
-  const target = e.target;
-  if (!pick || !box || !target) return;
-  if (pick.contains?.(target) || box.contains?.(target)) return;
-  hideLoginUserSuggest();
-  if (hasExactLoginUserMatch()) {
-    focusLoginPassword();
+  if (e.key === "Enter" && !$("#btn").disabled) {
+    e.preventDefault();
+    $("#btn").click();
   }
 });
 
-setLoginAvatar("");
-syncLoginPickerMode();
-window.addEventListener("resize", syncLoginPickerMode);
+// Enable/disable submit based on form state
+$("#pass").addEventListener("input", updateLoginSubmitState);
+
+setLoginAvatar("", "?");
 loadLoginUsers();
 </script>
   <div class="connIndicator" id="connIndicator">
@@ -414,6 +414,20 @@ loadLoginUsers();
       }).catch(function (err) {
         console.error("SW registration failed:", err);
       });
+    });
+  })();
+</script>
+<script>
+  // Capture beforeinstallprompt early so app.html can use it.
+  // Some browsers only fire it on the first page; capture in sessionStorage.
+  (function() {
+    if (!('serviceWorker' in navigator)) return;
+    var isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true;
+    if (isStandalone) return;
+    window.addEventListener('beforeinstallprompt', function(e) {
+      e.preventDefault();
+      try { window.__deferredInstallPrompt = e; } catch (_) {}
     });
   })();
 </script>

@@ -109,7 +109,7 @@ export default function SalidasPage() {
   const handleRevertConfirm = async (pin) => {
     if (!revertingId) return;
     try {
-      await salidasService.revert(revertingId);
+      await salidasService.revert(revertingId, pin);
       toast.success(`Salida #${revertingId} revertida correctamente`);
       setRevertPinOpen(false);
       setRevertingId(null);

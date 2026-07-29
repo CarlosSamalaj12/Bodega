@@ -1,82 +1,48 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { VitePWA } from 'vite-plugin-pwa'
 import path from 'node:path'
 
 // https://vite.dev/config/
+// PWA is owned by the root public/ folder (served by Express). We deliberately
+// do NOT register vite-plugin-pwa here to avoid a second competing manifest + SW
+// when the client is built. See /public/manifest.webmanifest and /public/sw.js.
 export default defineConfig({
   plugins: [
     react(),
-    VitePWA({
-      strategies: 'injectManifest',
-      srcDir: 'public',
-      filename: 'sw-custom.js',
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'pw.ico'],
-      manifest: {
-        name: 'Bodega Jardines · Sistema de Inventario',
-        short_name: 'Bodega',
-        description: 'Sistema de inventario y gestión de bodegas',
-        theme_color: '#070a12',
-        background_color: '#070a12',
-        display: 'standalone',
-        scope: '/',
-        start_url: '/',
-        orientation: 'portrait-primary',
-        icons: [
-          {
-            src: '/icon-192x192.png',
-            sizes: '192x192',
-            type: 'image/png',
-          },
-          {
-            src: '/icon-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable',
-          },
-        ],
+    {
+      // Force a full page reload (not HMR) when the router or auth store
+      // changes — these modules own the React context tree and partial HMR
+      // would leave children like useNavigate() with a null context.
+      name: 'react-router-hmr-shim',
+      handleHotUpdate({ file, server }) {
+        if (file.endsWith('router.jsx') || file.endsWith('auth.store.js')) {
+          server.ws.send({ type: 'full-reload' });
+        }
       },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https?:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-cache',
-              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
-            },
-          },
-          {
-            urlPattern: /^https?:\/\/fonts\.gstatic\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'gstatic-fonts-cache',
-              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
-            },
-          },
-          {
-            urlPattern: /\/api\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 5 },
-              networkTimeoutSeconds: 5,
-            },
-          },
-        ],
-      },
-    }),
+    },
   ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // Pre-bundle React + Router together so the dep optimizer produces a single
+  // consistent React instance for the whole app. This prevents the
+  // "Cannot read properties of null (reading 'useContext')" error that
+  // happens when react-router-dom and the app code end up with different
+  // React copies after an HMR partial update.
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-dom/client', 'react-router-dom'],
+  },
   server: {
     port: 5173,
     host: true,
+    hmr: {
+      // Pin the HMR client port so the WebSocket token stays stable across
+      // reconnects; this avoids the "ws://localhost:5173/?token=... failed"
+      // warning that the dev server prints when the client port is dynamic.
+      clientPort: 5173,
+    },
     // Proxy any /api, /auth, /socket.io requests to the existing Express backend.
     // The backend stays untouched and runs on PORT (default 3001).
     proxy: {

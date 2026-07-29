@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { Modal } from '@/components/ui/Modal';
+import { PinModal } from '@/components/ui/PinModal';
 import { Select } from '@/components/ui/Select';
 import { Input } from '@/components/ui/Input';
 import { toast } from '@/components/ui/Toast';
@@ -39,6 +40,7 @@ export default function ConteoCiclicoPage() {
 
   // Completar/Ajustar
   const [actionLoading, setActionLoading] = useState(false);
+  const [ajustarPinOpen, setAjustarPinOpen] = useState(false);
 
   const fetchConteos = useCallback(async () => {
     setLoading(true);
@@ -145,10 +147,17 @@ export default function ConteoCiclicoPage() {
       toast.error('No hay diferencias para ajustar');
       return;
     }
-    if (!window.confirm(`¿Ajustar inventario? Se crearán movimientos de ajuste para ${diffs.length} producto${diffs.length !== 1 ? 's' : ''} con diferencias.`)) return;
+    setAjustarPinOpen(true);
+  };
+
+  const handleAjustarConfirm = async (pin) => {
+    if (!selectedConteo) return;
+    setAjustarPinOpen(false);
     setActionLoading(true);
     try {
-      const { data } = await api.post(`/api/conteo-ciclico/${selectedConteo.id_conteo}/ajustar`);
+      const { data } = await api.post(`/api/conteo-ciclico/${selectedConteo.id_conteo}/ajustar`, {
+        supervisor_pin: pin,
+      });
       const msgs = (data.movimientos || []).map((m) => `#${m.id_movimiento} (${m.tipo})`);
       toast.success(`Ajustes creados: ${msgs.join(', ')}`);
       setShowDetail(false);
@@ -401,6 +410,15 @@ export default function ConteoCiclicoPage() {
           </div>
         ) : null}
       </Modal>
+
+      <PinModal
+        open={ajustarPinOpen}
+        title="Ajustar inventario"
+        description={`¿Ajustar inventario desde el conteo #${selectedConteo?.id_conteo || ''}?\n\nSe crearán movimientos de ajuste por las diferencias encontradas. Requiere PIN de supervisor.`}
+        submitting={actionLoading}
+        onConfirm={handleAjustarConfirm}
+        onCancel={() => setAjustarPinOpen(false)}
+      />
     </>
   );
 }

@@ -1,18 +1,21 @@
 import PropTypes from 'prop-types';
-import { useId } from 'react';
+import { forwardRef, useId } from 'react';
 
 /**
  * Input — campo de texto con label y mensajes
  */
-export function Input({
-  label,
-  hint,
-  error,
-  type = 'text',
-  id,
-  className = '',
-  ...rest
-}) {
+export const Input = forwardRef(function Input(
+  {
+    label,
+    hint,
+    error,
+    type = 'text',
+    id,
+    className = '',
+    ...rest
+  },
+  ref
+) {
   const autoId = useId();
   const fieldId = id || autoId;
   const hintId = hint ? `${fieldId}-hint` : undefined;
@@ -27,6 +30,7 @@ export function Input({
       )}
       <input
         id={fieldId}
+        ref={ref}
         type={type}
         className={`input ${className}`}
         aria-invalid={Boolean(error) || undefined}
@@ -41,7 +45,7 @@ export function Input({
       )}
     </div>
   );
-}
+});
 
 Input.propTypes = {
   label: PropTypes.string,

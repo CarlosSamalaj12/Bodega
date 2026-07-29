@@ -1,54 +1,477 @@
 @use '@/styles/abstracts' as *;
 
+// === Login design tokens ===
+// Marca: gradient fijo (azul-cyan). Resto: theme-aware via CSS vars.
+$login-brand-from: #38bdf8;
+$login-brand-to: #818cf8;
+
 .login-page {
   min-height: 100vh;
   display: grid;
   place-items: center;
   padding: $space-5;
+  // Backdrop ambient — se atenúa en light mode
+  background:
+    radial-gradient(900px 580px at 8% 8%, rgba(56, 189, 248, 0.12), transparent 55%),
+    radial-gradient(800px 540px at 92% 92%, rgba(129, 140, 248, 0.10), transparent 55%),
+    var(--color-bg-elevated, $color-bg-elevated);
 
   &__panel {
-    @include card-glass;
-    width: min(420px, 100%);
-    padding: $space-7 $space-6;
+    position: relative;
+    width: min(440px, 100%);
+    padding: $space-6 $space-6 $space-6;
+    background: var(--color-surface, $color-surface);
+    border: 1px solid var(--color-stroke, $color-stroke);
+    border-radius: 24px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.04) inset,
+      0 24px 60px rgba(0, 0, 0, 0.18),
+      0 2px 8px rgba(0, 0, 0, 0.08);
     animation: rise $transition-slow;
   }
 
   &__brand {
     text-align: center;
-    margin-bottom: $space-7;
+    margin-bottom: $space-5;
   }
 
   &__logo {
-    width: 56px;
-    height: 56px;
-    border-radius: $radius-lg;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
     display: grid;
     place-items: center;
-    margin: 0 auto $space-4;
-    background: $color-accent;
-    color: $color-text-inverse;
-    font-weight: $font-weight-bold;
-    font-size: $font-size-2xl;
+    margin: 0 auto $space-3;
+    background: linear-gradient(135deg, $login-brand-from 0%, $login-brand-to 100%);
+    color: #ffffff;
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: -0.02em;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.12) inset,
+      0 6px 18px rgba(56, 189, 248, 0.32);
   }
 
   &__title {
-    font-size: $font-size-2xl;
-    font-weight: $font-weight-bold;
-    color: $color-text;
+    font-size: 21px;
+    font-weight: 700;
+    color: var(--color-text, $color-text);
+    letter-spacing: -0.01em;
   }
 
   &__subtitle {
-    font-size: $font-size-sm;
-    color: $color-text-muted;
-    margin-top: $space-1;
+    font-size: 11px;
+    color: var(--color-text-muted, $color-text-muted);
+    margin-top: 4px;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.14em;
+    font-weight: 600;
   }
 
+  // === Top avatar (the user likes this one) ===
+  &__avatarWrap {
+    width: 80px;
+    height: 80px;
+    border-radius: 999px;
+    margin: 0 auto $space-3;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.10), rgba(129, 140, 248, 0.10));
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    color: var(--color-text-muted, $color-text-muted);
+    position: relative;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+
+    &[data-has-user='true'] {
+      border-color: rgba(56, 189, 248, 0.55);
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.08), 0 8px 24px rgba(56, 189, 248, 0.18);
+    }
+
+    svg {
+      width: 34px;
+      height: 34px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  }
+
+  &__avatar {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  &__avatarInitials {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, $login-brand-from 0%, $login-brand-to 100%);
+    color: #ffffff;
+    font-weight: 800;
+    font-size: 24px;
+    letter-spacing: -0.01em;
+  }
+
+  &__selectedName {
+    text-align: center;
+    font-size: 14px;
+    color: var(--color-text, $color-text);
+    font-weight: 600;
+    margin-bottom: $space-5;
+    min-height: 18px;
+    letter-spacing: -0.005em;
+  }
+
+  // === Users section header ===
+  &__usersHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: $space-2;
+  }
+
+  &__usersTitle {
+    font-size: 11px;
+    color: var(--color-text-muted, $color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 700;
+  }
+
+  &__usersCount {
+    font-size: 11px;
+    color: var(--color-text-subtle, $color-text-subtle);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__search {
+    position: relative;
+    margin-bottom: $space-3;
+  }
+
+  &__searchIcon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-text-subtle, $color-text-subtle);
+    pointer-events: none;
+    display: grid;
+    place-items: center;
+
+    svg {
+      width: 15px;
+      height: 15px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  }
+
+  &__searchInput {
+    width: 100%;
+    background: var(--color-bg-2, $color-bg-2);
+    border: 1px solid var(--color-stroke, $color-stroke);
+    border-radius: 10px;
+    color: var(--color-text, $color-text);
+    padding: 10px 12px 10px 36px;
+    outline: none;
+    font-size: 13.5px;
+    font-family: inherit;
+    box-sizing: border-box;
+    transition: border-color 0.15s ease, background 0.15s ease;
+
+    &::placeholder {
+      color: var(--color-text-subtle, $color-text-subtle);
+    }
+
+    &:hover {
+      border-color: var(--color-stroke-strong, $color-stroke-strong);
+    }
+
+    &:focus {
+      border-color: rgba(56, 189, 248, 0.55);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.14);
+    }
+  }
+
+  // === User LIST (no avatars, just a small dot) ===
+  // Estilo "lista de contactos" — más limpio, menos invasivo que un grid de tarjetas.
+  // Limitado a 2 filas visibles; el resto se accede con scroll vertical.
+  &__usersGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 100px; // ≈ 2 filas: padding 8px × 2 + contenido 24px × 2 + gap 4px
+    overflow-y: auto;
+    padding: 4px 0 6px;
+    margin-bottom: $space-5;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(56, 189, 248, 0.4) transparent;
+
+    &::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: rgba(56, 189, 248, 0.4);
+      border-radius: 999px;
+    }
+  }
+
+  &__usersEmpty {
+    text-align: center;
+    color: var(--color-text-muted, $color-text-muted);
+    font-size: 13px;
+    padding: 20px 8px;
+  }
+
+  &__userCard {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--color-text, $color-text);
+    text-align: left;
+    width: 100%;
+    transition: background 0.12s ease, border-color 0.12s ease;
+
+    &:hover {
+      background: var(--color-surface-hover, $color-surface-hover);
+    }
+
+    &.is-selected {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(56, 189, 248, 0.06));
+      border-color: rgba(56, 189, 248, 0.45);
+
+      .login-page__userCardDot {
+        background: linear-gradient(135deg, $login-brand-from 0%, $login-brand-to 100%);
+        color: #ffffff;
+      }
+
+      .login-page__userCardUser {
+        color: $login-brand-from;
+      }
+    }
+  }
+
+  // Pequeño dot circular con la inicial (NO avatar grande)
+  &__userCardDot {
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: var(--color-bg-elevated, $color-bg-elevated);
+    border: 1px solid var(--color-stroke, $color-stroke);
+    color: var(--color-text-muted, $color-text-muted);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: -0.01em;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    transition: background 0.15s ease, color 0.15s ease;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+  }
+
+  &__userCardBody {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  &__userCardName {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--color-text, $color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__userCardUser {
+    font-size: 11px;
+    color: var(--color-text-muted, $color-text-muted);
+    font-family: $font-mono;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color 0.15s ease;
+  }
+
+  // === Form ===
   &__form {
     display: flex;
     flex-direction: column;
     gap: $space-4;
+  }
+
+  // Override del Input global para tema y tamaño
+  .field {
+    margin: 0;
+
+    .field__label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--color-text-muted, $color-text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .input {
+      background: var(--color-bg-2, $color-bg-2);
+      border: 1px solid var(--color-stroke, $color-stroke);
+      color: var(--color-text, $color-text);
+      font-size: 15px;
+      min-height: 44px;
+      padding: $space-3 44px $space-3 $space-4;
+
+      &::placeholder {
+        color: var(--color-text-subtle, $color-text-subtle);
+      }
+
+      &:hover {
+        border-color: var(--color-stroke-strong, $color-stroke-strong);
+      }
+
+      &:focus {
+        outline: none;
+        border-color: rgba(56, 189, 248, 0.55);
+        box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.14);
+      }
+    }
+
+    .field__error {
+      color: #ef4444;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+  }
+
+  &__passwordField {
+    position: relative;
+  }
+
+  &__togglePass {
+    position: absolute;
+    right: 6px;
+    bottom: 8px;
+    background: transparent;
+    border: 0;
+    padding: 8px;
+    color: var(--color-text-muted, $color-text-muted);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    transition: color 0.12s ease, background 0.12s ease;
+
+    &:hover {
+      color: $login-brand-from;
+      background: rgba(56, 189, 248, 0.1);
+    }
+
+    svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .login-page__iconEyeOff {
+      display: none;
+    }
+
+    &.is-showing .login-page__iconEye {
+      display: none;
+    }
+    &.is-showing .login-page__iconEyeOff {
+      display: block;
+    }
+  }
+
+  // === Override primary button for the login context ===
+  .btn.btn--primary,
+  button[type='submit'].btn {
+    background: linear-gradient(135deg, $login-brand-from 0%, $login-brand-to 100%);
+    color: #ffffff;
+    border: 0;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.12) inset,
+      0 8px 24px rgba(56, 189, 248, 0.28);
+    transition: transform 0.12s ease, box-shadow 0.15s ease, filter 0.15s ease;
+
+    &:hover:not(:disabled) {
+      background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
+      box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.18) inset,
+        0 10px 30px rgba(56, 189, 248, 0.4);
+      transform: translateY(-1px);
+    }
+
+    &:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    &:disabled {
+      background: var(--color-stroke, $color-stroke);
+      color: var(--color-text-subtle, $color-text-subtle);
+      box-shadow: none;
+      filter: none;
+      cursor: not-allowed;
+    }
+  }
+}
+
+// === Light mode: suavizar glow del brand ===
+[data-theme='light'] .login-page {
+  background:
+    radial-gradient(900px 580px at 8% 8%, rgba(56, 189, 248, 0.06), transparent 55%),
+    radial-gradient(800px 540px at 92% 92%, rgba(129, 140, 248, 0.05), transparent 55%),
+    var(--color-bg-elevated, #f5f5f7);
+
+  &__panel {
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.5) inset,
+      0 12px 32px rgba(15, 23, 42, 0.08),
+      0 2px 6px rgba(15, 23, 42, 0.04);
+  }
+
+  &__avatarWrap {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.08), rgba(129, 140, 248, 0.08));
   }
 }
 
