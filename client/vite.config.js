@@ -24,6 +24,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      'canvg': path.resolve(__dirname, './src/utils/empty.js'),
+      'html2canvas': path.resolve(__dirname, './src/utils/empty.js'),
+      'dompurify': path.resolve(__dirname, './src/utils/empty.js'),
+      'fflate': path.resolve(__dirname, './src/utils/empty.js'),
     },
   },
   // Pre-bundle React + Router together so the dep optimizer produces a single
@@ -64,14 +68,7 @@ export default defineConfig({
       },
     },
   },
-  build: {
-    rollupOptions: {
-      external: ['canvg', 'html2canvas', 'dompurify', 'fflate'],
-    },
-    rolldownOptions: {
-      external: ['canvg', 'html2canvas', 'dompurify', 'fflate'],
-    }
-  },
+
   css: {
     preprocessorOptions: {
       scss: {
