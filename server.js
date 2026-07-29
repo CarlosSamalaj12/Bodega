@@ -4724,7 +4724,9 @@ app.post("/api/salidas", auth, requirePermission("action.create_update", "regist
     for (const ln of lines) {
       const id_producto = Number(ln.id_producto || 0);
       const qtyRequested = Number(ln.cantidad || ln.qty || 0);
-      const precioSalida = Number(ln.precio_salida || 0);
+      // Aceptar tanto `precio_salida` (forma correcta) como `precio` (legacy)
+      // para mantener compatibilidad con clientes que aún mandan el nombre viejo.
+      const precioSalida = Number(ln.precio_salida || ln.precio || 0);
       if (!id_producto || qtyRequested <= 0) continue;
       if (requierePrecioSalida && precioSalida <= 0) {
         await conn.rollback();
@@ -7388,7 +7390,10 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
                 md.lote,
                 md.cantidad,
                 md.costo_unitario,
-                (md.cantidad * md.costo_unitario) AS total_linea
+                md.precio_salida,
+                -- Si el usuario capturó precio de salida, ese manda; si no, se
+                -- usa el costo histórico (última entrada) como antes.
+                (md.cantidad * COALESCE(md.precio_salida, md.costo_unitario)) AS total_linea
          FROM movimiento_encabezado me
          JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
          LEFT JOIN bodegas bo ON bo.id_bodega=me.id_bodega_origen

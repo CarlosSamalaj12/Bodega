@@ -5,20 +5,17 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
-import { DataList } from '@/components/ui/DataList';
-import { SearchInput } from '@/components/ui/SearchInput';
 import { toast } from '@/components/ui/Toast';
 import { useAuthStore } from '@/stores/auth.store';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { useDebounce } from '@/hooks/useDebounce';
 import { catalogosService } from '@/services/catalogos.service';
 import { salidasService } from '@/services/salidas.service';
 import { SalidaForm } from '@/components/salidas/SalidaForm';
 import { MovimientoDetailModal } from '@/components/shared/MovimientoDetailModal';
+import { MovimientosListTable } from '@/components/shared/MovimientosListTable';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { PinModal } from '@/components/ui/PinModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
-import { formatDate } from '@/utils/format';
 import './SalidasPage.scss';
 
 export default function SalidasPage() {
@@ -36,15 +33,12 @@ export default function SalidasPage() {
   const [catalogError, setCatalogError] = useState(null);
   const [loadingCatalogs, setLoadingCatalogs] = useState(true);
 
-  const [salidas, setSalidas] = useState([]);
-  const [loadingSalidas, setLoadingSalidas] = useState(true);
-  const [search, setSearch] = useState('');
   const [detailId, setDetailId] = useState(null);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   const [revertPinOpen, setRevertPinOpen] = useState(false);
   const [revertingId, setRevertingId] = useState(null);
   const [showAnulados, setShowAnulados] = useState(false);
-  const debouncedSearch = useDebounce(search, 250);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Leer ?open=ID de la URL para abrir detalle automáticamente
   useEffect(() => {
@@ -78,30 +72,16 @@ export default function SalidasPage() {
     }
   }, [user]);
 
-  const loadSalidas = useCallback(async () => {
-    setLoadingSalidas(true);
-    try {
-      const data = await salidasService.list();
-      setSalidas(Array.isArray(data) ? data : []);
-    } catch (e) {
-      toast.error(e?.response?.data?.error || 'No se pudieron cargar las salidas');
-    } finally {
-      setLoadingSalidas(false);
-    }
-  }, []);
-
   useEffect(() => {
     loadCatalogs();
-    loadSalidas();
-  }, [loadCatalogs, loadSalidas]);
+  }, [loadCatalogs]);
 
   const handleCreated = () => {
     setModalOpen(false);
-    loadSalidas();
+    setReloadKey((k) => k + 1);
   };
 
-  const handleRevertClick = (e, id) => {
-    e.stopPropagation();
+  const handleRevertClick = (id) => {
     setRevertingId(Number(id));
     setRevertPinOpen(true);
   };
@@ -113,7 +93,7 @@ export default function SalidasPage() {
       toast.success(`Salida #${revertingId} revertida correctamente`);
       setRevertPinOpen(false);
       setRevertingId(null);
-      loadSalidas();
+      setReloadKey((k) => k + 1);
     } catch (e) {
       const msg = e?.response?.data?.error || 'No se pudo revertir la salida';
       toast.error(msg);
@@ -122,120 +102,10 @@ export default function SalidasPage() {
     }
   };
 
-  const filtered = useMemo(() => {
-    let result = salidas;
-    if (!showAnulados) {
-      result = result.filter((s) => String(s.estado || '').toUpperCase() !== 'ANULADO');
-    }
-    if (!debouncedSearch) return result;
-    const q = debouncedSearch.toLowerCase();
-    return result.filter((s) => {
-      const doc = String(s.no_documento || '').toLowerCase();
-      const motivo = String(s.nombre_motivo || '').toLowerCase();
-      const usuario = String(s.usuario_creador || '').toLowerCase();
-      const bodega2 = String(s.bodega || '').toLowerCase();
-      const obs = String(s.observaciones || '').toLowerCase();
-      const id = String(s.id_movimiento || '');
-      return (
-        id.includes(q) || doc.includes(q) || motivo.includes(q) ||
-        usuario.includes(q) || bodega2.includes(q) || obs.includes(q)
-      );
-    });
-  }, [salidas, debouncedSearch, showAnulados]);
-
   const bodegaNombre = useMemo(
     () => bodega?.nombre_bodega || user?.bodega_nombre || 'Bodega del usuario',
     [bodega, user]
   );
-
-  const columns = useMemo(() => [
-    {
-      key: 'id_movimiento',
-      label: '#',
-      width: 60,
-      primary: true,
-      render: (s) => <code>#{s.id_movimiento}</code>,
-    },
-    {
-      key: 'fecha',
-      label: 'Fecha',
-      width: 100,
-      render: (s) => <span className="salidas-page__date">{formatDate(s.fecha)}</span>,
-    },
-    {
-      key: 'nombre_motivo',
-      label: 'Motivo',
-      width: 160,
-      render: (s) => (
-        <div className="salidas-page__cell-with-obs">
-          <span>{s.nombre_motivo || '—'}</span>
-          {s.observaciones && (
-            <span className="salidas-page__obs-preview" title={s.observaciones}>
-              {s.observaciones}
-            </span>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'no_documento',
-      label: 'Documento',
-      width: 110,
-      render: (s) => s.no_documento || '—',
-    },
-    {
-      key: 'total_cantidad',
-      label: 'Unidades',
-      width: 90,
-      align: 'right',
-      render: (s) => String(s.total_cantidad ?? '—'),
-    },
-    {
-      key: 'total_costo',
-      label: 'Total',
-      width: 110,
-      align: 'right',
-      render: (s) => {
-        const total = Number(s.total_costo || 0);
-        return <span className="salidas-page__total">{total.toFixed(2)}</span>;
-      },
-    },
-    {
-      key: 'estado',
-      label: 'Estado',
-      width: 90,
-      render: (s) => {
-        const isAnulado = String(s.estado || '').toUpperCase() === 'ANULADO';
-        if (isAnulado) {
-          const anuladoPor = s.anulado_por_usuario || '';
-          const anuladoEn = s.anulado_en ? formatDate(s.anulado_en) : '';
-          const tooltip = [anuladoPor && `Por: ${anuladoPor}`, anuladoEn && `Fecha: ${anuladoEn}`].filter(Boolean).join(' | ');
-          return <span className="salidas-page__anulado" title={tooltip || undefined}>Anulado</span>;
-        }
-        return null;
-      },
-    },
-    {
-      key: '__acciones',
-      label: '',
-      width: 80,
-      align: 'right',
-      render: (s) => {
-        const isAnulado = String(s.estado || '').toUpperCase() === 'ANULADO';
-        if (isAnulado) return null;
-        return (
-          <Button
-            size="sm"
-            variant="subtle"
-            onClick={(ev) => handleRevertClick(ev, s.id_movimiento)}
-            title="Revertir salida"
-          >
-            ↩
-          </Button>
-        );
-      },
-    },
-  ], []);
 
   const exportColumns = [
     { key: 'id_movimiento', label: '#' },
@@ -254,14 +124,9 @@ export default function SalidasPage() {
     <>
       <Header
         title="Salidas"
-        subtitle={`${filtered.length} salida${filtered.length === 1 ? '' : 's'}`}
+        subtitle="Salidas recientes de la bodega"
         actions={
           <div className="salidas-page__header-actions">
-            {filtered.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-                Exportar CSV
-              </Button>
-            )}
             {canCreate && (
               <Button size={isMobile ? 'sm' : 'md'} onClick={() => setModalOpen(true)}>
                 + Nueva salida
@@ -272,34 +137,17 @@ export default function SalidasPage() {
       />
 
       <div className="salidas-page">
-        <Card compact>
-          <div className="salidas-page__search-row">
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Buscar por #, documento, motivo, usuario…"
-            />
-            <button
-              className={`salidas-page__chip ${showAnulados ? 'salidas-page__chip--active' : ''}`}
-              onClick={() => setShowAnulados((v) => !v)}
-              title={showAnulados ? 'Ocultar anulados' : 'Mostrar anulados'}
-            >
-              {showAnulados ? '✓' : ''} Anulados
-            </button>
-          </div>
-        </Card>
-
-        <DataList
-          columns={columns}
-          rows={filtered}
-          loading={loadingSalidas}
-          keyField="id_movimiento"
-          onRowClick={(s) => setDetailId(Number(s.id_movimiento))}
-          rowClass={(r) => String(r.estado || '').toUpperCase() === 'ANULADO' ? 'table__row--anulado' : ''}
-          emptyTitle={search ? 'Sin resultados' : 'Sin salidas'}
-          emptyMessage={search ? 'Intenta con otros términos.' : 'Cuando registres una salida aparecerá aquí.'}
+        <MovimientosListTable
+          service={salidasService}
+          tipoLabel="SALIDA"
+          emptyTitle="Sin salidas"
+          emptyMessage="Cuando registres una salida aparecerá aquí."
           emptyIcon="⇡"
-          emptyAction={!search && canCreate ? <Button onClick={() => setModalOpen(true)}>Registrar primera salida</Button> : null}
+          reloadKey={reloadKey}
+          showAnulados={showAnulados}
+          onToggleAnulados={() => setShowAnulados((v) => !v)}
+          onRowDetail={(id) => setDetailId(Number(id))}
+          onRevertClick={handleRevertClick}
         />
 
         <Card
@@ -321,6 +169,12 @@ export default function SalidasPage() {
             <strong>{bodegaNombre}</strong>
           </p>
         </Card>
+
+        <div className="salidas-page__footer-actions">
+          <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
+            Exportar (resumen)
+          </Button>
+        </div>
       </div>
 
       <MovimientoDetailModal
@@ -347,17 +201,19 @@ export default function SalidasPage() {
         storageKey="export-columns-salidas"
         onConfirm={(cols, format) => {
           const fn = { csv: downloadCSV, xlsx: downloadXLSX, pdf: downloadPDF }[format] || downloadCSV;
-          fn(filtered, {
-            filename: `salidas_${new Date().toISOString().slice(0, 10)}`,
-            columns: cols,
-            format: (row, col) => {
-              if (col.key === 'fecha' && row.fecha) {
-                const d = new Date(row.fecha);
-                return d.toLocaleString();
-              }
-              return row[col.key];
-            },
-          });
+          salidasService.list({ limit: 500 }).then((rows) => {
+            fn(rows || [], {
+              filename: `salidas_${new Date().toISOString().slice(0, 10)}`,
+              columns: cols,
+              format: (row, col) => {
+                if (col.key === 'fecha' && row.fecha) {
+                  const d = new Date(row.fecha);
+                  return d.toLocaleString();
+                }
+                return row[col.key];
+              },
+            });
+          }).catch(() => toast.error('No se pudo exportar'));
           setShowColumnSelector(false);
         }}
       />

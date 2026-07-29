@@ -5,20 +5,17 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
-import { DataList } from '@/components/ui/DataList';
-import { SearchInput } from '@/components/ui/SearchInput';
 import { toast } from '@/components/ui/Toast';
 import { useAuthStore } from '@/stores/auth.store';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { useDebounce } from '@/hooks/useDebounce';
 import { catalogosService } from '@/services/catalogos.service';
 import { entradasService } from '@/services/entradas.service';
 import { EntradaForm } from '@/components/entradas/EntradaForm';
 import { MovimientoDetailModal } from '@/components/shared/MovimientoDetailModal';
+import { MovimientosListTable } from '@/components/shared/MovimientosListTable';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { PinModal } from '@/components/ui/PinModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
-import { formatDate } from '@/utils/format';
 import './EntradasPage.scss';
 
 export default function EntradasPage() {
@@ -37,15 +34,13 @@ export default function EntradasPage() {
   const [catalogError, setCatalogError] = useState(null);
   const [loadingCatalogs, setLoadingCatalogs] = useState(true);
 
-  const [entradas, setEntradas] = useState([]);
-  const [loadingEntradas, setLoadingEntradas] = useState(true);
-  const [search, setSearch] = useState('');
   const [detailId, setDetailId] = useState(null);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   const [revertPinOpen, setRevertPinOpen] = useState(false);
   const [revertingId, setRevertingId] = useState(null);
   const [showAnulados, setShowAnulados] = useState(false);
-  const debouncedSearch = useDebounce(search, 250);
+  // reloadKey cambia después de crear/revertir para que la tabla vuelva a fetchear
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Leer ?open=ID de la URL para abrir detalle automáticamente
   useEffect(() => {
@@ -81,30 +76,16 @@ export default function EntradasPage() {
     }
   }, [user]);
 
-  const loadEntradas = useCallback(async () => {
-    setLoadingEntradas(true);
-    try {
-      const data = await entradasService.list();
-      setEntradas(Array.isArray(data) ? data : []);
-    } catch (e) {
-      toast.error(e?.response?.data?.error || 'No se pudieron cargar las entradas');
-    } finally {
-      setLoadingEntradas(false);
-    }
-  }, []);
-
   useEffect(() => {
     loadCatalogs();
-    loadEntradas();
-  }, [loadCatalogs, loadEntradas]);
+  }, [loadCatalogs]);
 
   const handleCreated = () => {
     setModalOpen(false);
-    loadEntradas();
+    setReloadKey((k) => k + 1);
   };
 
-  const handleRevertClick = (e, id) => {
-    e.stopPropagation();
+  const handleRevertClick = (id) => {
     setRevertingId(Number(id));
     setRevertPinOpen(true);
   };
@@ -116,7 +97,7 @@ export default function EntradasPage() {
       toast.success(`Entrada #${revertingId} revertida correctamente`);
       setRevertPinOpen(false);
       setRevertingId(null);
-      loadEntradas();
+      setReloadKey((k) => k + 1);
     } catch (e) {
       const msg = e?.response?.data?.error || 'No se pudo revertir la entrada';
       toast.error(msg);
@@ -125,120 +106,10 @@ export default function EntradasPage() {
     }
   };
 
-  const filtered = useMemo(() => {
-    let result = entradas;
-    if (!showAnulados) {
-      result = result.filter((e) => String(e.estado || '').toUpperCase() !== 'ANULADO');
-    }
-    if (!debouncedSearch) return result;
-    const q = debouncedSearch.toLowerCase();
-    return result.filter((e) => {
-      const doc = String(e.no_documento || '').toLowerCase();
-      const motivo = String(e.nombre_motivo || '').toLowerCase();
-      const usuario = String(e.usuario_creador || '').toLowerCase();
-      const bodega2 = String(e.bodega || '').toLowerCase();
-      const obs = String(e.observaciones || '').toLowerCase();
-      const id = String(e.id_movimiento || '');
-      return (
-        id.includes(q) || doc.includes(q) || motivo.includes(q) ||
-        usuario.includes(q) || bodega2.includes(q) || obs.includes(q)
-      );
-    });
-  }, [entradas, debouncedSearch, showAnulados]);
-
   const bodegaNombre = useMemo(
     () => bodega?.nombre_bodega || user?.bodega_nombre || 'Bodega del usuario',
     [bodega, user]
   );
-
-  const columns = useMemo(() => [
-    {
-      key: 'id_movimiento',
-      label: '#',
-      width: 60,
-      primary: true,
-      render: (e) => <code>#{e.id_movimiento}</code>,
-    },
-    {
-      key: 'fecha',
-      label: 'Fecha',
-      width: 100,
-      render: (e) => <span className="entradas-page__date">{formatDate(e.fecha)}</span>,
-    },
-    {
-      key: 'nombre_motivo',
-      label: 'Motivo',
-      width: 160,
-      render: (e) => (
-        <div className="entradas-page__cell-with-obs">
-          <span>{e.nombre_motivo || '—'}</span>
-          {e.observaciones && (
-            <span className="entradas-page__obs-preview" title={e.observaciones}>
-              {e.observaciones}
-            </span>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'no_documento',
-      label: 'Documento',
-      width: 110,
-      render: (e) => e.no_documento || '—',
-    },
-    {
-      key: 'total_cantidad',
-      label: 'Unidades',
-      width: 90,
-      align: 'right',
-      render: (e) => String(e.total_cantidad ?? '—'),
-    },
-    {
-      key: 'total_costo',
-      label: 'Total',
-      width: 110,
-      align: 'right',
-      render: (e) => {
-        const total = Number(e.total_costo || 0);
-        return <span className="entradas-page__total">{total.toFixed(2)}</span>;
-      },
-    },
-    {
-      key: 'estado',
-      label: 'Estado',
-      width: 90,
-      render: (e) => {
-        const isAnulado = String(e.estado || '').toUpperCase() === 'ANULADO';
-        if (isAnulado) {
-          const anuladoPor = e.anulado_por_usuario || '';
-          const anuladoEn = e.anulado_en ? formatDate(e.anulado_en) : '';
-          const tooltip = [anuladoPor && `Por: ${anuladoPor}`, anuladoEn && `Fecha: ${anuladoEn}`].filter(Boolean).join(' | ');
-          return <span className="entradas-page__anulado" title={tooltip || undefined}>Anulado</span>;
-        }
-        return null;
-      },
-    },
-    {
-      key: '__acciones',
-      label: '',
-      width: 80,
-      align: 'right',
-      render: (e) => {
-        const isAnulado = String(e.estado || '').toUpperCase() === 'ANULADO';
-        if (isAnulado) return null;
-        return (
-          <Button
-            size="sm"
-            variant="subtle"
-            onClick={(ev) => handleRevertClick(ev, e.id_movimiento)}
-            title="Revertir entrada"
-          >
-            ↩
-          </Button>
-        );
-      },
-    },
-  ], []);
 
   const exportColumns = [
     { key: 'id_movimiento', label: '#' },
@@ -257,14 +128,9 @@ export default function EntradasPage() {
     <>
       <Header
         title="Entradas"
-        subtitle={`${filtered.length} entrada${filtered.length === 1 ? '' : 's'}`}
+        subtitle="Entradas recientes de la bodega"
         actions={
           <div className="entradas-page__header-actions">
-            {filtered.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-                Exportar CSV
-              </Button>
-            )}
             {canCreate && (
               <Button size={isMobile ? 'sm' : 'md'} onClick={() => setModalOpen(true)}>
                 + Nueva entrada
@@ -275,34 +141,17 @@ export default function EntradasPage() {
       />
 
       <div className="entradas-page">
-        <Card compact>
-          <div className="entradas-page__search-row">
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Buscar por #, documento, motivo, usuario…"
-            />
-            <button
-              className={`entradas-page__chip ${showAnulados ? 'entradas-page__chip--active' : ''}`}
-              onClick={() => setShowAnulados((v) => !v)}
-              title={showAnulados ? 'Ocultar anulados' : 'Mostrar anulados'}
-            >
-              {showAnulados ? '✓' : ''} Anulados
-            </button>
-          </div>
-        </Card>
-
-        <DataList
-          columns={columns}
-          rows={filtered}
-          loading={loadingEntradas}
-          keyField="id_movimiento"
-          onRowClick={(e) => setDetailId(Number(e.id_movimiento))}
-          rowClass={(r) => String(r.estado || '').toUpperCase() === 'ANULADO' ? 'table__row--anulado' : ''}
-          emptyTitle={search ? 'Sin resultados' : 'Sin entradas'}
-          emptyMessage={search ? 'Intenta con otros términos.' : 'Cuando registres una entrada aparecerá aquí.'}
+        <MovimientosListTable
+          service={entradasService}
+          tipoLabel="ENTRADA"
+          emptyTitle="Sin entradas"
+          emptyMessage="Cuando registres una entrada aparecerá aquí."
           emptyIcon="⇣"
-          emptyAction={!search && canCreate ? <Button onClick={() => setModalOpen(true)}>Registrar primera entrada</Button> : null}
+          reloadKey={reloadKey}
+          showAnulados={showAnulados}
+          onToggleAnulados={() => setShowAnulados((v) => !v)}
+          onRowDetail={(id) => setDetailId(Number(id))}
+          onRevertClick={handleRevertClick}
         />
 
         <Card
@@ -325,6 +174,12 @@ export default function EntradasPage() {
             <strong>{bodegaNombre}</strong>
           </p>
         </Card>
+
+        <div className="entradas-page__footer-actions">
+          <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
+            Exportar (resumen)
+          </Button>
+        </div>
       </div>
 
       <MovimientoDetailModal
@@ -351,17 +206,25 @@ export default function EntradasPage() {
         storageKey="export-columns-entradas"
         onConfirm={(cols, format) => {
           const fn = { csv: downloadCSV, xlsx: downloadXLSX, pdf: downloadPDF }[format] || downloadCSV;
-          fn(filtered, {
-            filename: `entradas_${new Date().toISOString().slice(0, 10)}`,
-            columns: cols,
-            format: (row, col) => {
-              if (col.key === 'fecha' && row.fecha) {
-                const d = new Date(row.fecha);
-                return d.toLocaleString();
-              }
-              return row[col.key];
-            },
-          });
+          // Para exportación usamos los datos del reporte plano: la tabla ya los
+          // tiene cargados, pero por simplicidad volvemos a fetchear.
+          entradasService.list({ limit: 500 }).then((rows) => {
+            const flat = [];
+            for (const m of rows || []) {
+              flat.push(m);
+            }
+            fn(flat, {
+              filename: `entradas_${new Date().toISOString().slice(0, 10)}`,
+              columns: cols,
+              format: (row, col) => {
+                if (col.key === 'fecha' && row.fecha) {
+                  const d = new Date(row.fecha);
+                  return d.toLocaleString();
+                }
+                return row[col.key];
+              },
+            });
+          }).catch(() => toast.error('No se pudo exportar'));
           setShowColumnSelector(false);
         }}
       />

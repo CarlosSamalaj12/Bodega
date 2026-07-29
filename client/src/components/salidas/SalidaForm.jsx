@@ -16,7 +16,8 @@ const EMPTY_LINE = {
   sku: null,
   cantidad: '',
   precio: '',
-  lote: '',
+  // El lote se asigna automáticamente con FEFO (First-Expiry, First-Out)
+  // en el backend. No se pide al usuario.
 };
 
 export function SalidaForm({
@@ -74,8 +75,9 @@ export function SalidaForm({
         .map((l) => ({
           id_producto: l.id_producto,
           cantidad: Number(l.cantidad),
-          precio: Number(l.precio) || 0,
-          lote: l.lote.trim() || null,
+          // El backend distingue costo_unitario (autocalculado) de
+          // precio_salida (lo que pone el usuario al despachar).
+          precio_salida: Number(l.precio) || 0,
         })),
     };
 
@@ -133,7 +135,7 @@ export function SalidaForm({
     },
     {
       key: 'precio',
-      label: 'Costo unit.',
+      label: 'Precio de salida',
       width: 120,
       render: (l, idx) => (
         <input
@@ -144,21 +146,7 @@ export function SalidaForm({
           value={l.precio}
           onChange={(e) => setLine(idx, { precio: e.target.value })}
           placeholder="0.00"
-        />
-      ),
-    },
-    {
-      key: 'lote',
-      label: 'Lote',
-      width: 120,
-      mobileFullWidth: true,
-      render: (l, idx) => (
-        <input
-          type="text"
-          className="input salida-form__text"
-          value={l.lote}
-          onChange={(e) => setLine(idx, { lote: e.target.value })}
-          placeholder="Lote"
+          title="Precio unitario al que se registra la salida. Si la bodega lo requiere, es obligatorio."
         />
       ),
     },
@@ -214,6 +202,11 @@ export function SalidaForm({
             <strong>{bodegaNombre}</strong>
           </div>
         )}
+
+        <p className="salida-form__hint">
+          ℹ️ El lote se asigna automáticamente del más antiguo disponible (FEFO).
+          Al expandir el movimiento en la lista verás qué lote se usó en cada línea.
+        </p>
       </div>
 
       <div className="salida-form__section">

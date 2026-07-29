@@ -2,6 +2,7 @@ import api from './api';
 
 /**
  * Agrupa líneas del reporte por id_movimiento y devuelve resúmenes.
+ * Conserva el array de líneas para que el cliente pueda renderizarlas.
  */
 function agruparMovimientos(rows) {
   const map = new Map();
@@ -12,23 +13,37 @@ function agruparMovimientos(rows) {
       map.set(id, {
         id_movimiento: id,
         fecha: r.creado_en || r.fecha,
+        hora: r.hora,
+        nombre_bodega: r.nombre_bodega,
+        nombre_motivo: r.nombre_motivo,
+        no_documento: r.no_documento,
+        usuario_creador: r.usuario_creador,
+        observaciones: r.observaciones,
+        estado: r.estado,
+        anulado_por: r.anulado_por,
+        anulado_en: r.anulado_en,
+        anulado_por_usuario: r.anulado_por_usuario,
         tipo: r.tipo_salida || r.tipo_movimiento || 'SALIDA',
-        no_documento: r.no_documento || null,
-        observaciones: r.observaciones || null,
-        estado: r.estado || null,
-        anulado_por: r.anulado_por || null,
-        anulado_en: r.anulado_en || null,
-        anulado_por_usuario: r.anulado_por_usuario || null,
-        nombre_motivo: r.nombre_motivo || '—',
-        id_motivo: r.id_motivo,
-        usuario_creador: r.usuario_creador || '—',
-        bodega: r.nombre_bodega || '—',
+        lineas: [],
         total_lineas: 0,
         total_cantidad: 0,
         total_costo: 0,
       });
     }
     const m = map.get(id);
+    m.lineas.push({
+      id_detalle: r.id_detalle,
+      id_producto: r.id_producto,
+      nombre_producto: r.nombre_producto,
+      sku: r.sku,
+      nombre_categoria: r.nombre_categoria,
+      nombre_subcategoria: r.nombre_subcategoria,
+      lote: r.lote,
+      fecha_vencimiento: r.fecha_vencimiento,
+      cantidad: Number(r.cantidad || 0),
+      costo_unitario: Number(r.costo_unitario || 0),
+      total_linea: Number(r.total_linea || 0),
+    });
     m.total_lineas += 1;
     m.total_cantidad += Number(r.cantidad || 0);
     m.total_costo += Number(r.total_linea || 0);
@@ -40,29 +55,32 @@ function agruparMovimientos(rows) {
 
 export const salidasService = {
   /**
-   * Listar salidas (resumen por movimiento).
-   * @param {object} opts - { q, lote, documento, from, to, categoria, subcategoria, motivo, limit }
+   * Listar salidas como filas planas (una por línea de detalle).
    */
   async list(opts = {}) {
     const { data } = await api.get('/api/reportes/salidas', {
-      params: { limit: 100, ...opts },
+      params: { limit: 500, ...opts },
     });
-    const rows = Array.isArray(data) ? data : (data?.rows || []);
+    return Array.isArray(data) ? data : (data?.rows || []);
+  },
+
+  /**
+   * Listar salidas agrupadas por movimiento (con líneas).
+   */
+  async listAgrupado(opts = {}) {
+    const rows = await this.list(opts);
     return agruparMovimientos(rows);
   },
 
   /**
    * Obtener detalle completo de una salida (con líneas).
-   * Carga el reporte y filtra por id_movimiento en cliente.
    */
   async getDetail(id) {
-    const { data } = await api.get('/api/reportes/salidas', {
-      params: { limit: 500 },
-    });
-    const rows = Array.isArray(data) ? data : (data?.rows || []);
+    const rows = await this.list({});
     const lines = (rows || []).filter((r) => Number(r.id_movimiento) === Number(id));
     if (!lines.length) {
-      return agruparMovimientos(rows).find((m) => m.id_movimiento === Number(id)) || null;
+      const grouped = agruparMovimientos(rows);
+      return grouped.find((m) => m.id_movimiento === Number(id)) || null;
     }
     const first = lines[0];
     return {

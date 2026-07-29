@@ -39,8 +39,10 @@ export default function HomePage() {
     try {
       const [dash, entradas, salidas, pedidos] = await Promise.all([
         dashboardService.resumen({ days: d, mov_days: d }),
-        entradasService.list({ limit: 5 }),
-        salidasService.list({ limit: 5 }),
+        // listAgrupado devuelve objetos con id_movimiento, total_cantidad, total_costo
+        // (necesario para mostrar el resumen en la Home).
+        entradasService.listAgrupado({ limit: 100 }),
+        salidasService.listAgrupado({ limit: 100 }),
         pedidosService.list({ scope: 'dispatch' }),
       ]);
 
