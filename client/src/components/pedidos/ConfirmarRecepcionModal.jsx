@@ -153,7 +153,11 @@ export function ConfirmarRecepcionModal({ open, pedido, onClose, onConfirmed }) 
         <div className="confirmar-recepcion__pinBox">
           <Input
             label={`PIN de pedidos de ${pedido.requester_name || 'el solicitante'}`}
-            type="password"
+            type="text"
+            style={{ WebkitTextSecurity: 'disc' }}
+            autoComplete="new-password"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={pin}
             onChange={(e) => {
               setPin(e.target.value.replace(/\D/g, ''));
@@ -163,7 +167,6 @@ export function ConfirmarRecepcionModal({ open, pedido, onClose, onConfirmed }) 
             error={error || undefined}
             autoFocus
             disabled={submitting}
-            inputMode="numeric"
           />
         </div>
 

@@ -173,7 +173,11 @@ export function PedidoForm({
           />
           <Input
             label="PIN de pedidos"
-            type="password"
+            type="text"
+            style={{ WebkitTextSecurity: 'disc' }}
+            autoComplete="new-password"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={cabecera.requester_pin}
             onChange={(e) => setCab('requester_pin', e.target.value.replace(/\D/g, ''))}
             placeholder="6-12 dígitos"

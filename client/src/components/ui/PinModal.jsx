@@ -57,7 +57,11 @@ export function PinModal({ open, title, description, submitting, onConfirm, onCa
           {description && <p className="pin-modal__desc">{description}</p>}
           <Input
             label="PIN de supervisor"
-            type="password"
+            type="text"
+            style={{ WebkitTextSecurity: 'disc' }}
+            autoComplete="new-password"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={pin}
             onChange={(e) => {
               setPin(e.target.value.replace(/\D/g, ''));
