@@ -5398,6 +5398,63 @@ const [rows] = await pool.query(
   });
 });
 
+// ── Stock de un producto en la bodega del usuario (para mostrar en formularios) ──
+app.get("/api/existencias/producto/:id/stock", auth, async (req, res) => {
+  const scope = await resolveStockScope(req.user);
+  if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
+  if (!scope.can_view_existencias && !scope.can_all_bodegas && !scope.maneja_stock) {
+    return res.status(403).json({ error: "Sin acceso a existencias" });
+  }
+
+  const id_producto = Number(req.params.id);
+  if (!id_producto) return res.status(400).json({ error: "ID de producto inválido" });
+
+  const id_bodega = scope.can_all_bodegas
+    ? (Number(req.query.bodega) || scope.id_bodega)
+    : scope.id_bodega;
+
+  const [rows] = await pool.query(
+    `SELECT
+       COALESCE(SUM(v.stock), 0) AS stock_total,
+       COUNT(DISTINCT v.lote) AS lotes
+     FROM v_stock_por_lote v
+     WHERE v.id_producto = ?
+       AND v.id_bodega = ?
+       AND v.stock > 0`,
+    [id_producto, id_bodega]
+  );
+
+  const [limiteRows] = await pool.query(
+    `SELECT COALESCE(l.minimo, 0) AS minimo, COALESCE(l.maximo, 0) AS maximo
+     FROM limites_producto_bodega l
+     WHERE l.id_producto = ? AND l.id_bodega = ?
+       AND l.activo = 1`,
+    [id_producto, id_bodega]
+  );
+
+  // Último precio de entrada (referencia visual para el usuario)
+  const [precioRows] = await pool.query(
+    `SELECT md.costo_unitario
+     FROM movimiento_detalle md
+     JOIN movimiento_encabezado me ON me.id_movimiento = md.id_movimiento
+     JOIN motivos_movimiento mot ON mot.id_motivo = me.id_motivo
+     WHERE md.id_producto = ?
+       AND mot.tipo_movimiento = 'ENTRADA'
+       AND md.costo_unitario > 0
+     ORDER BY me.creado_en DESC
+     LIMIT 1`,
+    [id_producto]
+  );
+
+  res.json({
+    stock_total: Number(rows[0]?.stock_total || 0),
+    lotes: Number(rows[0]?.lotes || 0),
+    minimo: Number(limiteRows[0]?.minimo || 0),
+    maximo: Number(limiteRows[0]?.maximo || 0),
+    ultimo_precio: Number(precioRows[0]?.costo_unitario || 0),
+  });
+});
+
 app.get("/api/reportes/existencias/alertas", auth, async (req, res) => {
   const scope = await resolveStockScope(req.user);
   if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });

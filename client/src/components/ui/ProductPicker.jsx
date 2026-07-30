@@ -48,6 +48,8 @@ export function ProductPicker({
   onChange,
   placeholder = 'Buscar producto…',
   disabled = false,
+  stockInfo = null, // { stock_total, minimo, maximo }
+  ultimoPrecio = 0, // último precio de entrada (referencia visual)
 }) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -174,29 +176,49 @@ export function ProductPicker({
     return (
       <div className="product-picker product-picker--selected" ref={wrapperRef}>
         <div className="product-picker__chip">
-          <div className="product-picker__chip-icon" aria-hidden="true">◧</div>
-          <div className="product-picker__chip-info">
-            <div className="product-picker__chip-name">{value.nombre_producto}</div>
-            <div className="product-picker__chip-meta">
-              {value.sku && <code className="product-picker__chip-sku">{value.sku}</code>}
-              {value.nombre_categoria && (
-                <span className="product-picker__chip-cat">{value.nombre_categoria}</span>
+          {/* Fila 1: icono + nombre + quitar */}
+          <div className="product-picker__chip-top">
+            <div className="product-picker__chip-icon" aria-hidden="true">◧</div>
+            <div className="product-picker__chip-info">
+              <div className="product-picker__chip-name">{value.nombre_producto}</div>
+              <div className="product-picker__chip-meta">
+                {value.sku && <code className="product-picker__chip-sku">{value.sku}</code>}
+                {value.nombre_categoria && (
+                  <span className="product-picker__chip-cat">{value.nombre_categoria}</span>
+                )}
+                {value.nombre_medida && (
+                  <span className="product-picker__chip-unit">{value.nombre_medida}</span>
+                )}
+              </div>
+            </div>
+            {!disabled && (
+              <button
+                type="button"
+                className="product-picker__chip-remove"
+                onClick={handleClear}
+                aria-label="Cambiar producto"
+                title="Cambiar producto"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Fila 2: badges de stock y precio */}
+          {(stockInfo != null || ultimoPrecio > 0) && (
+            <div className="product-picker__chip-badges">
+              {stockInfo != null && (
+                <span className={`product-picker__chip-stock-value ${stockInfo.stock_total <= 0 ? 'product-picker__chip-stock-value--zero' : stockInfo.minimo > 0 && stockInfo.stock_total < stockInfo.minimo ? 'product-picker__chip-stock-value--low' : ''}`}>
+                  {stockInfo.stock_total <= 0 ? 'Sin stock' : `${stockInfo.stock_total.toFixed(2)} en existencia`}
+                </span>
               )}
-              {value.nombre_medida && (
-                <span className="product-picker__chip-unit">{value.nombre_medida}</span>
+              {ultimoPrecio > 0 && (
+                <span className="product-picker__chip-precio">
+                  <span className="product-picker__chip-precio-label">Últ. precio:</span>
+                  <span className="product-picker__chip-precio-value">Q{ultimoPrecio.toFixed(2)}</span>
+                </span>
               )}
             </div>
-          </div>
-          {!disabled && (
-            <button
-              type="button"
-              className="product-picker__chip-remove"
-              onClick={handleClear}
-              aria-label="Cambiar producto"
-              title="Cambiar producto"
-            >
-              ✕
-            </button>
           )}
         </div>
       </div>
@@ -340,4 +362,6 @@ ProductPicker.propTypes = {
   onChange: PropTypes.func,
   placeholder: PropTypes.string,
   disabled: PropTypes.bool,
+  stockInfo: PropTypes.object,
+  ultimoPrecio: PropTypes.number,
 };

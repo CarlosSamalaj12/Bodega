@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
@@ -9,6 +9,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { PinModal } from '@/components/ui/PinModal';
 import { toast } from '@/components/ui/Toast';
 import { salidasService } from '@/services/salidas.service';
+import { existenciasService } from '@/services/existencias.service';
 import './SalidaForm.scss';
 
 const EMPTY_LINE = {
@@ -36,6 +37,26 @@ export function SalidaForm({
   });
   const [lines, setLines] = useState([{ ...EMPTY_LINE }]);
   const [submitError, setSubmitError] = useState(null);
+  // Stock por índice de línea (para mostrar "X en existencia" en el chip)
+  const [stockMap, setStockMap] = useState({});
+
+  // Fetch stock cuando se selecciona un producto
+  const fetchStock = useCallback(async (lineIdx, idProducto) => {
+    if (!idProducto) {
+      setStockMap((prev) => {
+        const next = { ...prev };
+        delete next[lineIdx];
+        return next;
+      });
+      return;
+    }
+    try {
+      const info = await existenciasService.getStockByProduct(idProducto);
+      setStockMap((prev) => ({ ...prev, [lineIdx]: info }));
+    } catch {
+      // Silencioso — no bloqueamos la selección
+    }
+  }, []);
 
   // PIN de supervisor (cuando el motivo es AJUSTE)
   const [pinRequired, setPinRequired] = useState(false);
@@ -49,6 +70,16 @@ export function SalidaForm({
   const addLine = () => setLines((prev) => [...prev, { ...EMPTY_LINE }]);
   const removeLine = (idx) => {
     setLines((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== idx)));
+    // Reindex stockMap para mantener sincronizados los índices de línea
+    setStockMap((prev) => {
+      const keys = Object.keys(prev).map(Number).sort((a, b) => a - b);
+      const next = {};
+      for (const k of keys) {
+        if (k === idx) continue; // elimina el removido
+        next[k > idx ? k - 1 : k] = prev[k];
+      }
+      return next;
+    });
   };
 
   const totales = useMemo(() => {
@@ -159,12 +190,17 @@ export function SalidaForm({
       render: (l, idx) => (
         <ProductPicker
           value={l.id_producto ? { id_producto: l.id_producto, nombre_producto: l.nombre_producto, sku: l.sku } : null}
-          onChange={(p) => setLine(idx, {
-            id_producto: p?.id_producto || null,
-            nombre_producto: p?.nombre_producto || '',
-            sku: p?.sku || null,
-          })}
+          onChange={(p) => {
+            setLine(idx, {
+              id_producto: p?.id_producto || null,
+              nombre_producto: p?.nombre_producto || '',
+              sku: p?.sku || null,
+            });
+            fetchStock(idx, p?.id_producto || null);
+          }}
           placeholder="Buscar producto…"
+          stockInfo={stockMap[idx] || null}
+          ultimoPrecio={0}
         />
       ),
     },

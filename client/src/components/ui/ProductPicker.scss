@@ -240,12 +240,21 @@
   &--selected {
     .product-picker__chip {
       display: flex;
-      align-items: center;
-      gap: $space-3;
+      flex-direction: column;
+      gap: $space-2;
       padding: $space-3;
       background: $color-surface;
       border: 1px solid $color-stroke;
       border-radius: $radius-md;
+      min-width: 0; // previene overflow horizontal
+    }
+
+    // Fila 1: icono + info + quitar
+    .product-picker__chip-top {
+      display: flex;
+      align-items: flex-start;
+      gap: $space-2;
+      min-width: 0;
     }
 
     .product-picker__chip-icon {
@@ -311,6 +320,55 @@
         background: $color-danger-soft;
         color: $color-danger;
       }
+    }
+
+    // Fila 2: badges
+    .product-picker__chip-badges {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: $space-1;
+    }
+
+    .product-picker__chip-stock-value {
+      font-size: $font-size-xs;
+      font-weight: $font-weight-semibold;
+      color: $color-success;
+      background: $color-success-soft;
+      padding: 2px $space-2;
+      border-radius: $radius-xs;
+      white-space: nowrap;
+
+      &--zero {
+        color: $color-danger;
+        background: $color-danger-soft;
+      }
+
+      &--low {
+        color: $color-warning;
+        background: $color-warning-soft;
+      }
+    }
+
+    .product-picker__chip-precio {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .product-picker__chip-precio-label {
+      font-size: $font-size-xs;
+      color: $color-text-muted;
+    }
+
+    .product-picker__chip-precio-value {
+      font-size: $font-size-xs;
+      font-weight: $font-weight-semibold;
+      color: $color-secondary;
+      background: $color-secondary-soft;
+      padding: 2px $space-2;
+      border-radius: $radius-xs;
+      white-space: nowrap;
     }
   }
 }

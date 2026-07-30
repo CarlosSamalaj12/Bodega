@@ -34,4 +34,16 @@ export const existenciasService = {
     });
     return Array.isArray(data) ? data : [];
   },
+
+  /**
+   * Stock actual de un producto en la bodega del usuario.
+   * @param {number} idProducto
+   * @param {number} [idBodega] - Si no se pasa, usa la bodega del usuario
+   */
+  async getStockByProduct(idProducto, idBodega) {
+    const params = {};
+    if (idBodega) params.bodega = idBodega;
+    const { data } = await api.get(`/api/existencias/producto/${idProducto}/stock`, { params });
+    return data; // { stock_total, lotes, minimo, maximo }
+  },
 };
