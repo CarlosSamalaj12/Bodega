@@ -23,6 +23,7 @@ import { pedidosService } from '@/services/pedidos.service';
 import { getSocket } from '@/services/socket';
 import { DespachoForm } from '@/components/despachos/DespachoForm';
 import { RevertPanel } from '@/components/despachos/RevertPanel';
+import { ConfirmarRecepcionModal } from '@/components/pedidos/ConfirmarRecepcionModal';
 import './DespacharPage.scss';
 
 const ESTADO_LABELS = {
@@ -44,6 +45,20 @@ const STATUS_OPTIONS = [
   { value: 'CANCELADO', label: 'Cancelado', variant: 'danger' },
 ];
 
+// Pedido despachado por completo, de una bodega que exige PIN de recepcion,
+// y aun sin confirmar.
+function needsConfirmation(p) {
+  return (
+    Number(p?.confirmacion_requerida) === 1 &&
+    !p?.confirmado_en &&
+    ['COMPLETADO', 'COMPLETADO_JUSTIFICADO'].includes(String(p?.estado || '').toUpperCase())
+  );
+}
+
+function isReceiptConfirmed(p) {
+  return Number(p?.confirmacion_requerida) === 1 && Boolean(p?.confirmado_en);
+}
+
 export default function DespacharPage() {
   const isMobile = !useMediaQuery('(min-width: 768px)');
   const user = useAuthStore((s) => s.user);
@@ -60,6 +75,7 @@ export default function DespacharPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showColumnSelector, setShowColumnSelector] = useState(false);
+  const [confirmPedido, setConfirmPedido] = useState(null);
   const debouncedSearch = useDebounce(search, 250);
   const [searchParams, setSearchParams] = useSearchParams();
   const loadingRef = useRef(false);
@@ -166,9 +182,35 @@ export default function DespacharPage() {
     setActiveDetails(null);
   };
 
-  const handleDone = () => {
+  const handleDone = async () => {
+    const id = activeId;
     handleClose();
     loadPedidos();
+    // Si la bodega exige confirmacion de recepcion, ofrecerla de inmediato:
+    // el solicitante ve el preview de lo despachado y captura su PIN.
+    if (!id) return;
+    try {
+      const det = await pedidosService.getDetails(id);
+      if (needsConfirmation(det)) {
+        setConfirmPedido({ ...det, id_pedido: id });
+      }
+    } catch {
+      /* si falla la carga, la confirmacion queda disponible desde la lista */
+    }
+  };
+
+  const handleOpenConfirm = async (p) => {
+    try {
+      const det = await pedidosService.getDetails(p.id_pedido);
+      setConfirmPedido({ ...det, id_pedido: p.id_pedido });
+    } catch (e) {
+      toast.error(e?.response?.data?.error || 'No se pudo cargar el pedido');
+    }
+  };
+
+  const handleConfirmed = () => {
+    setConfirmPedido(null);
+    safeLoadPedidos();
   };
 
   const visibles = useMemo(() => {
@@ -260,6 +302,11 @@ export default function DespacharPage() {
           <span className="despachar-page__print-icon" aria-hidden="true">📄</span>
         </button>
       </div>
+      {needsConfirmation(p) && (
+        <Button size="sm" variant="primary" onClick={() => handleOpenConfirm(p)} title="El solicitante confirma la recepción con su PIN">
+          ✓ Confirmar recepción
+        </Button>
+      )}
       {canDispatch && (
         <Button size="sm" onClick={() => handleOpen(p.id_pedido)}>
           Despachar
@@ -315,7 +362,13 @@ export default function DespacharPage() {
       width: 100,
       render: (p) => {
         const est = ESTADO_LABELS[p.estado] || { label: p.estado, variant: 'default' };
-        return <Badge variant={est.variant}>{est.label}</Badge>;
+        return (
+          <span style={{ display: 'inline-flex', gap: '4px', flexWrap: 'wrap' }}>
+            <Badge variant={est.variant}>{est.label}</Badge>
+            {isReceiptConfirmed(p) && <Badge variant="success">✓ Recibido</Badge>}
+            {needsConfirmation(p) && <Badge variant="warning">Por confirmar</Badge>}
+          </span>
+        );
       },
       cardMeta: (p) => {
         const est = ESTADO_LABELS[p.estado] || { label: p.estado, variant: 'default' };
@@ -406,6 +459,7 @@ export default function DespacharPage() {
             <li>Edita las <strong>cantidades a surtir</strong> por línea (puedes surtir menos o anular).</li>
             <li>Si anulas algo, debes escribir una <strong>justificación</strong>.</li>
             <li>Al confirmar, se descuenta el stock de tu bodega y se crea el movimiento correspondiente.</li>
+            <li>Si tu bodega tiene <strong>PIN de recepción</strong> activo (se configura en Bodegas), el solicitante revisa el detalle y confirma con su PIN como fe de recibido.</li>
           </ol>
         </Card>
       </div>
@@ -471,6 +525,14 @@ export default function DespacharPage() {
           </div>
         )}
       </Modal>
+
+      {/* Confirmación de recepción con PIN del solicitante */}
+      <ConfirmarRecepcionModal
+        open={!!confirmPedido}
+        pedido={confirmPedido}
+        onClose={() => setConfirmPedido(null)}
+        onConfirmed={handleConfirmed}
+      />
     </>
   );
 }

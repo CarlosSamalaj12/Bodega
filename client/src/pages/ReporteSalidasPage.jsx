@@ -298,10 +298,12 @@ export default function ReporteSalidasPage() {
         subtitle={`${total} movimiento${total === 1 ? '' : 's'} · Pág. ${page} de ${totalPages}`}
         actions={
           grouped.length > 0 && !loading ? (
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-                Exportar
-              </Button>
+            <div className="reporte-salidas__header-actions">
+              {!isMobile && (
+                <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
+                  Exportar
+                </Button>
+              )}
               <Button variant="ghost" size="sm" onClick={fetchData} disabled={loading}>
                 Refrescar
               </Button>

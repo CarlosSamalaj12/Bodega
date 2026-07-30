@@ -4,15 +4,21 @@
   display: flex;
   min-height: 100vh;
   width: 100%;
+  max-width: 100vw;
+  overflow: hidden;
 
   &__main {
     flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
+    max-width: 100%;
+    overflow: hidden;
 
     &--mobile {
       padding-top: 56px;
+      width: 100%;
+      max-width: 100%;
     }
   }
 

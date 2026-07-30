@@ -264,10 +264,12 @@ export default function ReportePedidosPage() {
         subtitle={`${total} pedido${total === 1 ? '' : 's'} · Pág. ${page} de ${totalPages}`}
         actions={
           rows.length > 0 && !loading ? (
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-                Exportar
-              </Button>
+            <div className="reporte-pedidos__header-actions">
+              {!isMobile && (
+                <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
+                  Exportar
+                </Button>
+              )}
               <Button variant="ghost" size="sm" onClick={fetchData} disabled={loading}>
                 Refrescar
               </Button>

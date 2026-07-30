@@ -6,6 +6,18 @@
   flex-direction: column;
   gap: $space-4;
 
+  @media (max-width: $bp-md) { padding: $space-4; }
+  @media (max-width: 480px) { padding: $space-3; }
+
+  &__header-actions {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    flex-wrap: wrap;
+
+    > * { min-width: 0; flex-shrink: 1; max-width: 100%; }
+  }
+
   &__state {
     display: flex;
     align-items: center;
@@ -33,6 +45,12 @@
     display: flex;
     align-items: center;
     gap: $space-2;
+
+    @media (max-width: $bp-md) {
+      flex: 1 1 100%;
+      flex-wrap: wrap;
+      input { flex: 1 1 calc(50% - 8px); min-width: 0; }
+    }
   }
 
   &__date-input {
@@ -45,6 +63,14 @@
   &__fecha-sep {
     color: $color-text-muted;
     font-size: $font-size-sm;
+    flex-shrink: 0;
+
+    @media (max-width: $bp-md) {
+      flex: 0 0 100%;
+      text-align: center;
+      order: 2;
+      margin-top: $space-1;
+    }
   }
 
   &__rango {
@@ -54,9 +80,17 @@
     border: 1px solid $color-stroke;
     border-radius: $radius-md;
     padding: 2px;
+    overflow-x: auto;
+    max-width: 100%;
+    flex-wrap: nowrap;
 
     @media (min-width: 768px) {
       justify-content: center;
+    }
+
+    @media (max-width: $bp-md) {
+      flex: 1 1 100%;
+      justify-content: flex-start;
     }
   }
 

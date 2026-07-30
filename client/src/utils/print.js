@@ -40,7 +40,7 @@ export function printPedidoPos80mm(pedido, opts = {}) {
     body {
       width: 302px;
       max-width: 302px;
-      padding: 20px 20px 40px;
+      padding: 20px 12px 40px;
       font-family: 'Courier New', 'Lucida Console', monospace;
       font-size: 16px;
       font-weight: bold;
@@ -107,14 +107,15 @@ export function printPedidoPos80mm(pedido, opts = {}) {
     .lines-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 15px;
+      font-size: 14px;
+      table-layout: fixed;
     }
 
     .lines-table th {
       text-align: left;
       font-weight: bold;
-      font-size: 14px;
-      padding: 6px 4px;
+      font-size: 13px;
+      padding: 3px 2px;
       border-bottom: 2px solid #000;
       border-top: 2px solid #000;
       white-space: nowrap;
@@ -124,14 +125,27 @@ export function printPedidoPos80mm(pedido, opts = {}) {
       text-align: right;
     }
 
+    .lines-table th:nth-child(2),
+    .lines-table th:nth-child(3),
+    .lines-table th:nth-child(4) {
+      width: 38px;
+    }
+
     .lines-table tr {
       border-bottom: 2px solid #000;
     }
 
     .lines-table td {
-      padding: 8px 4px;
+      padding: 4px 2px;
       vertical-align: top;
+    }
+
+    .lines-table td.product-name {
       word-break: break-word;
+      white-space: normal;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .lines-table td.right {
@@ -139,21 +153,15 @@ export function printPedidoPos80mm(pedido, opts = {}) {
       white-space: nowrap;
     }
 
-    .lines-table .product-name {
-      word-break: break-word;
-      white-space: normal;
-      line-height: 1.2;
-    }
-
     .totals-section {
-      font-size: 16px;
+      font-size: 15px;
       margin-top: 8px;
     }
 
     .totals-section div {
       display: flex;
       justify-content: space-between;
-      padding: 4px 0;
+      padding: 3px 0;
     }
 
     .footer {
@@ -177,7 +185,7 @@ export function printPedidoPos80mm(pedido, opts = {}) {
       body {
         width: 80mm !important;
         max-width: 80mm !important;
-        padding: 5mm 5mm 10mm !important;
+        padding: 5mm 4mm 10mm !important;
         font-size: 16px !important;
       }
       .header { margin-bottom: 5mm; padding-bottom: 4mm; }
@@ -186,7 +194,10 @@ export function printPedidoPos80mm(pedido, opts = {}) {
       .info-table .label { width: 26mm; }
       .separator { margin: 3mm 0; }
       .lines-title { margin-bottom: 2mm; }
-      .lines-table th, .lines-table td { padding: 1.5mm 1mm; }
+      .lines-table th, .lines-table td { padding: 1mm 0.5mm; }
+      .lines-table th:nth-child(2),
+      .lines-table th:nth-child(3),
+      .lines-table th:nth-child(4) { width: 16mm; }
       .lines-table tr { border-bottom: 2px solid #000; }
       .totals-section { margin-top: 2mm; }
       .totals-section div { padding: 1mm 0; }

@@ -422,9 +422,9 @@ export default function TransferenciasPage() {
         title="Transferencias"
         subtitle={`${total} transferencia${total === 1 ? '' : 's'} · Pág. ${page} de ${totalPages} · ${totales.totalCantidad.toFixed(2)} unidades`}
         actions={
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div className="transferencias-page__header-actions">
             <Button variant="primary" size="sm" onClick={openCreateModal}>+ Nueva transferencia</Button>
-            {rows.length > 0 && !loading && (
+            {rows.length > 0 && !loading && !isMobile && (
               <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>Exportar</Button>
             )}
             <Button variant="ghost" size="sm" onClick={fetchData} disabled={loading}>Refrescar</Button>

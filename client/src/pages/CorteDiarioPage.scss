@@ -6,10 +6,46 @@
   flex-direction: column;
   gap: $space-4;
 
+  // ---------- Móvil ----------
+  @media (max-width: $bp-md) {
+    padding: $space-4;
+
+    &__filters {
+      gap: $space-2;
+    }
+
+    &__search-box {
+      min-width: 0;
+    }
+
+    &__filter-controls {
+      flex-wrap: wrap;
+      gap: $space-1;
+    }
+  }
+
+  @media (max-width: 480px) {
+    padding: $space-3;
+
+    // Las métricas ya son 2 columnas por defecto, solo reducir padding
+    &__metrics {
+      gap: $space-2;
+    }
+
+    &__metric-card {
+      padding: $space-3 $space-2;
+    }
+
+    &__metric-value {
+      font-size: $font-size-lg;
+    }
+  }
+
   &__header-actions {
     display: flex;
     align-items: center;
     gap: $space-2;
+    flex-wrap: wrap;
   }
 
   // ---- Filtros ----

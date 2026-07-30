@@ -6,6 +6,51 @@
   flex-direction: column;
   gap: $space-4;
 
+  &__header-actions {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    flex-wrap: wrap;
+
+    > * { min-width: 0; flex-shrink: 1; max-width: 100%; }
+  }
+
+  // ---------- Móvil ----------
+  @media (max-width: $bp-md) {
+    padding: $space-4;
+
+    &__filters {
+      gap: $space-2;
+    }
+
+    &__fecha-group {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    &__fecha-sep {
+      text-align: center;
+    }
+
+    &__rango {
+      overflow-x: auto;
+      justify-content: flex-start;
+    }
+
+    // Detalle expandido con menos indent en móvil
+    &__detalle {
+      padding: $space-3 $space-3 $space-3 $space-4;
+    }
+  }
+
+  @media (max-width: 480px) {
+    padding: $space-3;
+
+    &__filters {
+      grid-template-columns: 1fr !important; // Forzar 1 columna
+    }
+  }
+
   &__state {
     display: flex;
     align-items: center;

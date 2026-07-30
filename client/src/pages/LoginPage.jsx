@@ -55,12 +55,6 @@ export default function LoginPage() {
     };
   }, []);
 
-  // Si ya está autenticado, redirige a la app
-  if (isAuthenticated) {
-    const from = location.state?.from?.pathname || '/';
-    return <Navigate to={from} replace />;
-  }
-
   const filteredUsers = useMemo(() => {
     const q = filter.trim().toLowerCase();
     if (!q) return users;
@@ -70,6 +64,13 @@ export default function LoginPage() {
         String(u.full_name || '').toLowerCase().includes(q)
     );
   }, [users, filter]);
+
+  // Si ya está autenticado, redirige a la app
+  // (después de TODOS los hooks para no romper las reglas de hooks)
+  if (isAuthenticated) {
+    const from = location.state?.from?.pathname || '/';
+    return <Navigate to={from} replace />;
+  }
 
   const onSelectUser = (u) => {
     setSelectedUser(u);

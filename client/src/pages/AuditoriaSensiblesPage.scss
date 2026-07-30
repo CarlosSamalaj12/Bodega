@@ -6,6 +6,19 @@
   flex-direction: column;
   gap: $space-4;
 
+  // ---------- Móvil ----------
+  @media (max-width: $bp-md) { padding: $space-4; }
+  @media (max-width: 480px) { padding: $space-3; }
+
+  &__header-actions {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    flex-wrap: wrap;
+
+    > * { min-width: 0; flex-shrink: 1; max-width: 100%; }
+  }
+
   &__state {
     display: flex;
     align-items: center;

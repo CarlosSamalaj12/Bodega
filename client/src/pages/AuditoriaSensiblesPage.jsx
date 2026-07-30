@@ -8,9 +8,9 @@ import { Spinner } from '@/components/ui/Spinner';
 import { Badge } from '@/components/ui/Badge';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { toast } from '@/components/ui/Toast';
 
-import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import { formatDate } from '@/utils/format';
@@ -171,10 +171,12 @@ export default function AuditoriaSensiblesPage() {
         subtitle={`${rows.length} registro${rows.length === 1 ? '' : 's'}`}
         actions={
           rows.length > 0 && !loading ? (
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-                Exportar
-              </Button>
+            <div className="auditoria-sensibles__header-actions">
+              {!isMobile && (
+                <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
+                  Exportar
+                </Button>
+              )}
               <Button variant="ghost" size="sm" onClick={fetchData} disabled={loading}>
                 Refrescar
               </Button>

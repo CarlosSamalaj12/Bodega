@@ -40,6 +40,16 @@ export const pedidosService = {
   },
 
   /**
+   * Confirmar recepcion del pedido con el PIN del solicitante.
+   * @param id id_pedido
+   * @param payload { pin }
+   */
+  async confirmReceipt(id, payload) {
+    const { data } = await api.post(`/api/orders/${id}/confirm-receipt`, payload);
+    return data;
+  },
+
+  /**
    * Anular una línea de pedido.
    * @param id id_pedido
    * @param payload { id_pedido_detalle, justificacion }

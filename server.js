@@ -350,6 +350,50 @@ async function ensureWarehouseSalidaPriceRequirementColumn() {
   }
 }
 
+async function ensureRecepcionConfirmacionSchema() {
+  // Config por bodega: al despachar, exigir PIN del solicitante como fe de recibido
+  const [[cfgCol]] = await pool.query(
+    `SELECT COUNT(*) AS c
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA=DATABASE()
+       AND TABLE_NAME='configuracion_bodega'
+       AND COLUMN_NAME='requiere_confirmacion_recepcion'`
+  );
+  if (!Number(cfgCol?.c || 0)) {
+    await pool.query(
+      `ALTER TABLE configuracion_bodega
+       ADD COLUMN requiere_confirmacion_recepcion TINYINT(1) NOT NULL DEFAULT 0`
+    );
+  }
+  // Datos de confirmacion en el pedido (snapshot + quien/cuando confirmo)
+  const [cols] = await pool.query(
+    `SELECT COLUMN_NAME AS col
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA=DATABASE()
+       AND TABLE_NAME='pedido_encabezado'
+       AND COLUMN_NAME IN ('confirmacion_requerida','confirmado_por','confirmado_en')`
+  );
+  const colSet = new Set((cols || []).map((r) => String(r?.col || "").toLowerCase()));
+  if (!colSet.has("confirmacion_requerida")) {
+    await pool.query(
+      `ALTER TABLE pedido_encabezado
+       ADD COLUMN confirmacion_requerida TINYINT(1) NOT NULL DEFAULT 0`
+    );
+  }
+  if (!colSet.has("confirmado_por")) {
+    await pool.query(
+      `ALTER TABLE pedido_encabezado
+       ADD COLUMN confirmado_por INT NULL`
+    );
+  }
+  if (!colSet.has("confirmado_en")) {
+    await pool.query(
+      `ALTER TABLE pedido_encabezado
+       ADD COLUMN confirmado_en DATETIME NULL`
+    );
+  }
+}
+
 async function ensureMovimientoDetallePrecioSalidaColumn() {
   const [rows] = await pool.query(
     `SELECT COUNT(*) AS c
@@ -1648,6 +1692,9 @@ ensureSensitiveActionAuditTable().catch((e) => {
 });
 ensureOrderDispatchColumns().catch((e) => {
   console.error("No se pudo actualizar columnas de despacho en pedidos:", e);
+});
+ensureRecepcionConfirmacionSchema().catch((e) => {
+  console.error("No se pudo crear esquema de confirmacion de recepcion:", e);
 });
 
 async function ensureConteoCiclicoTables() {
@@ -4148,7 +4195,8 @@ app.get("/api/bodegas", auth, async (req, res) => {
             cb.modo_despacho_auto,
             cb.id_bodega_destino_default,
             cb.permite_salida_conteo_final,
-            cb.requiere_precio_salida
+            cb.requiere_precio_salida,
+            cb.requiere_confirmacion_recepcion
      FROM bodegas b
      LEFT JOIN configuracion_bodega cb ON cb.id_bodega=b.id_bodega
      WHERE (:all=1 OR b.activo=1)
@@ -7781,10 +7829,20 @@ app.post("/api/orders", auth, requirePermission("action.create_update", "crear p
       return res.status(400).json({ error: "Solo se puede pedir a bodegas PRINCIPAL o RECEPTORA" });
     }
 
+    // Snapshot: si la bodega surtidora exige confirmacion de recepcion con PIN
+    const [[cfgSurtidor]] = await conn.query(
+      `SELECT requiere_confirmacion_recepcion
+       FROM configuracion_bodega
+       WHERE id_bodega=:id_bodega
+       LIMIT 1`,
+      { id_bodega: requestedFromWarehouseId }
+    );
+    const confirmacionRequerida = Number(cfgSurtidor?.requiere_confirmacion_recepcion || 0) === 1 ? 1 : 0;
+
     const [r] = await conn.query(
-      `INSERT INTO pedido_encabezado(id_usuario_solicita, id_bodega_solicita, id_bodega_surtidor, observaciones)
-       VALUES(:u,:bs,:bd,:obs)`,
-      { u: requester_user_id, bs: requester_warehouse_id, bd: requested_from_warehouse_id, obs: notes ?? null }
+      `INSERT INTO pedido_encabezado(id_usuario_solicita, id_bodega_solicita, id_bodega_surtidor, observaciones, confirmacion_requerida)
+       VALUES(:u,:bs,:bd,:obs,:conf)`,
+      { u: requester_user_id, bs: requester_warehouse_id, bd: requested_from_warehouse_id, obs: notes ?? null, conf: confirmacionRequerida }
     );
     const id_pedido = r.insertId;
 
@@ -7896,14 +7954,16 @@ app.get("/api/orders/:id/details", auth, async (req, res) => {
   const stockScope = await resolveStockScope(req.user);
   if (!actorWarehouse) return res.status(400).json({ error: "Usuario sin bodega" });
   const [[pe]] = await pool.query(
-    `SELECT p.*, 
+    `SELECT p.*,
             b.nombre_bodega AS from_warehouse,
             bs.nombre_bodega AS requester_warehouse,
-            u.nombre_completo AS requester_name
+            u.nombre_completo AS requester_name,
+            uc.nombre_completo AS confirmado_por_nombre
      FROM pedido_encabezado p
      JOIN bodegas b ON b.id_bodega=p.id_bodega_surtidor
      LEFT JOIN bodegas bs ON bs.id_bodega=p.id_bodega_solicita
      LEFT JOIN usuarios u ON u.id_usuario=p.id_usuario_solicita
+     LEFT JOIN usuarios uc ON uc.id_usuario=p.confirmado_por
      WHERE p.id_pedido=:id_pedido`,
     { id_pedido }
   );
@@ -7946,6 +8006,10 @@ app.get("/api/orders/:id/details", auth, async (req, res) => {
     requester_name: pe.requester_name,
     observaciones: pe.observaciones || null,
     justificacion_despacho: pe.justificacion_despacho || null,
+    confirmacion_requerida: Number(pe.confirmacion_requerida || 0) === 1,
+    confirmado_en: pe.confirmado_en || null,
+    confirmado_por: pe.confirmado_por || null,
+    confirmado_por_nombre: pe.confirmado_por_nombre || null,
     lines,
   });
 });
@@ -8000,7 +8064,7 @@ app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "
     }
 
     const [[cfg]] = await conn.query(
-      `SELECT cb.modo_despacho_auto, cb.maneja_stock, b.tipo_bodega
+      `SELECT cb.modo_despacho_auto, cb.maneja_stock, cb.requiere_confirmacion_recepcion, b.tipo_bodega
        FROM configuracion_bodega cb
        JOIN bodegas b ON b.id_bodega=cb.id_bodega
        WHERE cb.id_bodega=:id`,
@@ -8184,6 +8248,16 @@ app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "
     });
     const newStatus = recalc.estado;
 
+    // Si la bodega solicitante exige confirmacion de recepcion y el pedido
+    // se completo, marcar que requiere confirmacion del solicitante.
+    const requiereConf = Number(cfg?.requiere_confirmacion_recepcion || 0) === 1;
+    if (requiereConf && ['COMPLETADO', 'COMPLETADO_JUSTIFICADO'].includes(newStatus)) {
+      await conn.query(
+        `UPDATE pedido_encabezado SET confirmacion_requerida=1 WHERE id_pedido=:id`,
+        { id: id_pedido }
+      );
+    }
+
     await conn.commit();
     emitPedidoChanged({
       id_pedido,
@@ -8199,6 +8273,94 @@ app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "
       justificacion_despacho: recalc.justificacion_despacho || null,
       skipped,
     });
+  } catch (e) {
+    await conn.rollback();
+    res.status(500).json({ error: String(e.message || e) });
+  } finally {
+    conn.release();
+  }
+});
+
+/* =========================
+   CONFIRMAR RECEPCION (PIN DEL SOLICITANTE)
+   El solicitante da fe de haber recibido su pedido despachado.
+   El PIN de pedidos del solicitante es la autorizacion (puede capturarlo
+   en la sesion del despachador al momento de la entrega).
+========================= */
+app.post("/api/orders/:id/confirm-receipt", auth, async (req, res) => {
+  const id_pedido = Number(req.params.id);
+  if (!Number.isFinite(id_pedido) || id_pedido <= 0) {
+    return res.status(400).json({ error: "Pedido invalido" });
+  }
+  const pin = String(req.body?.pin || "").trim();
+  if (!pin) return res.status(400).json({ error: "Falta el PIN del solicitante" });
+  if (!isValidOrderPin(pin)) {
+    return res.status(400).json({ error: "El PIN de pedido debe tener entre 6 y 12 digitos" });
+  }
+  if (!beginIdempotentRequest(req, res, { pathKey: `/api/orders/${id_pedido}/confirm-receipt` })) {
+    return res.status(409).json({ error: "Solicitud duplicada detectada. Espera unos segundos e intenta de nuevo." });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [[pe]] = await conn.query(
+      "SELECT * FROM pedido_encabezado WHERE id_pedido=:id_pedido FOR UPDATE",
+      { id_pedido }
+    );
+    if (!pe) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Pedido no existe" });
+    }
+    if (Number(pe.confirmacion_requerida || 0) !== 1) {
+      await conn.rollback();
+      return res.status(400).json({ error: "Este pedido no requiere confirmacion de recepcion" });
+    }
+    if (pe.confirmado_en) {
+      await conn.rollback();
+      return res.status(400).json({ error: "La recepcion de este pedido ya fue confirmada" });
+    }
+    if (!["COMPLETADO", "COMPLETADO_JUSTIFICADO"].includes(String(pe.estado || ""))) {
+      await conn.rollback();
+      return res.status(400).json({ error: "El pedido aun no esta completamente despachado" });
+    }
+
+    const [[solicitante]] = await conn.query(
+      `SELECT u.id_usuario, u.activo, upp.pin_hash
+       FROM usuarios u
+       LEFT JOIN usuario_pin_pedido upp ON upp.id_usuario=u.id_usuario
+       WHERE u.id_usuario=:id_usuario
+       LIMIT 1`,
+      { id_usuario: pe.id_usuario_solicita }
+    );
+    if (!solicitante || Number(solicitante.activo || 0) !== 1 || !solicitante.pin_hash) {
+      await conn.rollback();
+      return res.status(400).json({ error: "El solicitante no tiene PIN de pedidos configurado" });
+    }
+    const pinOk = await bcrypt.compare(pin, solicitante.pin_hash || "");
+    if (!pinOk) {
+      trackPinFailure("order", { id_pedido, requester_user_id: pe.id_usuario_solicita, actor_user_id: Number(req.user?.id_user || 0) });
+      await conn.rollback();
+      return res.status(401).json({ error: "PIN del solicitante invalido" });
+    }
+
+    await conn.query(
+      `UPDATE pedido_encabezado
+       SET confirmado_por=:confirmado_por, confirmado_en=NOW()
+       WHERE id_pedido=:id_pedido`,
+      { confirmado_por: pe.id_usuario_solicita, id_pedido }
+    );
+
+    await conn.commit();
+    emitPedidoChanged({
+      id_pedido,
+      requester_warehouse_id: pe.id_bodega_solicita,
+      requested_from_warehouse_id: pe.id_bodega_surtidor,
+      status: pe.estado,
+      action: "confirmed",
+    });
+    res.json({ ok: true, id_pedido, confirmado_por: pe.id_usuario_solicita });
   } catch (e) {
     await conn.rollback();
     res.status(500).json({ error: String(e.message || e) });
@@ -9320,6 +9482,35 @@ app.patch("/api/bodegas/:id", auth, requirePermission("action.manage_permissions
     return res.status(500).json({ error: String(e.message || e) });
   } finally {
     conn.release();
+  }
+});
+
+/* =========================
+   CONFIG: CONFIRMACION DE RECEPCION POR BODEGA
+   Activa/desactiva que los despachos de esta bodega requieran
+   el PIN del solicitante como fe de recibido.
+========================= */
+app.patch("/api/bodegas/:id/config-recepcion", auth, requirePermission("action.manage_permissions", "configurar bodegas"), async (req, res) => {
+  try {
+    const id_bodega = Number(req.params.id || 0);
+    if (!id_bodega) return res.status(400).json({ error: "Bodega invalida" });
+    const flag = req.body?.requiere_confirmacion_recepcion ? 1 : 0;
+
+    const [[bod]] = await pool.query(
+      `SELECT id_bodega FROM bodegas WHERE id_bodega=:id_bodega LIMIT 1`,
+      { id_bodega }
+    );
+    if (!bod) return res.status(404).json({ error: "Bodega no existe" });
+
+    await pool.query(
+      `INSERT INTO configuracion_bodega (id_bodega, requiere_confirmacion_recepcion)
+       VALUES (:id_bodega, :flag)
+       ON DUPLICATE KEY UPDATE requiere_confirmacion_recepcion=VALUES(requiere_confirmacion_recepcion)`,
+      { id_bodega, flag }
+    );
+    res.json({ ok: true, id_bodega, requiere_confirmacion_recepcion: flag });
+  } catch (e) {
+    return res.status(500).json({ error: String(e.message || e) });
   }
 });
 

@@ -19,6 +19,7 @@ import { catalogosService } from '@/services/catalogos.service';
 import { pedidosService } from '@/services/pedidos.service';
 import { printPedidoPos80mm } from '@/utils/print';
 import { PedidoForm } from '@/components/pedidos/PedidoForm';
+import { ConfirmarRecepcionModal } from '@/components/pedidos/ConfirmarRecepcionModal';
 import './PedidosPage.scss';
 
 const ESTADO_LABELS = {
@@ -30,6 +31,20 @@ const ESTADO_LABELS = {
   CANCELADO: { label: 'Cancelado', variant: 'danger' },
 };
 
+// Un pedido puede confirmarse cuando la bodega surtidora lo exige,
+// ya se despacho por completo y aun no se confirma la recepcion.
+function needsConfirmation(p) {
+  return (
+    Number(p?.confirmacion_requerida) === 1 &&
+    !p?.confirmado_en &&
+    ['COMPLETADO', 'COMPLETADO_JUSTIFICADO'].includes(String(p?.estado || '').toUpperCase())
+  );
+}
+
+function isReceiptConfirmed(p) {
+  return Number(p?.confirmacion_requerida) === 1 && Boolean(p?.confirmado_en);
+}
+
 export default function PedidosPage() {
   const user = useAuthStore((s) => s.user);
   const permisos = user?.permisos || {};
@@ -39,6 +54,7 @@ export default function PedidosPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [createdPedido, setCreatedPedido] = useState(null);
+  const [confirmPedido, setConfirmPedido] = useState(null);
 
   const [bodegas, setBodegas] = useState([]);
   const [catalogError, setCatalogError] = useState(null);
@@ -117,6 +133,20 @@ export default function PedidosPage() {
     }
   };
 
+  const handleOpenConfirm = async (pedido) => {
+    try {
+      const detalles = await pedidosService.getDetails(pedido.id_pedido);
+      setConfirmPedido({ ...detalles, id_pedido: pedido.id_pedido });
+    } catch (e) {
+      toast.error(e?.response?.data?.error || 'No se pudo cargar el pedido');
+    }
+  };
+
+  const handleConfirmed = () => {
+    setConfirmPedido(null);
+    loadPedidos();
+  };
+
   const pedidosSorted = useMemo(() => {
     let filtered = [...pedidos].sort((a, b) => Number(b.id_pedido || 0) - Number(a.id_pedido || 0));
     if (debouncedSearch) {
@@ -171,7 +201,13 @@ export default function PedidosPage() {
         width: 180,
         render: (p) => {
           const est = ESTADO_LABELS[p.estado] || { label: p.estado, variant: 'default' };
-          return <Badge variant={est.variant}>{est.label}</Badge>;
+          return (
+            <span style={{ display: 'inline-flex', gap: '4px', flexWrap: 'wrap' }}>
+              <Badge variant={est.variant}>{est.label}</Badge>
+              {isReceiptConfirmed(p) && <Badge variant="success">✓ Recibido</Badge>}
+              {needsConfirmation(p) && <Badge variant="warning">Por confirmar</Badge>}
+            </span>
+          );
         },
         cardMeta: (p) => {
           const est = ESTADO_LABELS[p.estado] || { label: p.estado, variant: 'default' };
@@ -181,21 +217,37 @@ export default function PedidosPage() {
       {
         key: 'acciones',
         label: 'Acciones',
-        width: 90,
+        width: 170,
         sortable: false,
         render: (p) => (
-          <button
-            type="button"
-            className="btn btn--sm btn--ghost"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleImprimirPedido(p);
-            }}
-            title="Imprimir ticket"
-            style={{ padding: '4px 8px', fontSize: '12px' }}
-          >
-            🖨 Imprimir
-          </button>
+          <span style={{ display: 'inline-flex', gap: '4px' }}>
+            {needsConfirmation(p) && (
+              <button
+                type="button"
+                className="btn btn--sm btn--primary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenConfirm(p);
+                }}
+                title="Ver lo despachado y confirmar con tu PIN"
+                style={{ padding: '4px 8px', fontSize: '12px' }}
+              >
+                ✓ Confirmar
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn btn--sm btn--ghost"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleImprimirPedido(p);
+              }}
+              title="Imprimir ticket"
+              style={{ padding: '4px 8px', fontSize: '12px' }}
+            >
+              🖨 Imprimir
+            </button>
+          </span>
         ),
       },
     ],
@@ -209,7 +261,7 @@ export default function PedidosPage() {
         subtitle={`${pedidos.length} pedido${pedidos.length === 1 ? '' : 's'} en total`}
         actions={
           <div className="pedidos-page__actions">
-            {pedidosSorted.length > 0 && (
+            {!isMobile && pedidosSorted.length > 0 && (
               <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
                 Exportar CSV
               </Button>
@@ -230,6 +282,8 @@ export default function PedidosPage() {
         <Card
           title="¿Cómo funciona?"
           subtitle="Pides productos a otra bodega (PRINCIPAL o RECEPTORA)"
+          collapsible={isMobile}
+          defaultOpen={!isMobile}
         >
           <ol className="pedidos-page__steps">
             <li>Elige la <strong>bodega</strong> a la que pides (no la tuya).</li>
@@ -237,6 +291,7 @@ export default function PedidosPage() {
             <li>Agrega las <strong>líneas</strong> con producto y cantidad.</li>
             <li>Envía — el surtidor recibe la solicitud en su panel.</li>
             <li>El estado pasa de <em>Pendiente</em> a <em>Parcial</em>/<em>Completado</em> cuando surten.</li>
+            <li>Si la bodega lo exige, al recibir revisas el <strong>detalle despachado</strong> y confirmas con tu <strong>PIN</strong> (botón <em>✓ Confirmar</em>).</li>
           </ol>
         </Card>
 
@@ -345,6 +400,14 @@ export default function PedidosPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Modal de confirmación de recepción con PIN */}
+      <ConfirmarRecepcionModal
+        open={!!confirmPedido}
+        pedido={confirmPedido}
+        onClose={() => setConfirmPedido(null)}
+        onConfirmed={handleConfirmed}
+      />
     </>
   );
 }

@@ -241,6 +241,23 @@ export default function BodegasPage() {
     }
   };
 
+  const handleToggleRecepcion = async (row) => {
+    const next = Number(row.requiere_confirmacion_recepcion) === 1 ? 0 : 1;
+    try {
+      await api.patch(`/api/bodegas/${row.id_bodega}/config-recepcion`, {
+        requiere_confirmacion_recepcion: next,
+      });
+      await fetchItems();
+      toast.success(
+        next
+          ? `PIN de recepción activado para ${row.nombre_bodega}`
+          : `PIN de recepción desactivado para ${row.nombre_bodega}`
+      );
+    } catch (e) {
+      toast.error(e?.response?.data?.error || 'Error al cambiar la configuración');
+    }
+  };
+
   // ================== RENDER ==================
   return (
     <>
@@ -282,6 +299,16 @@ export default function BodegasPage() {
                   </span>
                 </div>
                 <div className="bodegas-page__item-actions">
+                  {['PRINCIPAL', 'RECEPTORA'].includes(String(row.tipo_bodega || '').toUpperCase()) && (
+                    <Button
+                      size="sm"
+                      variant={Number(row.requiere_confirmacion_recepcion) === 1 ? 'subtle' : 'ghost'}
+                      onClick={() => handleToggleRecepcion(row)}
+                      title="Al despachar desde esta bodega, el solicitante deberá confirmar la recepción con su PIN"
+                    >
+                      {Number(row.requiere_confirmacion_recepcion) === 1 ? '🔒 PIN recepción: ON' : '🔓 PIN recepción: OFF'}
+                    </Button>
+                  )}
                   <Button size="sm" variant={Number(row.activo) === 1 ? 'subtle' : 'ghost'} onClick={() => handleToggle(row)} title={Number(row.activo) === 1 ? 'Desactivar' : 'Activar'}>
                     {Number(row.activo) === 1 ? 'Desactivar' : 'Activar'}
                   </Button>
