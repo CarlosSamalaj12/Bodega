@@ -12,6 +12,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useDebounce } from '@/hooks/useDebounce';
 import { toast } from '@/components/ui/Toast';
 import { useAuthStore } from '@/stores/auth.store';
+import { hasPermission } from '@/utils/permissions';
 import { useDispatchStore } from '@/stores/dispatch.store';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
@@ -46,7 +47,7 @@ const STATUS_OPTIONS = [
 export default function DespacharPage() {
   const isMobile = !useMediaQuery('(min-width: 768px)');
   const user = useAuthStore((s) => s.user);
-  const hasPermission = user?.permisos?.['action.dispatch'] !== false;
+  const canDispatch = hasPermission(user?.permisos, 'action.dispatch');
 
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -259,7 +260,7 @@ export default function DespacharPage() {
           <span className="despachar-page__print-icon" aria-hidden="true">📄</span>
         </button>
       </div>
-      {hasPermission && (
+      {canDispatch && (
         <Button size="sm" onClick={() => handleOpen(p.id_pedido)}>
           Despachar
         </Button>

@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth.store';
 import { useDispatchStore } from '@/stores/dispatch.store';
+import { hasPermission } from '@/utils/permissions';
 import api from '@/services/api';
 import { getSocket } from '@/services/socket';
 import './Sidebar.scss';
@@ -124,9 +125,7 @@ function SidebarContent({ onLinkClick, collapsed, onToggle }) {
   }, [fetchAlertCount, user?.id_warehouse]);
 
   const visibleItems = NAV_ITEMS.filter((item) => {
-    const key = `section.view.${item.section}`;
-    if (!permissions || Object.keys(permissions).length === 0) return true;
-    return permissions[key] !== false;
+    return hasPermission(permissions, `section.view.${item.section}`);
   });
 
   // Agrupar ítems visibles por grupo, respetando GROUP_ORDER

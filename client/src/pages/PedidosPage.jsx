@@ -10,6 +10,7 @@ import { DataList } from '@/components/ui/DataList';
 import { useDebounce } from '@/hooks/useDebounce';
 import { toast } from '@/components/ui/Toast';
 import { useAuthStore } from '@/stores/auth.store';
+import { hasPermission } from '@/utils/permissions';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
@@ -31,7 +32,7 @@ const ESTADO_LABELS = {
 export default function PedidosPage() {
   const user = useAuthStore((s) => s.user);
   const permisos = user?.permisos || {};
-  const canCreate = permisos['action.create_update'] !== false;
+  const canCreate = hasPermission(permisos, 'action.create_update');
   const isMobile = !useMediaQuery('(min-width: 768px)');
 
   const [modalOpen, setModalOpen] = useState(false);

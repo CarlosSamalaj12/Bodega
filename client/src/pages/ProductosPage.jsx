@@ -15,6 +15,7 @@ import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import { productosService } from '@/services/productos.service';
 import { catalogosService } from '@/services/catalogos.service';
 import { useAuthStore } from '@/stores/auth.store';
+import { hasPermission } from '@/utils/permissions';
 import { EmptyState } from '@/components/ui/EmptyState';
 import './ProductosPage.scss';
 
@@ -58,8 +59,8 @@ function DragItem({ row, children, onReorder }) {
 export default function ProductosPage() {
   const user = useAuthStore((s) => s.user);
   const permisos = user?.permisos || {};
-  const canCreate = permisos['action.create_update'] !== false;
-  const canEdit = permisos['action.create_update'] !== false;
+  const canCreate = hasPermission(permisos, 'action.create_update');
+  const canEdit = hasPermission(permisos, 'action.create_update');
   const isMobile = !useMediaQuery('(min-width: 768px)');
 
   // Filtros

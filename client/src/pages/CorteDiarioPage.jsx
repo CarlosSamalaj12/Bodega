@@ -9,6 +9,7 @@ import { SearchInput } from '@/components/ui/SearchInput';
 import { toast } from '@/components/ui/Toast';
 
 import { useAuthStore } from '@/stores/auth.store';
+import { hasPermission } from '@/utils/permissions';
 import { PinModal } from '@/components/ui/PinModal';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
@@ -32,7 +33,7 @@ export default function CorteDiarioPage() {
 
   const user = useAuthStore((s) => s.user);
   const permisos = useMemo(() => user?.permisos || {}, [user]);
-  const canCierre = permisos['action.create_update'] !== false;
+  const canCierre = hasPermission(permisos, 'action.create_update');
 
   // Datos
   const [data, setData] = useState(null);

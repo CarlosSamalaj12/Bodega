@@ -7,6 +7,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
 import { toast } from '@/components/ui/Toast';
 import { useAuthStore } from '@/stores/auth.store';
+import { hasPermission } from '@/utils/permissions';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { catalogosService } from '@/services/catalogos.service';
 import { salidasService } from '@/services/salidas.service';
@@ -22,7 +23,7 @@ export default function SalidasPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((s) => s.user);
   const permisos = user?.permisos || {};
-  const canCreate = permisos['action.create_update'] !== false;
+  const canCreate = hasPermission(permisos, 'action.create_update');
   const isMobile = !useMediaQuery('(min-width: 768px)');
 
   const [modalOpen, setModalOpen] = useState(false);

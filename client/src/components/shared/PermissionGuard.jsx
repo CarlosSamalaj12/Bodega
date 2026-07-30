@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth.store';
+import { hasPermission } from '@/utils/permissions';
 
 /**
  * PermissionGuard
@@ -51,10 +52,6 @@ export function usePermission() {
   return {
     permisos: perms || null,
     hasPermsLoaded,
-    has: (key) => {
-      if (!hasPermsLoaded) return true; // permisivo si no hay datos
-      const v = perms[key];
-      return !(v === false || v === 0);
-    },
+    has: (key) => hasPermission(perms, key),
   };
 }
