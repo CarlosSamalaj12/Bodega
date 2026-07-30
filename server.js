@@ -5603,11 +5603,21 @@ app.get("/api/reportes/existencias/stock-minimo", auth, async (req, res) => {
 app.get("/api/reportes/corte-diario", auth, async (req, res) => {
   const scope = await resolveStockScope(req.user);
   if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
+
+  const queryDate = String(req.query.fecha || "").trim();
+  const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(queryDate);
+  const targetDate = isValidDate ? queryDate : localYmd(new Date());
+
+  const targetDateObj = new Date(targetDate + "T12:00:00");
+  const yesterdayObj = new Date(targetDateObj.getTime() - 24 * 60 * 60 * 1000);
+  const fecha_ayer = localYmd(yesterdayObj);
+  const fecha_hoy = targetDate;
+
   if (!scope.can_view_existencias) {
     return res.json({
       bodega: null,
-      fecha_ayer: localYmd(new Date(Date.now() - 24 * 60 * 60 * 1000)),
-      fecha_hoy: localYmd(new Date()),
+      fecha_ayer,
+      fecha_hoy,
       rows: [],
     });
   }
@@ -5616,8 +5626,8 @@ app.get("/api/reportes/corte-diario", auth, async (req, res) => {
   if (warehouseScope.denied || !warehouseScope.selected) {
     return res.json({
       bodega: null,
-      fecha_ayer: localYmd(new Date(Date.now() - 24 * 60 * 60 * 1000)),
-      fecha_hoy: localYmd(new Date()),
+      fecha_ayer,
+      fecha_hoy,
       rows: [],
     });
   }
@@ -5640,10 +5650,10 @@ app.get("/api/reportes/corte-diario", auth, async (req, res) => {
     `SELECT p.id_producto,
             p.nombre_producto,
             p.sku,
-            COALESCE(SUM(CASE WHEN k.creado_en < CURDATE() THEN k.delta_cantidad ELSE 0 END), 0) AS existencia_ayer,
-            COALESCE(SUM(CASE WHEN k.creado_en >= CURDATE() AND k.delta_cantidad > 0 THEN k.delta_cantidad ELSE 0 END), 0) AS entradas_hoy,
-            COALESCE(SUM(CASE WHEN k.creado_en >= CURDATE() AND k.delta_cantidad < 0 THEN ABS(k.delta_cantidad) ELSE 0 END), 0) AS salidas_hoy,
-            COALESCE(SUM(k.delta_cantidad), 0) AS existencia_actual
+            COALESCE(SUM(CASE WHEN k.creado_en < :target_date THEN k.delta_cantidad ELSE 0 END), 0) AS existencia_ayer,
+            COALESCE(SUM(CASE WHEN k.creado_en >= :target_date AND k.creado_en < :next_date AND k.delta_cantidad > 0 THEN k.delta_cantidad ELSE 0 END), 0) AS entradas_hoy,
+            COALESCE(SUM(CASE WHEN k.creado_en >= :target_date AND k.creado_en < :next_date AND k.delta_cantidad < 0 THEN ABS(k.delta_cantidad) ELSE 0 END), 0) AS salidas_hoy,
+            COALESCE(SUM(CASE WHEN k.creado_en < :next_date THEN k.delta_cantidad ELSE 0 END), 0) AS existencia_actual
      FROM productos p
      LEFT JOIN (
        SELECT k.*
@@ -5661,14 +5671,14 @@ app.get("/api/reportes/corte-diario", auth, async (req, res) => {
              OR ABS(existencia_actual) > 0)
      ORDER BY p.nombre_producto ASC
      LIMIT ${limit}`,
-    { id_bodega, show_all, ...qf.params }
+    { id_bodega, show_all, target_date: targetDate, next_date: addDaysYmd(targetDate, 1), ...qf.params }
   );
 
   res.json({
     bodega: bod?.nombre_bodega || `Bodega #${id_bodega}`,
     permite_salida_conteo_final: Number(bod?.permite_salida_conteo_final || 0) === 1,
-    fecha_ayer: localYmd(new Date(Date.now() - 24 * 60 * 60 * 1000)),
-    fecha_hoy: localYmd(new Date()),
+    fecha_ayer,
+    fecha_hoy,
     rows,
   });
 });

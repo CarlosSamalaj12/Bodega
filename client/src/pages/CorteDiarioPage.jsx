@@ -70,12 +70,19 @@ export default function CorteDiarioPage() {
   };
 
   const fetchData = useCallback(async () => {
+    if (!cierreStatus) return;
     setLoading(true);
     try {
       const params = { limit: 2000 };
       if (committedSearch) params.q = committedSearch;
       if (warehouseId) params.warehouse = warehouseId;
       if (showAll) params.show_all = 1;
+
+      if (cierreStatus?.pending_yesterday_close) {
+        params.fecha = cierreStatus.ayer;
+      } else {
+        params.fecha = cierreStatus.hoy;
+      }
 
       const { data: res } = await api.get('/api/reportes/corte-diario', { params });
       setData(res);
@@ -85,7 +92,7 @@ export default function CorteDiarioPage() {
     } finally {
       setLoading(false);
     }
-  }, [committedSearch, warehouseId, showAll]);
+  }, [committedSearch, warehouseId, showAll, cierreStatus]);
 
   // Consultar estado del cierre al montar y tras refrescar
   const fetchCierreStatus = useCallback(async () => {
@@ -157,6 +164,7 @@ export default function CorteDiarioPage() {
     try {
       const { data: res } = await api.post('/api/cierre-dia', {
         confirmar: 1,
+        fecha: cierreStatus?.pending_yesterday_close ? cierreStatus.ayer : cierreStatus?.hoy,
       });
       toast.success(res?.message || 'Cierre del día realizado correctamente');
       setCierreModalOpen(false);
@@ -175,7 +183,7 @@ export default function CorteDiarioPage() {
     } finally {
       setCierreConfirming(false);
     }
-  }, [fetchData, fetchCierreStatus]);
+  }, [fetchData, fetchCierreStatus, cierreStatus]);
 
   const handlePinConfirm = useCallback(async (pin) => {
     setPinConfirming(true);
@@ -183,6 +191,7 @@ export default function CorteDiarioPage() {
       const { data: res } = await api.post('/api/cierre-dia', {
         confirmar: 1,
         supervisor_pin: pin,
+        fecha: cierreStatus?.pending_yesterday_close ? cierreStatus.ayer : cierreStatus?.hoy,
       });
       toast.success(res?.message || 'Cierre del día realizado correctamente');
       setPinRequired(false);
@@ -193,7 +202,7 @@ export default function CorteDiarioPage() {
     } finally {
       setPinConfirming(false);
     }
-  }, [fetchData, fetchCierreStatus]);
+  }, [fetchData, fetchCierreStatus, cierreStatus]);
 
   // Totales
   const totales = useMemo(() => {
@@ -528,7 +537,7 @@ export default function CorteDiarioPage() {
           </ul>
           {cierreStatus && (
             <div className="corte-diario__cierre-resumen">
-              <span><strong>Fecha:</strong> {formatDate(cierreStatus.hoy)}</span>
+              <span><strong>Fecha:</strong> {formatDate(cierreStatus.pending_yesterday_close ? cierreStatus.ayer : cierreStatus.hoy)}</span>
               <span><strong>Bodega:</strong> {cierreStatus.id_bodega}</span>
               <span><strong>Productos:</strong> {rows.length}</span>
               <span><strong>Existencia final:</strong> {fmtNum(totales.exActual)}</span>
