@@ -5606,8 +5606,8 @@ app.get("/api/reportes/corte-diario", auth, async (req, res) => {
   if (!scope.can_view_existencias) {
     return res.json({
       bodega: null,
-      fecha_ayer: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-      fecha_hoy: new Date().toISOString().slice(0, 10),
+      fecha_ayer: localYmd(new Date(Date.now() - 24 * 60 * 60 * 1000)),
+      fecha_hoy: localYmd(new Date()),
       rows: [],
     });
   }
@@ -5616,8 +5616,8 @@ app.get("/api/reportes/corte-diario", auth, async (req, res) => {
   if (warehouseScope.denied || !warehouseScope.selected) {
     return res.json({
       bodega: null,
-      fecha_ayer: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-      fecha_hoy: new Date().toISOString().slice(0, 10),
+      fecha_ayer: localYmd(new Date(Date.now() - 24 * 60 * 60 * 1000)),
+      fecha_hoy: localYmd(new Date()),
       rows: [],
     });
   }
@@ -5667,8 +5667,8 @@ app.get("/api/reportes/corte-diario", auth, async (req, res) => {
   res.json({
     bodega: bod?.nombre_bodega || `Bodega #${id_bodega}`,
     permite_salida_conteo_final: Number(bod?.permite_salida_conteo_final || 0) === 1,
-    fecha_ayer: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-    fecha_hoy: new Date().toISOString().slice(0, 10),
+    fecha_ayer: localYmd(new Date(Date.now() - 24 * 60 * 60 * 1000)),
+    fecha_hoy: localYmd(new Date()),
     rows,
   });
 });
