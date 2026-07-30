@@ -398,6 +398,15 @@ export function EntradaForm({
         <Button type="button" variant="ghost" onClick={onCancel} disabled={submitting}>
           Cancelar
         </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={addLine}
+          disabled={submitting}
+          title="Agregar otra línea a este movimiento"
+        >
+          + Agregar línea
+        </Button>
         <Button type="submit" variant="primary" disabled={!canSubmit}>
           {submitting ? <Spinner size={14} /> : `Registrar entrada${totales.lineasValidas ? ` (${totales.lineasValidas})` : ''}`}
         </Button>

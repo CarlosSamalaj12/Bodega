@@ -3271,7 +3271,7 @@ app.get("/api/productos/search", auth, async (req, res) => {
   const q = String(req.query.q || "").trim();
   if (!q) return res.json([]);
   const id_bodega = Number(req.query.warehouse || 0) || null;
-  const qf = buildTokenizedPrefixFilter(q, ["nombre_producto", "sku"], "psq");
+  const qf = buildTokenizedLikeFilter(q, ["nombre_producto", "sku"], "psq");
   const visibilityClause = buildProductWarehouseVisibilityClause("p.id_producto", "id_bodega");
   const [rows] = await pool.query(
     `SELECT p.id_producto, p.nombre_producto, p.sku,

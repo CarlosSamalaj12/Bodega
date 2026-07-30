@@ -119,16 +119,19 @@ export function printPedidoPos80mm(pedido, opts = {}) {
       border-bottom: 2px solid #000;
       border-top: 2px solid #000;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: clip;
     }
 
     .lines-table th.right {
       text-align: right;
     }
 
+    .lines-table th:nth-child(1) { width: auto; }
     .lines-table th:nth-child(2),
     .lines-table th:nth-child(3),
     .lines-table th:nth-child(4) {
-      width: 38px;
+      width: 13mm;
     }
 
     .lines-table tr {
@@ -138,6 +141,7 @@ export function printPedidoPos80mm(pedido, opts = {}) {
     .lines-table td {
       padding: 4px 2px;
       vertical-align: top;
+      overflow: hidden;
     }
 
     .lines-table td.product-name {
@@ -151,6 +155,8 @@ export function printPedidoPos80mm(pedido, opts = {}) {
     .lines-table td.right {
       text-align: right;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: clip;
     }
 
     .totals-section {
@@ -180,24 +186,33 @@ export function printPedidoPos80mm(pedido, opts = {}) {
     @media print {
       @page {
         size: 80mm auto;
-        margin: 0;
+        margin: 0 !important;
+      }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        left: 0 !important;
       }
       body {
         width: 80mm !important;
         max-width: 80mm !important;
-        padding: 5mm 4mm 10mm !important;
+        min-width: 80mm !important;
+        padding: 5mm 0 10mm 0 !important;
         font-size: 16px !important;
+        text-align: left !important;
       }
+      .ticket { margin: 0 !important; padding: 0 0.5mm !important; }
+      .lines-table { width: calc(100% + 1.5mm) !important; margin-left: -1.5mm !important; }
       .header { margin-bottom: 5mm; padding-bottom: 4mm; }
       .info-table { margin-bottom: 4mm; }
       .info-table td { padding: 1.5mm 0; }
-      .info-table .label { width: 26mm; }
+      .info-table .label { width: 24mm; }
       .separator { margin: 3mm 0; }
       .lines-title { margin-bottom: 2mm; }
       .lines-table th, .lines-table td { padding: 1mm 0.5mm; }
       .lines-table th:nth-child(2),
       .lines-table th:nth-child(3),
-      .lines-table th:nth-child(4) { width: 16mm; }
+      .lines-table th:nth-child(4) { width: 11mm; }
       .lines-table tr { border-bottom: 2px solid #000; }
       .totals-section { margin-top: 2mm; }
       .totals-section div { padding: 1mm 0; }
@@ -244,7 +259,7 @@ export function printPedidoPos80mm(pedido, opts = {}) {
         <tr>
           <th>Producto</th>
           <th class="right">Solic.</th>
-          <th class="right">Despachado</th>
+          <th class="right">Desp.</th>
           <th class="right">Pend.</th>
         </tr>
       </thead>
