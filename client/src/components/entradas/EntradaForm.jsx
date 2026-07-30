@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { ProductPicker } from '@/components/ui/ProductPicker';
 import { LinesEditor } from '@/components/ui/LinesEditor';
 import { Spinner } from '@/components/ui/Spinner';
+import { PinModal } from '@/components/ui/PinModal';
 import { toast } from '@/components/ui/Toast';
 import { entradasService } from '@/services/entradas.service';
 import './EntradaForm.scss';
@@ -39,6 +40,11 @@ export function EntradaForm({
   const [lines, setLines] = useState([{ ...EMPTY_LINE }]);
   const [submitError, setSubmitError] = useState(null);
   const [duplicateWarn, setDuplicateWarn] = useState(null);
+
+  // PIN de supervisor (cuando el motivo es AJUSTE)
+  const [pinRequired, setPinRequired] = useState(false);
+  const [pinSubmitting, setPinSubmitting] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState(null);
 
   const setCab = (k, v) => setCabecera((p) => ({ ...p, [k]: v }));
   const setLine = (idx, patch) => {
@@ -114,11 +120,57 @@ export function EntradaForm({
       toast.success(`Entrada registrada (movimiento #${data.id_movimiento})`);
       onCreated?.(data);
     } catch (e) {
-      const msg = e?.response?.data?.error || 'No se pudo registrar la entrada';
+      const errData = e?.response?.data;
+      // Si el motivo es AJUSTE, el backend exige PIN de supervisor.
+      if (errData?.code === 'SUPERVISOR_PIN_REQUIRED') {
+        setPendingPayload(payload);
+        setPinRequired(true);
+        onSubmittingChange?.(false);
+        return;
+      }
+      const msg = errData?.error || 'No se pudo registrar la entrada';
       setSubmitError(msg);
     } finally {
       onSubmittingChange?.(false);
     }
+  };
+
+  // Reintenta el envío con el PIN de supervisor capturado.
+  const handlePinConfirm = async (pin) => {
+    if (!pendingPayload) {
+      setPinRequired(false);
+      return;
+    }
+    setPinSubmitting(true);
+    try {
+      const data = await entradasService.create({
+        ...pendingPayload,
+        supervisor_pin: pin,
+      });
+      toast.success(`Entrada registrada (movimiento #${data.id_movimiento})`);
+      setPinRequired(false);
+      setPendingPayload(null);
+      onCreated?.(data);
+    } catch (e) {
+      const errData = e?.response?.data;
+      // Si el PIN es inválido, mantenemos el modal abierto con un toast de error.
+      if (errData?.code === 'INVALID_SUPERVISOR_PIN') {
+        toast.error('PIN de supervisor inválido. Intenta de nuevo.');
+        return;
+      }
+      // Si requiere PIN de nuevo o cualquier otro error, cerramos el modal
+      // y mostramos el error en el form.
+      toast.error(errData?.error || 'No se pudo registrar la entrada');
+      setPinRequired(false);
+      setPendingPayload(null);
+    } finally {
+      setPinSubmitting(false);
+    }
+  };
+
+  const handlePinCancel = () => {
+    setPinRequired(false);
+    setPendingPayload(null);
   };
 
   const columns = [
@@ -314,6 +366,16 @@ export function EntradaForm({
           {submitting ? <Spinner size={14} /> : `Registrar entrada${totales.lineasValidas ? ` (${totales.lineasValidas})` : ''}`}
         </Button>
       </div>
+
+      {/* Modal de PIN para motivos tipo AJUSTE (entrada de inventario) */}
+      <PinModal
+        open={pinRequired}
+        title="PIN de supervisor"
+        description="Este motivo requiere autorización de un supervisor. Ingresa el PIN para registrar el ajuste."
+        submitting={pinSubmitting}
+        onConfirm={handlePinConfirm}
+        onCancel={handlePinCancel}
+      />
     </form>
   );
 }

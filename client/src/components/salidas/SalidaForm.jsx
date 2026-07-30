@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { ProductPicker } from '@/components/ui/ProductPicker';
 import { LinesEditor } from '@/components/ui/LinesEditor';
 import { Spinner } from '@/components/ui/Spinner';
+import { PinModal } from '@/components/ui/PinModal';
 import { toast } from '@/components/ui/Toast';
 import { salidasService } from '@/services/salidas.service';
 import './SalidaForm.scss';
@@ -35,6 +36,11 @@ export function SalidaForm({
   });
   const [lines, setLines] = useState([{ ...EMPTY_LINE }]);
   const [submitError, setSubmitError] = useState(null);
+
+  // PIN de supervisor (cuando el motivo es AJUSTE)
+  const [pinRequired, setPinRequired] = useState(false);
+  const [pinSubmitting, setPinSubmitting] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState(null);
 
   const setCab = (k, v) => setCabecera((p) => ({ ...p, [k]: v }));
   const setLine = (idx, patch) => {
@@ -92,11 +98,56 @@ export function SalidaForm({
       toast.success(`Salida registrada (movimiento #${data.id_movimiento})`);
       onCreated?.(data);
     } catch (e) {
-      const msg = e?.response?.data?.error || 'No se pudo registrar la salida';
+      const errData = e?.response?.data;
+      // Si el motivo es AJUSTE, el backend exige PIN de supervisor.
+      if (errData?.code === 'SUPERVISOR_PIN_REQUIRED') {
+        setPendingPayload(payload);
+        setPinRequired(true);
+        onSubmittingChange?.(false);
+        return;
+      }
+      const msg = errData?.error || 'No se pudo registrar la salida';
       setSubmitError(msg);
     } finally {
       onSubmittingChange?.(false);
     }
+  };
+
+  // Reintenta el envío con el PIN de supervisor capturado.
+  const handlePinConfirm = async (pin) => {
+    if (!pendingPayload) {
+      setPinRequired(false);
+      return;
+    }
+    setPinSubmitting(true);
+    try {
+      const data = await salidasService.create({
+        ...pendingPayload,
+        supervisor_pin: pin,
+      });
+      toast.success(`Salida registrada (movimiento #${data.id_movimiento})`);
+      setPinRequired(false);
+      setPendingPayload(null);
+      onCreated?.(data);
+    } catch (e) {
+      const errData = e?.response?.data;
+      // PIN inválido: mantener el modal abierto con un toast de error.
+      if (errData?.code === 'INVALID_SUPERVISOR_PIN') {
+        toast.error('PIN de supervisor inválido. Intenta de nuevo.');
+        return;
+      }
+      // Otro error: cerrar el modal y mostrar en el form.
+      toast.error(errData?.error || 'No se pudo registrar la salida');
+      setPinRequired(false);
+      setPendingPayload(null);
+    } finally {
+      setPinSubmitting(false);
+    }
+  };
+
+  const handlePinCancel = () => {
+    setPinRequired(false);
+    setPendingPayload(null);
   };
 
   const columns = [
@@ -246,6 +297,16 @@ export function SalidaForm({
           {submitting ? <Spinner size={14} /> : `Registrar salida${totales.lineasValidas ? ` (${totales.lineasValidas})` : ''}`}
         </Button>
       </div>
+
+      {/* Modal de PIN para motivos tipo AJUSTE (salida de inventario) */}
+      <PinModal
+        open={pinRequired}
+        title="PIN de supervisor"
+        description="Este motivo requiere autorización de un supervisor. Ingresa el PIN para registrar el ajuste."
+        submitting={pinSubmitting}
+        onConfirm={handlePinConfirm}
+        onCancel={handlePinCancel}
+      />
     </form>
   );
 }

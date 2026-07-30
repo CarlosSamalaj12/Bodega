@@ -107,6 +107,10 @@ $z-sticky: 200;
 $z-fixed: 300;
 $z-modal-backdrop: 1000;
 $z-modal: 1001;
+// Modal anidado sobre otro modal (ej. PIN sobre Nueva Entrada).
+// Mayor que $z-modal para quedar encima, menor que $z-toast para no
+// tapar notificaciones emergentes.
+$z-modal-nested: 1500;
 $z-toast: 2000;
 $z-tooltip: 3000;
 

@@ -66,15 +66,40 @@ export function ProductPicker({
     setActiveIndex(0);
   }, [productos]);
 
-  // Recalcula coordenadas del input para posicionar el portal
+  // Recalcula coordenadas del input y decide si el dropdown va hacia abajo
+  // o hacia arriba según el espacio disponible en el viewport.
+  // También limita el alto para que nunca se salga de la ventana.
   const updateCoords = () => {
     const el = inputRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+    const vw = window.innerWidth || document.documentElement.clientWidth;
+    const gap = 6; // separación entre input y dropdown
+    const margin = 12; // margen de seguridad al borde inferior/superior
+
+    // Alto objetivo: 360px, pero nunca más que lo que cabe en el viewport.
+    const desired = 360;
+    const spaceBelow = vh - rect.bottom - gap - margin;
+    const spaceAbove = rect.top - gap - margin;
+
+    // Si no cabe bien hacia abajo, hacer flip hacia arriba.
+    // Umbral mínimo: 200px (que alcance para mostrar 2-3 opciones).
+    const minHeight = 200;
+    const flipUp = spaceBelow < minHeight && spaceAbove > spaceBelow;
+
+    const available = flipUp ? spaceAbove : spaceBelow;
+    const maxHeight = Math.max(minHeight, Math.min(desired, available));
+
     setCoords({
-      top: rect.bottom + 6,
+      top: flipUp ? null : (rect.bottom + gap),
+      bottom: flipUp ? (window.innerHeight - rect.top + gap) : null,
       left: rect.left,
       width: rect.width,
+      maxHeight,
+      flipUp,
+      // Si el dropdown se sale por la derecha, lo alineamos al borde derecho.
+      rightAligned: rect.left + rect.width > vw - 8,
     });
   };
 
@@ -188,9 +213,13 @@ export function ProductPicker({
             role="listbox"
             style={{
               position: 'fixed',
-              top: coords.top,
-              left: coords.left,
+              top: coords.flipUp ? undefined : coords.top,
+              bottom: coords.flipUp ? coords.bottom : undefined,
+              left: coords.rightAligned
+                ? Math.max(8, window.innerWidth - coords.left - coords.width)
+                : coords.left,
               width: coords.width,
+              maxHeight: coords.maxHeight,
             }}
             onMouseDown={(e) => e.preventDefault()}
           >

@@ -41,7 +41,10 @@
     background: $color-bg-2;
     border: 1px solid $color-stroke;
     border-radius: $radius-md;
-    max-height: 200px;
+    // Crece según el contenido pero respeta la altura del modal.
+    // El modal padre ya limita el alto a calc(100vh - 32px) y hace scroll
+    // interno en su __body, así que no necesitamos un cap artificial aquí.
+    max-height: min(40vh, 320px);
     overflow: auto;
     @include custom-scrollbar;
   }

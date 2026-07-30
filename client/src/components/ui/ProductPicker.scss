@@ -65,7 +65,9 @@
     border: 1px solid $color-stroke;
     border-radius: $radius-md;
     box-shadow: $shadow-lg;
-    max-height: 360px;
+    // El max-height real lo calcula el JS según el viewport.
+    // Este es solo un fallback para que nunca crezca demasiado.
+    max-height: 80vh;
     display: flex;
     flex-direction: column;
     overflow: hidden;

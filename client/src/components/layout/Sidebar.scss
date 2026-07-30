@@ -166,6 +166,7 @@
     margin-top: $space-4;
     padding-top: $space-4;
     border-top: 1px solid $color-stroke;
+    flex-shrink: 0; // No comprimirse cuando el nav tiene muchos items
   }
 
   &__user {

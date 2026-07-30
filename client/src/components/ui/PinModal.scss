@@ -7,17 +7,23 @@
 
 /// Overlay que envuelve backdrop + modal para capturar eventos
 /// de teclado (Escape, Enter) desde un solo contenedor.
+///
+/// Importante: este overlay puede abrirse ENCIMA de otro modal abierto
+/// (por ejemplo, cuando se hace un ajuste de inventario con motivo AJUSTE
+/// y el backend pide PIN: el modal de Nueva Entrada sigue abierto y el
+/// PIN debe verse por encima). Por eso usamos $z-modal-nested, no
+/// $z-modal-backdrop.
 .pin-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: $z-modal-backdrop;
+  z-index: $z-modal-nested;
   display: flex;
   align-items: center;
   justify-content: center;
 
   // El backdrop interno de .modal-backdrop ya tiene su propio
-  // z-index, pero el overlay debe estar por encima de otros
-  // elementos de la página para capturar el teclado correctamente.
+  // z-index, pero el overlay debe estar por encima del modal padre
+  // para no quedar tapado.
 
   @media (max-width: $bp-md) {
     align-items: flex-end; // bottom sheet en móvil
