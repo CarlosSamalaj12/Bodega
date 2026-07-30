@@ -5523,9 +5523,10 @@ app.get("/api/reportes/corte-diario", auth, async (req, res) => {
   const limit = Math.max(1, Math.min(2000, Number(req.query.limit || 1000)));
 
   const [[bod]] = await pool.query(
-    `SELECT nombre_bodega
-     FROM bodegas
-     WHERE id_bodega=:id_bodega
+    `SELECT b.nombre_bodega, COALESCE(cb.permite_salida_conteo_final, 0) AS permite_salida_conteo_final
+     FROM bodegas b
+     LEFT JOIN configuracion_bodega cb ON cb.id_bodega=b.id_bodega
+     WHERE b.id_bodega=:id_bodega
      LIMIT 1`,
     { id_bodega }
   );
@@ -5560,6 +5561,7 @@ app.get("/api/reportes/corte-diario", auth, async (req, res) => {
 
   res.json({
     bodega: bod?.nombre_bodega || `Bodega #${id_bodega}`,
+    permite_salida_conteo_final: Number(bod?.permite_salida_conteo_final || 0) === 1,
     fecha_ayer: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
     fecha_hoy: new Date().toISOString().slice(0, 10),
     rows,
@@ -7894,9 +7896,14 @@ app.get("/api/orders/:id/details", auth, async (req, res) => {
   const stockScope = await resolveStockScope(req.user);
   if (!actorWarehouse) return res.status(400).json({ error: "Usuario sin bodega" });
   const [[pe]] = await pool.query(
-    `SELECT p.*, b.nombre_bodega AS from_warehouse
+    `SELECT p.*, 
+            b.nombre_bodega AS from_warehouse,
+            bs.nombre_bodega AS requester_warehouse,
+            u.nombre_completo AS requester_name
      FROM pedido_encabezado p
      JOIN bodegas b ON b.id_bodega=p.id_bodega_surtidor
+     LEFT JOIN bodegas bs ON bs.id_bodega=p.id_bodega_solicita
+     LEFT JOIN usuarios u ON u.id_usuario=p.id_usuario_solicita
      WHERE p.id_pedido=:id_pedido`,
     { id_pedido }
   );
@@ -7931,8 +7938,13 @@ app.get("/api/orders/:id/details", auth, async (req, res) => {
   );
 
   res.json({
+    id_pedido: pe.id_pedido,
+    creado_en: pe.creado_en,
+    estado: pe.estado || null,
     from_warehouse: pe.from_warehouse,
-    status: pe.estado || null,
+    requester_warehouse: pe.requester_warehouse,
+    requester_name: pe.requester_name,
+    observaciones: pe.observaciones || null,
     justificacion_despacho: pe.justificacion_despacho || null,
     lines,
   });

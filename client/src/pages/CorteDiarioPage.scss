@@ -63,6 +63,10 @@
     @media (min-width: 640px) {
       grid-template-columns: repeat(4, 1fr);
     }
+
+    @media (min-width: 1024px) {
+      grid-template-columns: repeat(5, 1fr);
+    }
   }
 
   &__metric-card {
@@ -140,6 +144,46 @@
     &--current {
       font-weight: $font-weight-semibold;
       color: $color-text;
+    }
+  }
+
+  // ---- Input conteo final ----
+  &__conteo-input {
+    width: 90px;
+    text-align: right;
+    padding: 2px 4px;
+    font-size: 12px;
+    border: 1px solid $color-accent;
+    border-radius: $radius-sm;
+    background: #fff;
+    color: $color-text;
+    font-family: $font-mono;
+    font-weight: 600;
+
+    &:focus {
+      outline: none;
+      border-color: $color-accent;
+      background: #fff;
+    }
+
+    &--error {
+      border-color: $color-danger;
+      background: #fff0f0;
+      color: $color-danger;
+    }
+
+    &--ok {
+      border-color: $color-success;
+      background: #f0fff0;
+    }
+  }
+
+  // ---- Fila con error ----
+  &__row--error {
+    background-color: rgba($color-danger, 0.08);
+
+    td {
+      background-color: transparent;
     }
   }
 

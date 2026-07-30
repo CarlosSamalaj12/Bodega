@@ -39,6 +39,10 @@ export default function CorteDiarioPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Conteo final del día (para bodegas con permite_salida_conteo_final)
+  const [conteosFinales, setConteosFinales] = useState({}); // { [id_producto]: cantidad }
+  const [editingConteo, setEditingConteo] = useState(null);
+
   // Cierre del día
   const [cierreStatus, setCierreStatus] = useState(null); // null | { today_closed, yesterday_closed, ... }
   const [cierreModalOpen, setCierreModalOpen] = useState(false);
@@ -96,10 +100,57 @@ export default function CorteDiarioPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
   useEffect(() => { fetchCierreStatus(); }, [fetchCierreStatus]);
 
+  // Limpiar conteos finales cuando cambian los datos (nueva bodega o refrescar)
+  useEffect(() => {
+    setConteosFinales({});
+    setEditingConteo(null);
+  }, [data?.bodega, data?.fecha_hoy]);
+
+  // Handler para cambiar el conteo final
+  const handleConteoFinalChange = (id_producto, value) => {
+    const num = value === '' ? null : Number(value);
+    // Bloquear valores negativos a nivel de handler
+    if (num !== null && num < 0) {
+      toast.error('El conteo final no puede ser negativo');
+      return;
+    }
+    setConteosFinales(prev => ({
+      ...prev,
+      [id_producto]: num
+    }));
+    setEditingConteo(null);
+  };
+
+  // Mensaje de error para un conteo inválido
+  const getConteoErrorMsg = (row) => {
+    const conteo = conteosFinales[row.id_producto];
+    if (conteo == null) return null;
+    if (conteo < 0) return 'No puede ser negativo';
+    if (conteo > Number(row.existencia_actual)) return `No puede exceder exist. actual (${Number(row.existencia_actual).toFixed(2)})`;
+    return null;
+  };
+
+  // rows se define aquí para que esté disponible antes de los useMemo que lo usan
+  const rows = data?.rows || [];
+
+  // Contar productos con errores
+  const conteosConError = useMemo(() => {
+    if (!data?.permite_salida_conteo_final) return 0;
+    return rows.filter(r => getConteoErrorMsg(r) !== null).length;
+  }, [rows, conteosFinales, data]);
+
+  // Verificar antes de cerrar
   const handleCerrarDia = useCallback(async () => {
     if (!cierreStatus || cierreStatus.today_closed) return;
+
+    // Si hay conteos inválidos, no permitir cerrar
+    if (data?.permite_salida_conteo_final && conteosConError > 0) {
+      toast.error(`Hay ${conteosConError} producto(s) con conteo inválido. Corrige los valores antes de cerrar.`);
+      return;
+    }
+
     setCierreModalOpen(true);
-  }, [cierreStatus]);
+  }, [cierreStatus, data, conteosConError]);
 
   const handleCierreConfirm = useCallback(async () => {
     setCierreConfirming(true);
@@ -144,8 +195,6 @@ export default function CorteDiarioPage() {
     }
   }, [fetchData, fetchCierreStatus]);
 
-  const rows = data?.rows || [];
-
   // Totales
   const totales = useMemo(() => {
     let exAyer = 0, entHoy = 0, salHoy = 0, exActual = 0;
@@ -155,8 +204,12 @@ export default function CorteDiarioPage() {
       salHoy += Number(r.salidas_hoy || 0);
       exActual += Number(r.existencia_actual || 0);
     }
-    return { exAyer, entHoy, salHoy, exActual };
-  }, [rows]);
+    // Si la bodega usa modo conteo final: salidas = existencia_ayer + entradas - existencia_actual
+    const salHoyPorConteo = data?.permite_salida_conteo_final
+      ? exAyer + entHoy - exActual
+      : salHoy;
+    return { exAyer, entHoy, salHoy, salHoyPorConteo, exActual };
+  }, [rows, data]);
 
   const hasActiveFilters = committedSearch || warehouseId || showAll;
 
@@ -213,7 +266,89 @@ export default function CorteDiarioPage() {
       align: 'right',
       render: (r) => <span className="corte-diario__qty corte-diario__qty--current">{fmtNum(r.existencia_actual)}</span>,
     },
-  ], []);
+    // Columna de Conteo Final (solo para bodegas con permite_salida_conteo_final)
+    ...(data?.permite_salida_conteo_final ? [{
+      key: 'conteo_final',
+      label: 'Conteo Final',
+      width: 140,
+      align: 'right',
+      render: (r) => {
+        const conteo = conteosFinales[r.id_producto];
+        const diff = conteo != null ? (Number(r.existencia_actual) - conteo) : null;
+        const isEditing = editingConteo === r.id_producto;
+        const errMsg = getConteoErrorMsg(r);
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+            {isEditing ? (
+              <input
+                type="number"
+                className="input"
+                step="0.001"
+                min="0"
+                autoFocus
+                defaultValue={conteo != null ? conteo : ''}
+                placeholder="—"
+                onBlur={(e) => handleConteoFinalChange(r.id_producto, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleConteoFinalChange(r.id_producto, e.target.value);
+                  if (e.key === 'Escape') setEditingConteo(null);
+                }}
+                style={{
+                  width: '110px',
+                  textAlign: 'right',
+                  padding: '5px 8px',
+                  fontSize: '14px',
+                  fontFamily: 'monospace',
+                  fontWeight: '700',
+                  color: '#1a1a1a',
+                  background: '#ffffff',
+                  border: '2px solid #6f42c1',
+                  borderRadius: '6px',
+                  outline: 'none',
+                }}
+              />
+            ) : (
+              <span
+                onClick={() => setEditingConteo(r.id_producto)}
+                style={{
+                  cursor: 'pointer',
+                  minWidth: '110px',
+                  textAlign: 'right',
+                  padding: '5px 10px',
+                  borderRadius: '6px',
+                  border: `2px ${conteo != null ? 'solid' : 'dashed'} ${errMsg ? '#dc3545' : conteo != null ? '#6f42c1' : '#555'}`,
+                  background: errMsg ? '#fff5f5' : conteo != null ? '#f5f0ff' : 'transparent',
+                  display: 'block',
+                  fontFamily: 'monospace',
+                  fontWeight: '700',
+                  fontSize: '14px',
+                  color: errMsg ? '#dc3545' : conteo != null ? '#1a1a1a' : '#888',
+                }}
+                title="Clic para ingresar conteo físico"
+              >
+                {conteo != null ? fmtNum(conteo) : '—'}
+              </span>
+            )}
+            {errMsg ? (
+              <span style={{ fontSize: '10px', color: '#dc3545', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                ⚠ {errMsg}
+              </span>
+            ) : diff != null ? (
+              <span style={{
+                fontSize: '11px',
+                color: diff > 0 ? '#28a745' : diff < 0 ? '#dc3545' : '#666',
+                fontWeight: 'bold',
+                fontFamily: 'monospace',
+              }}>
+                {diff > 0 ? `+${diff.toFixed(2)}` : diff.toFixed(2)}
+              </span>
+            ) : null}
+          </div>
+        );
+      },
+    }] : []),
+  ], [data, conteosFinales, editingConteo]);
 
   // Columnas para exportación
   const allExportColumns = [
@@ -317,6 +452,14 @@ export default function CorteDiarioPage() {
             <span className="corte-diario__metric-label">Existencia Actual</span>
             <span className="corte-diario__metric-value">{fmtNum(totales.exActual)}</span>
           </Card>
+          {data?.permite_salida_conteo_final && (
+            <Card compact className="corte-diario__metric-card" style={{ borderLeft: '3px solid #6f42c1' }}>
+              <span className="corte-diario__metric-label">Salida x Conteo</span>
+              <span className="corte-diario__metric-value" style={{ color: '#6f42c1' }}>
+                {totales.salHoyPorConteo != null ? `−${fmtNum(totales.salHoyPorConteo)}` : '—'}
+              </span>
+            </Card>
+          )}
         </div>
 
         {/* Tabla de datos */}
@@ -327,6 +470,11 @@ export default function CorteDiarioPage() {
             loading={loading}
             keyField="id_producto"
             density="sm"
+            rowClass={(r) => {
+              if (!data?.permite_salida_conteo_final) return undefined;
+              if (getConteoErrorMsg(r)) return 'corte-diario__row--error';
+              return undefined;
+            }}
             emptyTitle="Sin movimientos"
             emptyMessage="No hay productos con movimiento en el período seleccionado."
             emptyIcon="◷"
@@ -340,6 +488,9 @@ export default function CorteDiarioPage() {
             <li><strong>Entradas Hoy</strong> — Total de unidades que ingresaron hoy.</li>
             <li><strong>Salidas Hoy</strong> — Total de unidades que salieron hoy.</li>
             <li><strong>Existencia Actual</strong> — Stock disponible: <em>Existencia Ayer + Entradas − Salidas</em>.</li>
+            {data?.permite_salida_conteo_final && (
+              <li><strong>Conteo Final</strong> — Ingresa la cantidad contada físicamente. La <em>Salida por Conteo</em> se calcula como: <em>Existencia Actual − Conteo Final</em>. Haz clic en una celda para editarla.</li>
+            )}
           </ol>
         </Card>
       </div>
@@ -352,6 +503,20 @@ export default function CorteDiarioPage() {
         size="sm"
       >
         <div className="corte-diario__cierre-modal">
+          {data?.permite_salida_conteo_final && conteosConError > 0 && (
+            <div style={{
+              padding: '12px',
+              background: '#fff0f0',
+              border: '1px solid #dc3545',
+              borderRadius: '6px',
+              marginBottom: '16px'
+            }}>
+              <strong style={{ color: '#dc3545' }}>⚠ Hay conteos inválidos</strong>
+              <p style={{ margin: '8px 0 0', fontSize: '13px', color: '#721c24' }}>
+                {conteosConError} producto(s) tienen un conteo final menor a 0. Estos productos se muestran resaltados en rojo en la tabla.
+              </p>
+            </div>
+          )}
           <p>
             <strong>¿Estás seguro de realizar el cierre del día?</strong>
           </p>
@@ -375,7 +540,7 @@ export default function CorteDiarioPage() {
             </Button>
             <Button
               variant="primary"
-              disabled={cierreConfirming}
+              disabled={cierreConfirming || (data?.permite_salida_conteo_final && conteosConError > 0)}
               onClick={handleCierreConfirm}
             >
               {cierreConfirming ? 'Cerrando…' : 'Sí, cerrar día'}

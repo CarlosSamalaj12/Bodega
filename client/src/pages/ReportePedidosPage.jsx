@@ -12,6 +12,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import { formatDate } from '@/utils/format';
+import { printPedidoPos80mm } from '@/utils/print';
 import { catalogosService } from '@/services/catalogos.service';
 import api from '@/services/api';
 import './ReportePedidosPage.scss';
@@ -419,6 +420,32 @@ export default function ReportePedidosPage() {
                               ))}
                             </tbody>
                           </table>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem', gap: '0.5rem' }}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const pedidoParaImprimir = {
+                                  id_pedido: g.id_pedido,
+                                  creado_en: g.fecha_pedido || g.creado_en,
+                                  estado: g.estado,
+                                  requester_name: g.solicitante,
+                                  requester_warehouse: g.bodega_solicitante,
+                                  nombre_bodega_surtidor: g.bodega_despacho,
+                                  observaciones: g.observaciones,
+                                  lines: g.lineas.map(l => ({
+                                    nombre_producto: l.nombre_producto,
+                                    cantidad_solicitada: l.cantidad_solicitada,
+                                    cantidad_surtida: l.cantidad_surtida,
+                                    pendiente: l.pendiente,
+                                  })),
+                                };
+                                printPedidoPos80mm(pedidoParaImprimir, { autoPrint: true });
+                              }}
+                            >
+                              🖨 Imprimir ticket (80mm)
+                            </Button>
+                          </div>
                           {g.observaciones && <div className="reporte-pedidos__obs">{g.observaciones}</div>}
                           {g.usuario_aprobador && (
                             <div className="reporte-pedidos__obs">

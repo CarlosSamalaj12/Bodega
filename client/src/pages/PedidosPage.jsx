@@ -17,6 +17,7 @@ import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import { formatDate } from '@/utils/format';
 import { catalogosService } from '@/services/catalogos.service';
 import { pedidosService } from '@/services/pedidos.service';
+import { printPedidoPos80mm } from '@/utils/print';
 import { PedidoForm } from '@/components/pedidos/PedidoForm';
 import './PedidosPage.scss';
 
@@ -37,6 +38,7 @@ export default function PedidosPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [createdPedido, setCreatedPedido] = useState(null);
 
   const [bodegas, setBodegas] = useState([]);
   const [catalogError, setCatalogError] = useState(null);
@@ -79,9 +81,40 @@ export default function PedidosPage() {
     loadPedidos();
   }, [loadCatalogs, loadPedidos]);
 
-  const handleCreated = () => {
+  const handleCreated = async (data) => {
     setModalOpen(false);
     loadPedidos();
+    // Obtener detalles para poder imprimir
+    if (data?.id_pedido || data?.id_order) {
+      try {
+        const id = data.id_pedido || data.id_order;
+        const detalles = await pedidosService.getDetails(id);
+        // Los campos ya vienen del endpoint en el formato correcto
+        setCreatedPedido(detalles);
+      } catch (e) {
+        toast.error('No se pudieron cargar los detalles del pedido para imprimir');
+      }
+    }
+  };
+
+  const handlePrintPedido = () => {
+    if (createdPedido) {
+      printPedidoPos80mm(createdPedido, { autoPrint: true });
+      setCreatedPedido(null);
+    }
+  };
+
+  const handleDismissCreated = () => {
+    setCreatedPedido(null);
+  };
+
+  const handleImprimirPedido = async (pedido) => {
+    try {
+      const detalles = await pedidosService.getDetails(pedido.id_pedido);
+      printPedidoPos80mm(detalles, { autoPrint: true });
+    } catch (e) {
+      toast.error('No se pudo cargar el pedido para imprimir');
+    }
   };
 
   const pedidosSorted = useMemo(() => {
@@ -144,6 +177,26 @@ export default function PedidosPage() {
           const est = ESTADO_LABELS[p.estado] || { label: p.estado, variant: 'default' };
           return <Badge variant={est.variant}>{est.label}</Badge>;
         },
+      },
+      {
+        key: 'acciones',
+        label: 'Acciones',
+        width: 90,
+        sortable: false,
+        render: (p) => (
+          <button
+            type="button"
+            className="btn btn--sm btn--ghost"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleImprimirPedido(p);
+            }}
+            title="Imprimir ticket"
+            style={{ padding: '4px 8px', fontSize: '12px' }}
+          >
+            🖨 Imprimir
+          </button>
+        ),
       },
     ],
     []
@@ -269,6 +322,28 @@ export default function PedidosPage() {
             />
           </>
         )}
+      </Modal>
+
+      {/* Modal de éxito con opción de imprimir */}
+      <Modal
+        open={!!createdPedido}
+        onClose={handleDismissCreated}
+        title="✅ Pedido creado"
+        size="sm"
+      >
+        <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+          <p style={{ marginBottom: '1.5rem', fontSize: '1rem' }}>
+            El pedido <strong>#{createdPedido?.id_pedido}</strong> se creó exitosamente.
+          </p>
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Button variant="primary" onClick={handlePrintPedido}>
+              🖨 Imprimir ticket (80mm)
+            </Button>
+            <Button variant="ghost" onClick={handleDismissCreated}>
+              Cerrar
+            </Button>
+          </div>
+        </div>
       </Modal>
     </>
   );

@@ -31,11 +31,6 @@ export function printPedidoPos80mm(pedido, opts = {}) {
   <meta charset="UTF-8" />
   <title>${title} #${pedido.id_pedido}</title>
   <style>
-    @page {
-      size: 80mm auto;
-      margin: 0;
-    }
-
     * {
       margin: 0;
       padding: 0;
@@ -43,13 +38,13 @@ export function printPedidoPos80mm(pedido, opts = {}) {
     }
 
     body {
-      width: 80mm;
-      max-width: 80mm;
-      padding: 4mm 4mm 8mm;
+      width: 302px;
+      max-width: 302px;
+      padding: 20px 20px 40px;
       font-family: 'Courier New', 'Lucida Console', monospace;
-      font-size: 12px;
+      font-size: 16px;
       font-weight: bold;
-      line-height: 1.4;
+      line-height: 1.3;
       color: #000;
       background: #fff;
     }
@@ -60,65 +55,68 @@ export function printPedidoPos80mm(pedido, opts = {}) {
 
     .header {
       text-align: center;
-      margin-bottom: 4mm;
-      padding-bottom: 3mm;
-      border-bottom: 2px dashed #000;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 3px dashed #000;
     }
 
     .header h1 {
-      font-size: 18px;
+      font-size: 22px;
       font-weight: bold;
       text-transform: uppercase;
       letter-spacing: 1px;
-      margin-bottom: 1mm;
+      margin-bottom: 8px;
     }
 
     .header .sub {
-      font-size: 11px;
+      font-size: 14px;
     }
 
     .info-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 3mm;
-      font-size: 12px;
+      margin-bottom: 15px;
+      font-size: 16px;
     }
 
     .info-table td {
-      padding: 0.5mm 0;
+      padding: 6px 0;
       vertical-align: top;
     }
 
     .info-table .label {
       font-weight: bold;
-      width: 30mm;
+      width: 100px;
     }
 
-
+    .info-table .value {
+      word-break: break-word;
+    }
 
     .separator {
-      border-top: 1px dashed #000;
-      margin: 2mm 0;
+      border-top: 2px dashed #000;
+      margin: 12px 0;
     }
 
     .lines-title {
       font-weight: bold;
-      font-size: 13px;
-      margin-bottom: 1mm;
+      font-size: 17px;
+      margin-bottom: 8px;
     }
 
     .lines-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 11px;
+      font-size: 15px;
     }
 
     .lines-table th {
       text-align: left;
       font-weight: bold;
-      font-size: 11px;
-      padding: 0.5mm 1mm;
-      border-bottom: 1px solid #000;
+      font-size: 14px;
+      padding: 6px 4px;
+      border-bottom: 2px solid #000;
+      border-top: 2px solid #000;
       white-space: nowrap;
     }
 
@@ -126,9 +124,14 @@ export function printPedidoPos80mm(pedido, opts = {}) {
       text-align: right;
     }
 
+    .lines-table tr {
+      border-bottom: 2px solid #000;
+    }
+
     .lines-table td {
-      padding: 0.5mm 1mm;
+      padding: 8px 4px;
       vertical-align: top;
+      word-break: break-word;
     }
 
     .lines-table td.right {
@@ -137,18 +140,28 @@ export function printPedidoPos80mm(pedido, opts = {}) {
     }
 
     .lines-table .product-name {
-      max-width: 42mm;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      word-break: break-word;
+      white-space: normal;
+      line-height: 1.2;
+    }
+
+    .totals-section {
+      font-size: 16px;
+      margin-top: 8px;
+    }
+
+    .totals-section div {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
     }
 
     .footer {
       text-align: center;
-      margin-top: 4mm;
-      padding-top: 3mm;
-      border-top: 2px dashed #000;
-      font-size: 11px;
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 3px dashed #000;
+      font-size: 14px;
     }
 
     .estado-badge {
@@ -157,7 +170,27 @@ export function printPedidoPos80mm(pedido, opts = {}) {
     }
 
     @media print {
-      body { margin: 0; }
+      @page {
+        size: 80mm auto;
+        margin: 0;
+      }
+      body {
+        width: 80mm !important;
+        max-width: 80mm !important;
+        padding: 5mm 5mm 10mm !important;
+        font-size: 16px !important;
+      }
+      .header { margin-bottom: 5mm; padding-bottom: 4mm; }
+      .info-table { margin-bottom: 4mm; }
+      .info-table td { padding: 1.5mm 0; }
+      .info-table .label { width: 26mm; }
+      .separator { margin: 3mm 0; }
+      .lines-title { margin-bottom: 2mm; }
+      .lines-table th, .lines-table td { padding: 1.5mm 1mm; }
+      .lines-table tr { border-bottom: 2px solid #000; }
+      .totals-section { margin-top: 2mm; }
+      .totals-section div { padding: 1mm 0; }
+      .footer { margin-top: 5mm; padding-top: 4mm; }
     }
   </style>
 </head>
@@ -217,20 +250,20 @@ export function printPedidoPos80mm(pedido, opts = {}) {
 
     ${lines.length > 0 ? `
     <div class="separator"></div>
-    <div style="margin-top: 1mm; font-size: 12px;">
-      <div style="display:flex; justify-content:space-between;">
+    <div class="totals-section">
+      <div>
         <span>Total líneas:</span>
         <span>${lines.length}</span>
       </div>
-      <div style="display:flex; justify-content:space-between;">
+      <div>
         <span>Total solicitado:</span>
         <span>${lines.reduce((a, l) => a + Number(l.cantidad_solicitada || 0), 0)}</span>
       </div>
-      <div style="display:flex; justify-content:space-between;">
+      <div>
         <span>Total despachado:</span>
         <span>${lines.reduce((a, l) => a + Number(l.cantidad_surtida || 0), 0)}</span>
       </div>
-      <div style="display:flex; justify-content:space-between;">
+      <div>
         <span>Pendiente:</span>
         <span>${lines.reduce((a, l) => a + Number(l.pendiente || 0), 0)}</span>
       </div>
@@ -238,16 +271,21 @@ export function printPedidoPos80mm(pedido, opts = {}) {
 
     <div class="footer">
       <p>Bodega · Sistema de Inventario</p>
-      <p style="margin-top: 1mm; font-size: 10px;">Impreso: ${new Date().toLocaleString('es-GT')}</p>
+      <p style="margin-top: 1mm;">Impreso: ${new Date().toLocaleString('es-GT')}</p>
     </div>
   </div>
 
   <script>
     ${autoPrint ? `
     window.onload = function() {
+      // Maximizar la ventana para ver el contenido
+      if (window.screen) {
+        window.moveTo(0, 0);
+        window.resizeTo(window.screen.availWidth, window.screen.availHeight);
+      }
       setTimeout(function() {
         window.print();
-      }, 300);
+      }, 500);
     };
     window.onafterprint = function() {
       window.close();
@@ -257,17 +295,20 @@ export function printPedidoPos80mm(pedido, opts = {}) {
 </body>
 </html>`;
 
-  const win = window.open('', '_blank', 'width=400,height=600,menubar=no,toolbar=no,location=no,status=no');
-  if (!win) {
-    // Fallback si el popup fue bloqueado
-    const fallback = document.createElement('a');
-    fallback.href = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
-    fallback.download = `pedido_${pedido.id_pedido}.html`;
-    fallback.click();
-    return;
+  try {
+    const win = window.open('', '_blank', '');
+    if (!win) {
+      // Fallback si el popup fue bloqueado
+      alert('Por favor permite las ventanas emergentes para imprimir');
+      return;
+    }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+  } catch (err) {
+    console.error('Error al imprimir:', err);
+    alert('Error al abrir la ventana de impresión');
   }
-  win.document.write(html);
-  win.document.close();
 }
 
 /**
