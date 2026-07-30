@@ -2088,7 +2088,7 @@ async function verifySensitiveApproval(req, conn, actionLabel) {
     opsMetrics.sensitive_actions.blocked += 1;
     return {
       ok: false,
-      status: 401,
+      status: 400,
       error: "PIN de supervisor invalido",
       code: "INVALID_SUPERVISOR_PIN",
     };
@@ -2236,7 +2236,7 @@ async function verifyCurrentSupervisorPin(req, conn, actionLabel) {
     opsMetrics.sensitive_actions.blocked += 1;
     return {
       ok: false,
-      status: 401,
+      status: 400,
       error: "PIN de supervisor invalido",
       code: "INVALID_SUPERVISOR_PIN",
     };
@@ -7846,7 +7846,7 @@ app.post("/api/orders", auth, requirePermission("action.create_update", "crear p
     if (!pinOk) {
       trackPinFailure("order", { requester_user_id, actor_user_id: Number(req.user?.id_user || 0) });
       await conn.rollback();
-      return res.status(401).json({ error: "Codigo de usuario solicitante invalido" });
+      return res.status(400).json({ error: "Codigo de usuario solicitante invalido" });
     }
     const duplicatedPinOwner = await findOrderPinCollision(requester_pin, requester_user_id, conn, true);
     if (duplicatedPinOwner) {
@@ -8399,7 +8399,7 @@ app.post("/api/orders/:id/confirm-receipt", auth, async (req, res) => {
     if (!pinOk) {
       trackPinFailure("order", { id_pedido, requester_user_id: pe.id_usuario_solicita, actor_user_id: Number(req.user?.id_user || 0) });
       await conn.rollback();
-      return res.status(401).json({ error: "PIN del solicitante invalido" });
+      return res.status(400).json({ error: "PIN del solicitante invalido" });
     }
 
     await conn.query(
