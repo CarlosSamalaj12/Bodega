@@ -34,6 +34,15 @@ export const authService = {
     return data;
   },
 
+  /**
+   * Refresca el snapshot de permisos del usuario actual.
+   * Devuelve `{ permisos, catalogo, is_admin_role }`.
+   */
+  async refreshPermisos() {
+    const { data } = await api.get('/api/me/permisos');
+    return data;
+  },
+
   async listLoginUsers() {
     const { data } = await api.get('/api/auth/users');
     return Array.isArray(data) ? data : [];

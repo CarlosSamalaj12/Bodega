@@ -617,11 +617,25 @@ io.use((socket, next) => {
 });
 
 io.on("connection", (socket) => {
+  const idUser = Number(socket.user?.id_user || 0);
   const idWarehouse = Number(socket.user?.id_warehouse || 0);
+  // Room por usuario: para empujar cambios de permisos/estado en tiempo real.
+  if (idUser > 0) {
+    socket.join(`user:${idUser}`);
+  }
   if (idWarehouse > 0) {
     socket.join(`warehouse:${idWarehouse}`);
   }
 });
+
+// Avisa al socket del usuario afectado que sus permisos o su cuenta cambiaron,
+// para que el cliente recargue su snapshot y el Sidebar se reajuste en vivo.
+function emitPermisosChanged(idUsuario, kind = "permisos") {
+  const id = Number(idUsuario || 0);
+  if (id > 0) {
+    io.to(`user:${id}`).emit("permisos:changed", { id_usuario: id, kind });
+  }
+}
 
 function emitPedidoChanged(payload) {
   const reqWh = Number(payload?.requester_warehouse_id || 0);
@@ -923,6 +937,13 @@ const PERM_CATALOG = [
   { key: "section.view.usuarios", label: "Ver modulo Usuarios", group: "Secciones" },
   { key: "section.view.bodegas", label: "Ver modulo Bodegas", group: "Secciones" },
   { key: "section.view.conteo-ciclico", label: "Ver modulo Conteo Ciclico", group: "Secciones" },
+  { key: "section.view.transferencias", label: "Ver modulo Transferencias", group: "Secciones", default_active: 0 },
+  { key: "section.view.alertas", label: "Ver modulo Alertas", group: "Secciones", default_active: 0 },
+  { key: "section.view.existencias", label: "Ver modulo Existencias", group: "Secciones", default_active: 0 },
+  { key: "section.view.kardex", label: "Ver modulo Kardex", group: "Secciones", default_active: 0 },
+  { key: "section.view.tendencia-producto", label: "Ver modulo Tendencia Producto", group: "Secciones", default_active: 0 },
+  { key: "section.view.medidas", label: "Ver modulo Medidas", group: "Secciones", default_active: 0 },
+  { key: "section.view.motivos", label: "Ver modulo Motivos", group: "Secciones", default_active: 0 },
   { key: "section.view.r-existencias", label: "Ver Reporte Existencias", group: "Reportes" },
   { key: "section.view.r-corte-diario", label: "Ver Reporte Corte Diario", group: "Reportes" },
   { key: "section.view.r-entradas", label: "Ver Reporte Entradas", group: "Reportes" },
@@ -9716,6 +9737,7 @@ app.patch("/api/usuarios/:id", auth, requirePermission("action.manage_permission
     }
 
     clearPermisosCache(id_user);
+    emitPermisosChanged(id_user, "user");
     res.json({ ok: true });
   } catch (e) {
     if (e && e.code === "ER_DUP_ENTRY") {
@@ -9748,6 +9770,8 @@ app.post("/api/usuarios/:id/deactivate", auth, requirePermission("action.manage_
       );
       if (!chk.length) return res.status(404).json({ error: "Usuario no existe" });
     }
+    clearPermisosCache(id_user);
+    emitPermisosChanged(id_user, "deactivated");
     res.json({ ok: true });
   } catch (e) {
     return res.status(500).json({ error: String(e.message || e) });
@@ -9942,6 +9966,7 @@ app.put("/api/usuarios/:id/bodegas-acceso", auth, requirePermission("action.mana
       );
     }
     await conn.commit();
+    emitPermisosChanged(id_usuario, "bodegas-acceso");
     res.json({ ok: true, id_usuario, id_bodegas: ids });
   } catch (e) {
     await conn.rollback();
@@ -9991,6 +10016,7 @@ app.put("/api/usuarios/:id/permisos", auth, async (req, res) => {
     }
     await conn.commit();
     clearPermisosCache(id_usuario);
+    emitPermisosChanged(id_usuario, "permisos");
     res.json({ ok: true });
   } catch (e) {
     await conn.rollback();

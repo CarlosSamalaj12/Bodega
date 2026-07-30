@@ -116,9 +116,52 @@ export function AppLayout() {
     };
     socket.on('movimiento:changed', movHandler);
 
+    // ---- Permisos / cuenta cambiados (admin editó este usuario en vivo) ----
+    const permisosHandler = async (payload) => {
+      const kind = String(payload?.kind || 'permisos');
+
+      // "bodegas-acceso" no afecta user.permisos (el scope se calcula server-side
+      // en cada request), pero la data ya cargada en la página actual queda stale.
+      // Avisamos al usuario y le damos la opción de recargar manualmente.
+      if (kind === 'bodegas-acceso') {
+        toast.info('Tu acceso a bodegas fue actualizado. Recarga la página para ver los cambios.', {
+          duration: 0, // no auto-dismiss
+          actionLabel: 'Recargar',
+          onClick: () => window.location.reload(),
+        });
+        return;
+      }
+
+      // Para "permisos" / "user" / "deactivated" sí refrescamos el snapshot local.
+      try {
+        await useAuthStore.getState().refreshPermisos();
+      } catch {
+        // Si el refresh falla (token vencido, user desactivado), el interceptor
+        // de axios ya se encarga de mandar al /login.
+        return;
+      }
+      if (kind === 'deactivated') {
+        toast.error('Tu cuenta fue desactivada. Contacta al administrador.', {
+          duration: 8000,
+        });
+      } else if (kind === 'user') {
+        toast.info('Tu usuario fue actualizado. Recarga para aplicar algunos cambios.', {
+          duration: 5000,
+          actionLabel: 'Recargar',
+          onClick: () => window.location.reload(),
+        });
+      } else {
+        toast.info('Tus permisos fueron actualizados. El menú se ha ajustado.', {
+          duration: 5000,
+        });
+      }
+    };
+    socket.on('permisos:changed', permisosHandler);
+
     return () => {
       socket.off('pedido:changed', pedidoHandler);
       socket.off('movimiento:changed', movHandler);
+      socket.off('permisos:changed', permisosHandler);
     };
   }, [notifyNew]);
 
