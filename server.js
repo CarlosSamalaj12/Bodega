@@ -7838,24 +7838,31 @@ app.post("/api/orders", auth, requirePermission("action.create_update", "crear p
       await conn.rollback();
       return res.status(400).json({ error: "Usuario solicitante no disponible" });
     }
+    
+    let finalRequesterUserId = requester_user_id;
+    
     if (!requesterUser.pin_hash) {
-      await conn.rollback();
-      return res.status(400).json({ error: "El usuario solicitante no tiene PIN de pedidos configurado" });
+      const matchedUser = await findOrderPinCollision(requester_pin, 0, conn, true);
+      if (matchedUser) {
+        finalRequesterUserId = matchedUser.id_usuario;
+      } else {
+        await conn.rollback();
+        return res.status(400).json({ error: "El usuario solicitante no tiene PIN de pedidos configurado" });
+      }
+    } else {
+      const pinOk = await bcrypt.compare(requester_pin, requesterUser.pin_hash || "");
+      if (!pinOk) {
+        const matchedUser = await findOrderPinCollision(requester_pin, 0, conn, true);
+        if (matchedUser) {
+          finalRequesterUserId = matchedUser.id_usuario;
+        } else {
+          trackPinFailure("order", { requester_user_id, actor_user_id: Number(req.user?.id_user || 0) });
+          await conn.rollback();
+          return res.status(400).json({ error: "Codigo de usuario solicitante invalido" });
+        }
+      }
     }
-    const pinOk = await bcrypt.compare(requester_pin, requesterUser.pin_hash || "");
-    if (!pinOk) {
-      trackPinFailure("order", { requester_user_id, actor_user_id: Number(req.user?.id_user || 0) });
-      await conn.rollback();
-      return res.status(400).json({ error: "Codigo de usuario solicitante invalido" });
-    }
-    const duplicatedPinOwner = await findOrderPinCollision(requester_pin, requester_user_id, conn, true);
-    if (duplicatedPinOwner) {
-      await conn.rollback();
-      return res.status(409).json({
-        error:
-          "El PIN de pedidos esta repetido con otro usuario activo. Restablece el PIN para continuar.",
-      });
-    }
+    
     const requester_warehouse_id = Number(requesterUser.id_bodega || 0);
     if (!requester_warehouse_id) {
       await conn.rollback();
@@ -7899,7 +7906,7 @@ app.post("/api/orders", auth, requirePermission("action.create_update", "crear p
     const [r] = await conn.query(
       `INSERT INTO pedido_encabezado(id_usuario_solicita, id_bodega_solicita, id_bodega_surtidor, observaciones, confirmacion_requerida)
        VALUES(:u,:bs,:bd,:obs,:conf)`,
-      { u: requester_user_id, bs: requester_warehouse_id, bd: requested_from_warehouse_id, obs: notes ?? null, conf: confirmacionRequerida }
+      { u: finalRequesterUserId, bs: requester_warehouse_id, bd: requested_from_warehouse_id, obs: notes ?? null, conf: confirmacionRequerida }
     );
     const id_pedido = r.insertId;
 
@@ -8391,15 +8398,18 @@ app.post("/api/orders/:id/confirm-receipt", auth, async (req, res) => {
        LIMIT 1`,
       { id_usuario: pe.id_usuario_solicita }
     );
-    if (!solicitante || Number(solicitante.activo || 0) !== 1 || !solicitante.pin_hash) {
-      await conn.rollback();
-      return res.status(400).json({ error: "El solicitante no tiene PIN de pedidos configurado" });
+    let pinOk = false;
+    if (solicitante && Number(solicitante.activo || 0) === 1 && solicitante.pin_hash) {
+      pinOk = await bcrypt.compare(pin, solicitante.pin_hash || "");
     }
-    const pinOk = await bcrypt.compare(pin, solicitante.pin_hash || "");
+    
     if (!pinOk) {
-      trackPinFailure("order", { id_pedido, requester_user_id: pe.id_usuario_solicita, actor_user_id: Number(req.user?.id_user || 0) });
-      await conn.rollback();
-      return res.status(400).json({ error: "PIN del solicitante invalido" });
+      const matchedUser = await findOrderPinCollision(pin, 0, conn, true);
+      if (!matchedUser) {
+        trackPinFailure("order", { id_pedido, requester_user_id: pe.id_usuario_solicita, actor_user_id: Number(req.user?.id_user || 0) });
+        await conn.rollback();
+        return res.status(400).json({ error: "PIN del solicitante invalido" });
+      }
     }
 
     await conn.query(
