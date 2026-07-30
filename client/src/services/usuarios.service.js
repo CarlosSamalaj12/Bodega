@@ -91,4 +91,18 @@ export const usuariosService = {
     const { data } = await api.put(`/api/usuarios/${id}/bodegas-acceso`, { ids });
     return data;
   },
+
+  /**
+   * Copia permisos (y opcionalmente bodegas-acceso) desde un usuario origen.
+   * @param {number} targetId - id del usuario destino
+   * @param {number} sourceId - id del usuario origen
+   * @param {{ copy_permisos?: boolean, copy_bodegas?: boolean }} options
+   */
+  async copyFrom(targetId, sourceId, options = {}) {
+    const { data } = await api.post(`/api/usuarios/${targetId}/copy-from/${sourceId}`, {
+      copy_permisos: options.copy_permisos !== false,
+      copy_bodegas: options.copy_bodegas === true,
+    });
+    return data;
+  },
 };

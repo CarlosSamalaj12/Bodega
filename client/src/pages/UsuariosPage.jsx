@@ -92,6 +92,12 @@ export default function UsuariosPage() {
   const [permisosLoading, setPermisosLoading] = useState(false);
   const [permisosSaving, setPermisosSaving] = useState(false);
 
+  // ---- Copiar permisos de otro usuario ----
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copySourceId, setCopySourceId] = useState('');
+  const [copyIncludeBodegas, setCopyIncludeBodegas] = useState(false);
+  const [copySubmitting, setCopySubmitting] = useState(false);
+
   // ---- Bodegas acceso ----
   const [bodegasAccesoOpen, setBodegasAccesoOpen] = useState(false);
   const [bodegasAccesoIds, setBodegasAccesoIds] = useState([]);
@@ -392,16 +398,71 @@ export default function UsuariosPage() {
     }
   };
 
-  // ---- Agrupar permisos por grupo ----
+  // ---- Agrupar permisos por grupo (orden = orden del sidebar) ----
   const permisosPorGrupo = useMemo(() => {
+    const GROUP_ORDER = ['Principal', 'Movimientos', 'Inventario', 'Reportes', 'Administración', 'Acciones'];
     const map = {};
     for (const p of permisosCatalogo) {
       const g = p.group || 'Otros';
       if (!map[g]) map[g] = [];
       map[g].push(p);
     }
-    return map;
+    // Devolver en el orden predefinido; los grupos desconocidos al final
+    const ordered = {};
+    for (const g of GROUP_ORDER) {
+      if (map[g]) ordered[g] = map[g];
+    }
+    for (const g of Object.keys(map)) {
+      if (!ordered[g]) ordered[g] = map[g];
+    }
+    return ordered;
   }, [permisosCatalogo]);
+
+  // ---- Lista de usuarios disponibles como fuente para copiar ----
+  const usuariosCopiables = useMemo(() => {
+    return ordered.filter((u) => Number(u.id_user) !== Number(editingId || 0));
+  }, [ordered, editingId]);
+
+  // ---- Abrir modal de copiar ----
+  const openCopyFrom = () => {
+    setCopySourceId(usuariosCopiables[0]?.id_user ? String(usuariosCopiables[0].id_user) : '');
+    setCopyIncludeBodegas(false);
+    setCopyOpen(true);
+  };
+
+  // ---- Ejecutar copia ----
+  const handleCopyFrom = async () => {
+    if (!editingId || !copySourceId) {
+      return toast.error('Selecciona un usuario origen');
+    }
+    if (Number(copySourceId) === Number(editingId)) {
+      return toast.error('Origen y destino no pueden ser el mismo usuario');
+    }
+    if (!window.confirm('Esto sobrescribirá los permisos actuales del usuario destino. ¿Continuar?')) {
+      return;
+    }
+    setCopySubmitting(true);
+    try {
+      const result = await usuariosService.copyFrom(editingId, Number(copySourceId), {
+        copy_permisos: true,
+        copy_bodegas: copyIncludeBodegas,
+      });
+      toast.success(
+        `Copiados ${result?.copied?.permisos || 0} permisos` +
+        (copyIncludeBodegas ? ` y ${result?.copied?.bodegas || 0} bodegas` : '')
+      );
+      setCopyOpen(false);
+      // Refrescar permisos y bodegas del usuario destino en el modal abierto
+      await loadPermisos(editingId);
+      if (copyIncludeBodegas) {
+        await loadBodegasAcceso(editingId);
+      }
+    } catch (e) {
+      toast.error(e?.response?.data?.error || 'No se pudieron copiar los permisos');
+    } finally {
+      setCopySubmitting(false);
+    }
+  };
 
   // ===================== RENDER =====================
   return (
@@ -684,6 +745,15 @@ export default function UsuariosPage() {
                       </div>
                     ))}
                     <div className="usuarios-page__section-actions">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={openCopyFrom}
+                        disabled={usuariosCopiables.length === 0}
+                        title={usuariosCopiables.length === 0 ? 'No hay otros usuarios para usar como fuente' : 'Copiar permisos de otro usuario'}
+                      >
+                        📋 Copiar de…
+                      </Button>
                       <Button size="sm" variant="primary" onClick={savePermisos} disabled={permisosSaving}>
                         {permisosSaving ? <Spinner size={14} /> : 'Guardar permisos'}
                       </Button>
@@ -809,6 +879,70 @@ export default function UsuariosPage() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* === Modal copiar permisos de otro usuario === */}
+      <Modal
+        open={copyOpen}
+        onClose={() => !copySubmitting && setCopyOpen(false)}
+        title={`Copiar permisos — ${form.full_name || form.username || ''}`}
+        size="md"
+      >
+        <div className="usuarios-page__form">
+          <p className="usuarios-page__section-empty" style={{ marginTop: 0 }}>
+            Esto sobrescribirá los permisos actuales del usuario destino con los
+            del usuario que elijas como fuente. Úsalo para asignar rápidamente
+            el mismo perfil a varias personas.
+          </p>
+
+          <div className="usuarios-page__field">
+            <label className="usuarios-page__label" htmlFor="cp-source">
+              Copiar de (usuario origen) <span className="usuarios-page__required">*</span>
+            </label>
+            <select
+              id="cp-source"
+              className="select"
+              value={copySourceId}
+              onChange={(e) => setCopySourceId(e.target.value)}
+            >
+              <option value="">Seleccionar…</option>
+              {usuariosCopiables.map((u) => (
+                <option key={`cpy-${u.id_user}`} value={u.id_user}>
+                  {u.full_name ? `${u.full_name} (${u.username})` : u.username}
+                  {u.role_name ? ` — ${u.role_name}` : ''}
+                </option>
+              ))}
+            </select>
+            {usuariosCopiables.length === 0 && (
+              <p className="usuarios-page__section-empty">No hay otros usuarios disponibles.</p>
+            )}
+          </div>
+
+          <label className="usuarios-page__toggle">
+            <input
+              type="checkbox"
+              checked={copyIncludeBodegas}
+              onChange={(e) => setCopyIncludeBodegas(e.target.checked)}
+            />
+            <span>
+              Copiar también el <b>acceso a bodegas</b> (solo aplica a usuarios con rol REPORTE)
+            </span>
+          </label>
+
+          <div className="usuarios-page__form-footer" style={{ marginTop: '1rem' }}>
+            <Button type="button" variant="ghost" onClick={() => setCopyOpen(false)} disabled={copySubmitting}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={handleCopyFrom}
+              disabled={copySubmitting || !copySourceId}
+            >
+              {copySubmitting ? <Spinner size={14} /> : 'Copiar'}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </>
   );

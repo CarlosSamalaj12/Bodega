@@ -920,30 +920,27 @@ function buildTokenizedPrefixFilter(rawInput, columns = [], paramPrefix = "qtk")
 }
 
 const PERM_CATALOG = [
-  { key: "section.view.home", label: "Ver modulo Inicio", group: "Secciones" },
-  { key: "section.view.entradas", label: "Ver modulo Entradas", group: "Secciones" },
-  { key: "section.view.salidas", label: "Ver modulo Salidas", group: "Secciones" },
-  { key: "section.view.ajustes", label: "Ver modulo Ajustes", group: "Secciones" },
-  { key: "section.view.pedidos", label: "Ver modulo Realizar pedidos", group: "Secciones" },
-  { key: "section.view.pedidos-despachar", label: "Ver modulo Pedidos x Despachar", group: "Secciones" },
-  { key: "section.view.cuadre-caja", label: "Ver modulo Cuadre de Caja", group: "Secciones" },
-  { key: "section.view.categorias", label: "Ver modulo Categorias", group: "Secciones" },
-  { key: "section.view.subcategorias", label: "Ver modulo Subcategorias", group: "Secciones" },
-  { key: "section.view.motivos-movimiento", label: "Ver modulo Motivo movimiento", group: "Secciones" },
-  { key: "section.view.proveedores", label: "Ver modulo Proveedores", group: "Secciones" },
-  { key: "section.view.productos", label: "Ver modulo Productos", group: "Secciones" },
-  { key: "section.view.limites", label: "Ver modulo Minimos/Maximos", group: "Secciones" },
-  { key: "section.view.reglas-subcategorias", label: "Ver modulo Reglas subcategorias", group: "Secciones" },
-  { key: "section.view.usuarios", label: "Ver modulo Usuarios", group: "Secciones" },
-  { key: "section.view.bodegas", label: "Ver modulo Bodegas", group: "Secciones" },
-  { key: "section.view.conteo-ciclico", label: "Ver modulo Conteo Ciclico", group: "Secciones" },
-  { key: "section.view.transferencias", label: "Ver modulo Transferencias", group: "Secciones", default_active: 0 },
-  { key: "section.view.alertas", label: "Ver modulo Alertas", group: "Secciones", default_active: 0 },
-  { key: "section.view.existencias", label: "Ver modulo Existencias", group: "Secciones", default_active: 0 },
-  { key: "section.view.kardex", label: "Ver modulo Kardex", group: "Secciones", default_active: 0 },
-  { key: "section.view.tendencia-producto", label: "Ver modulo Tendencia Producto", group: "Secciones", default_active: 0 },
-  { key: "section.view.medidas", label: "Ver modulo Medidas", group: "Secciones", default_active: 0 },
-  { key: "section.view.motivos", label: "Ver modulo Motivos", group: "Secciones", default_active: 0 },
+  // ── Principal (Sidebar: dashboard) ──
+  { key: "section.view.home", label: "Ver modulo Inicio", group: "Principal" },
+  { key: "section.view.ajustes", label: "Ver modulo Ajustes", group: "Principal" },
+
+  // ── Movimientos ──
+  { key: "section.view.entradas", label: "Ver modulo Entradas", group: "Movimientos" },
+  { key: "section.view.salidas", label: "Ver modulo Salidas", group: "Movimientos" },
+  { key: "section.view.pedidos", label: "Ver modulo Realizar pedidos", group: "Movimientos" },
+  { key: "section.view.pedidos-despachar", label: "Ver modulo Pedidos x Despachar", group: "Movimientos" },
+  { key: "section.view.transferencias", label: "Ver modulo Transferencias", group: "Movimientos", default_active: 0 },
+
+  // ── Inventario ──
+  { key: "section.view.productos", label: "Ver modulo Productos", group: "Inventario" },
+  { key: "section.view.existencias", label: "Ver modulo Existencias", group: "Inventario", default_active: 0 },
+  { key: "section.view.alertas", label: "Ver modulo Alertas", group: "Inventario", default_active: 0 },
+  { key: "section.view.conteo-ciclico", label: "Ver modulo Conteo Ciclico", group: "Inventario" },
+
+  // ── Reportes ──
+  { key: "section.view.kardex", label: "Ver modulo Kardex", group: "Reportes", default_active: 0 },
+  { key: "section.view.tendencia-producto", label: "Ver modulo Tendencia Producto", group: "Reportes", default_active: 0 },
+  { key: "section.view.cuadre-caja", label: "Ver modulo Cuadre de Caja", group: "Reportes" },
   { key: "section.view.r-existencias", label: "Ver Reporte Existencias", group: "Reportes" },
   { key: "section.view.r-corte-diario", label: "Ver Reporte Corte Diario", group: "Reportes" },
   { key: "section.view.r-entradas", label: "Ver Reporte Entradas", group: "Reportes" },
@@ -951,6 +948,20 @@ const PERM_CATALOG = [
   { key: "section.view.r-pedidos", label: "Ver Reporte Pedidos", group: "Reportes" },
   { key: "section.view.r-transferencias", label: "Ver Reporte Kardex", group: "Reportes" },
   { key: "section.view.r-auditoria-sensibles", label: "Ver Reporte Auditoria sensible", group: "Reportes" },
+
+  // ── Administración ──
+  { key: "section.view.categorias", label: "Ver modulo Categorias", group: "Administración" },
+  { key: "section.view.subcategorias", label: "Ver modulo Subcategorias", group: "Administración" },
+  { key: "section.view.motivos-movimiento", label: "Ver modulo Motivo movimiento", group: "Administración" },
+  { key: "section.view.motivos", label: "Ver modulo Motivos", group: "Administración", default_active: 0 },
+  { key: "section.view.proveedores", label: "Ver modulo Proveedores", group: "Administración" },
+  { key: "section.view.medidas", label: "Ver modulo Medidas", group: "Administración", default_active: 0 },
+  { key: "section.view.usuarios", label: "Ver modulo Usuarios", group: "Administración" },
+  { key: "section.view.bodegas", label: "Ver modulo Bodegas", group: "Administración" },
+  { key: "section.view.reglas-subcategorias", label: "Ver modulo Reglas subcategorias", group: "Administración" },
+  { key: "section.view.limites", label: "Ver modulo Minimos/Maximos", group: "Administración" },
+
+  // ── Acciones (no son secciones del sidebar; capabilities) ──
   { key: "action.filter", label: "Usar filtros y busquedas", group: "Acciones" },
   { key: "action.export_excel", label: "Exportar reportes a Excel", group: "Acciones" },
   { key: "action.create_update", label: "Crear y editar registros", group: "Acciones" },
@@ -9970,6 +9981,115 @@ app.put("/api/usuarios/:id/bodegas-acceso", auth, requirePermission("action.mana
     res.json({ ok: true, id_usuario, id_bodegas: ids });
   } catch (e) {
     await conn.rollback();
+    res.status(500).json({ error: String(e.message || e) });
+  } finally {
+    conn.release();
+  }
+});
+
+/* =========================
+   USUARIOS (COPIAR DE OTRO)
+   Copia permisos (y opcionalmente bodegas-acceso) desde un usuario origen
+   al usuario destino. Sobrescribe los valores actuales del destino.
+========================= */
+app.post("/api/usuarios/:id/copy-from/:sourceId", auth, requirePermission("action.manage_permissions", "copiar permisos entre usuarios"), async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    const id_destino = Number(req.params.id || 0);
+    const id_origen = Number(req.params.sourceId || 0);
+    const copyPermisos = req.body?.copy_permisos !== false; // default true
+    const copyBodegas = req.body?.copy_bodegas === true;
+
+    if (!id_destino) return res.status(400).json({ error: "Usuario destino invalido" });
+    if (!id_origen) return res.status(400).json({ error: "Usuario origen invalido" });
+    if (id_destino === id_origen) {
+      return res.status(400).json({ error: "Origen y destino no pueden ser el mismo usuario" });
+    }
+
+    // Validar que ambos usuarios existan
+    const [users] = await conn.query(
+      `SELECT id_usuario FROM usuarios WHERE id_usuario IN (?, ?)`,
+      [id_destino, id_origen]
+    );
+    const found = new Set(users.map((r) => Number(r.id_usuario)));
+    if (!found.has(id_destino)) return res.status(404).json({ error: "Usuario destino no existe" });
+    if (!found.has(id_origen)) return res.status(404).json({ error: "Usuario origen no existe" });
+
+    const copied = { permisos: 0, bodegas: 0 };
+
+    await conn.beginTransaction();
+
+    if (copyPermisos) {
+      // Tomamos el mapa EFECTIVO del origen (defaults + filas explícitas)
+      // y lo escribimos como filas explícitas en el destino. Esto hace que
+      // el destino termine con exactamente los mismos permisos efectivos
+      // que el origen, sin importar qué tenga explícito.
+      const sourceMap = permissionDefaults();
+      const [sourceRows] = await conn.query(
+        `SELECT permiso, activo FROM usuario_permisos WHERE id_usuario=:id_usuario`,
+        { id_usuario: id_origen }
+      );
+      for (const r of sourceRows || []) {
+        if (Object.prototype.hasOwnProperty.call(sourceMap, r.permiso)) {
+          sourceMap[r.permiso] = Number(r.activo) ? 1 : 0;
+        }
+      }
+
+      // Borramos lo actual del destino
+      await conn.query(`DELETE FROM usuario_permisos WHERE id_usuario=:id_usuario`, { id_usuario: id_destino });
+
+      // Insertamos el snapshot del origen
+      for (const k of Object.keys(sourceMap)) {
+        await conn.query(
+          `INSERT INTO usuario_permisos (id_usuario, permiso, activo)
+           VALUES (:id_usuario, :permiso, :activo)
+           ON DUPLICATE KEY UPDATE activo=VALUES(activo)`,
+          { id_usuario: id_destino, permiso: k, activo: sourceMap[k] }
+        );
+        copied.permisos++;
+      }
+    }
+
+    if (copyBodegas) {
+      // Solo tiene sentido para roles REPORTE no-admin (igual que el PUT normal)
+      const [[destRow]] = await conn.query(
+        `SELECT r.nombre_rol
+         FROM usuarios u
+         LEFT JOIN roles r ON r.id_rol=u.id_rol
+         WHERE u.id_usuario=:id_usuario LIMIT 1`,
+        { id_usuario: id_destino }
+      );
+      const roleName = String(destRow?.nombre_rol || "").trim().toUpperCase();
+      const isReportRole = roleName.includes("REPORTE");
+      const isAdminRole = roleName.includes("ADMIN");
+      if (!isReportRole || isAdminRole) {
+        await conn.rollback();
+        return res.status(400).json({ error: "El usuario destino no admite filtro de bodegas (no es rol REPORTE)" });
+      }
+
+      const [sourceBodRows] = await conn.query(
+        `SELECT id_bodega FROM usuario_bodegas_acceso WHERE id_usuario=:id_usuario ORDER BY id_bodega ASC`,
+        { id_usuario: id_origen }
+      );
+      const sourceBodegas = (sourceBodRows || []).map((r) => Number(r.id_bodega));
+
+      await conn.query(`DELETE FROM usuario_bodegas_acceso WHERE id_usuario=:id_usuario`, { id_usuario: id_destino });
+      for (const id_bodega of sourceBodegas) {
+        await conn.query(
+          `INSERT INTO usuario_bodegas_acceso (id_usuario, id_bodega) VALUES (:id_usuario, :id_bodega)`,
+          { id_usuario: id_destino, id_bodega }
+        );
+      }
+      copied.bodegas = sourceBodegas.length;
+    }
+
+    await conn.commit();
+    clearPermisosCache(id_destino);
+    // Avisar al usuario destino para que recargue su snapshot en vivo
+    emitPermisosChanged(id_destino, copyBodegas ? "bodegas-acceso" : "permisos");
+    res.json({ ok: true, id_destino, id_origen, copied });
+  } catch (e) {
+    try { await conn.rollback(); } catch {}
     res.status(500).json({ error: String(e.message || e) });
   } finally {
     conn.release();
