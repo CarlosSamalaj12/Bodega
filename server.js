@@ -2540,6 +2540,162 @@ function buildOperationalAlerts() {
   return alerts;
 }
 
+/**
+ * Aplica líneas de "conteo final" como salidas automáticas (movimientos AJUSTE
+ * con FEFO picking). Reutilizado por:
+ *   - POST /api/salidas/conteo-final  (uso independiente, sin cierre)
+ *   - POST /api/cierre-dia            (cuando la bodega tiene permite_salida_conteo_final
+ *                                       y el cliente envía conteosFinales en el body)
+ *
+ * IMPORTANTE:
+ *  - El helper NO maneja la transacción: el caller (endpoint) ya debe tener
+ *    `conn` dentro de un `beginTransaction()` y hacer commit/rollback fuera.
+ *  - El helper NO llama a verifySensitiveApproval: el caller debe haberlo
+ *    validado ANTES y pasar el resultado en `approval` (o construir un approval
+ *    sintético si no se requiere PIN, p.ej. para procesos automáticos).
+ *  - Las líneas con `existencia_final == existencia_actual` (o mayores) se ignoran.
+ *  - Líneas con `existencia_final > existencia_actual` se RECHAZAN con error
+ *    (no se permite generar entrada por sobrante en este flujo).
+ *
+ * @param {object} conn          - conexión mysql2 con transacción iniciada
+ * @param {object} opts
+ * @param {number} opts.id_bodega
+ * @param {Array<{id_producto:number, existencia_final:number, observacion_linea?:string}>} opts.lines
+ * @param {object} opts.motivo   - fila de motivos_movimiento (tipo AJUSTE)
+ * @param {object} opts.user     - req.user (id_user)
+ * @param {object} opts.approval - resultado de verifySensitiveApproval (o sintético)
+ * @param {string} [opts.observaciones]
+ * @returns {Promise<{id_movimiento:number, appliedLines:number, affectedProducts:number, totalSalida:number}>}
+ */
+async function applyConteoFinalLines(conn, { id_bodega, lines, motivo, user, approval, observaciones }) {
+  if (!Array.isArray(lines) || !lines.length) {
+    return { id_movimiento: 0, appliedLines: 0, affectedProducts: 0, totalSalida: 0 };
+  }
+  if (!motivo || !motivo.id_motivo) {
+    throw new Error("Motivo AJUSTE no proporcionado para conteo final");
+  }
+  if (!id_bodega) {
+    throw new Error("id_bodega requerido para conteo final");
+  }
+
+  const obsBase = String(observaciones || "").trim();
+  const [mhRes] = await conn.query(
+    `INSERT INTO movimiento_encabezado
+     (tipo_movimiento, id_motivo, id_bodega_origen, id_bodega_destino, observaciones, creado_por, confirmado_en, estado)
+     VALUES ('AJUSTE', :id_motivo, :id_bodega_origen, NULL, :observaciones, :creado_por, NOW(), 'CONFIRMADO')`,
+    {
+      id_motivo: Number(motivo.id_motivo || 0),
+      id_bodega_origen: id_bodega,
+      observaciones: obsBase || `Salida automatica por conteo final de bodega #${id_bodega}`,
+      creado_por: Number(user?.id_user || 0),
+    }
+  );
+  const id_movimiento = Number(mhRes.insertId || 0);
+
+  let appliedLines = 0;
+  let affectedProducts = 0;
+  let totalSalida = 0;
+
+  for (const ln of lines) {
+    const id_producto = Number(ln?.id_producto || 0);
+    if (!id_producto) continue;
+    if (!(await isProductVisibleInWarehouse(conn, id_producto, id_bodega))) {
+      throw new Error(`El producto #${id_producto} no esta habilitado para la bodega seleccionada`);
+    }
+
+    const existenciaFinal = Number(ln?.existencia_final);
+    if (!Number.isFinite(existenciaFinal) || existenciaFinal < 0) {
+      throw new Error(`Existencia final invalida para producto #${id_producto}`);
+    }
+
+    const [[stockRow]] = await conn.query(
+      `SELECT COALESCE(stock, 0) AS stock
+       FROM v_stock_resumen
+       WHERE id_bodega=:id_bodega
+         AND id_producto=:id_producto
+       LIMIT 1`,
+      { id_bodega, id_producto }
+    );
+    const existenciaActual = Number(stockRow?.stock || 0);
+    if (existenciaFinal > existenciaActual) {
+      throw new Error(
+        `La existencia final no puede ser mayor a la existencia actual para producto #${id_producto}`
+      );
+    }
+
+    const qtyRequested = existenciaActual - existenciaFinal;
+    if (qtyRequested <= 0) continue;
+
+    const { picks, remaining } = await pickLotsFEFO(conn, id_bodega, id_producto, qtyRequested);
+    if (!picks.length || remaining > 0) {
+      throw new Error(`Stock insuficiente para producto #${id_producto}`);
+    }
+
+    const notePrefix = `Conteo final. Sistema: ${existenciaActual}. Final: ${existenciaFinal}. Salida: ${qtyRequested}.`;
+    const extraNote = String(ln?.observacion_linea || "").trim();
+    for (const p of picks) {
+      const costo_unitario = await getLastUnitCost(conn, id_bodega, id_producto, p.lote);
+      const [d] = await conn.query(
+        `INSERT INTO movimiento_detalle
+         (id_movimiento, id_producto, lote, fecha_vencimiento, cantidad, costo_unitario, observacion_linea)
+         VALUES (:id_movimiento, :id_producto, :lote, :fecha_vencimiento, :cantidad, :costo_unitario, :observacion_linea)`,
+        {
+          id_movimiento,
+          id_producto,
+          lote: p.lote || null,
+          fecha_vencimiento: p.fecha_vencimiento || null,
+          cantidad: Number(p.qty || 0),
+          costo_unitario,
+          observacion_linea: extraNote ? `${notePrefix} ${extraNote}` : notePrefix,
+        }
+      );
+      await conn.query(
+        `INSERT INTO kardex
+         (id_movimiento, id_detalle, id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, costo_unitario)
+         VALUES (:id_movimiento, :id_detalle, :id_bodega, :id_producto, :lote, :fecha_vencimiento, :delta_cantidad, :costo_unitario)`,
+        {
+          id_movimiento,
+          id_detalle: Number(d.insertId || 0),
+          id_bodega,
+          id_producto,
+          lote: p.lote || null,
+          fecha_vencimiento: p.fecha_vencimiento || null,
+          delta_cantidad: -Number(p.qty || 0),
+          costo_unitario,
+        }
+      );
+      totalSalida += Number(p.qty || 0);
+    }
+    appliedLines += 1;
+    affectedProducts += 1;
+  }
+
+  // Audit sensible (best-effort, no rompe la operación si falla)
+  if (appliedLines > 0) {
+    try {
+      await writeSensitiveActionAudit({
+        req: { user },
+        action_key: "SALIDA_AJUSTE_MANUAL",
+        action_label: "Salida por conteo final",
+        approval,
+        reference_type: "MOVIMIENTO",
+        reference_id: id_movimiento,
+        detail: {
+          id_bodega,
+          id_motivo: Number(motivo.id_motivo || 0),
+          productos: affectedProducts,
+          lineas: appliedLines,
+          total_salida: totalSalida,
+        },
+      });
+    } catch (auditErr) {
+      console.error("No se pudo escribir auditoria de conteo final:", auditErr);
+    }
+  }
+
+  return { id_movimiento, appliedLines, affectedProducts, totalSalida };
+}
+
 async function buildDailyCloseRows(conn, id_bodega, fecha_cierre) {
   const nextDay = addDaysYmd(fecha_cierre, 1);
   const [rows] = await conn.query(
@@ -4999,134 +5155,29 @@ app.post("/api/salidas/conteo-final", auth, requirePermission("action.create_upd
       return res.status(Number(approval.status || 403)).json(approval);
     }
 
-    const obsBase = String(observaciones || "").trim();
-    const [mhRes] = await conn.query(
-      `INSERT INTO movimiento_encabezado
-       (tipo_movimiento, id_motivo, id_bodega_origen, id_bodega_destino, observaciones, creado_por, confirmado_en, estado)
-       VALUES ('AJUSTE', :id_motivo, :id_bodega_origen, NULL, :observaciones, :creado_por, NOW(), 'CONFIRMADO')`,
-      {
-        id_motivo: Number(motivo.id_motivo || 0),
-        id_bodega_origen: id_bodega,
-        observaciones:
-          obsBase ||
-          `Salida automatica por conteo final de ${warehouseRow.nombre_bodega || `bodega #${id_bodega}`}`,
-        creado_por: Number(req.user?.id_user || 0),
-      }
-    );
-    const id_movimiento = Number(mhRes.insertId || 0);
+    const result = await applyConteoFinalLines(conn, {
+      id_bodega,
+      lines,
+      motivo,
+      user: req.user,
+      approval,
+      observaciones: observaciones || `Salida automatica por conteo final de ${warehouseRow.nombre_bodega || `bodega #${id_bodega}`}`,
+    });
 
-    let appliedLines = 0;
-    let affectedProducts = 0;
-    let totalSalida = 0;
-
-    for (const ln of lines) {
-      const id_producto = Number(ln?.id_producto || 0);
-      if (!id_producto) continue;
-      if (!(await isProductVisibleInWarehouse(conn, id_producto, id_bodega))) {
-        await conn.rollback();
-        return res.status(400).json({ error: `El producto #${id_producto} no esta habilitado para la bodega seleccionada` });
-      }
-
-      const existenciaFinal = Number(ln?.existencia_final);
-      if (!Number.isFinite(existenciaFinal) || existenciaFinal < 0) {
-        await conn.rollback();
-        return res.status(400).json({ error: `Existencia final invalida para producto #${id_producto}` });
-      }
-
-      const [[stockRow]] = await conn.query(
-        `SELECT COALESCE(stock, 0) AS stock
-         FROM v_stock_resumen
-         WHERE id_bodega=:id_bodega
-           AND id_producto=:id_producto
-         LIMIT 1`,
-        { id_bodega, id_producto }
-      );
-      const existenciaActual = Number(stockRow?.stock || 0);
-      if (existenciaFinal > existenciaActual) {
-        await conn.rollback();
-        return res.status(400).json({
-          error: `La existencia final no puede ser mayor a la existencia actual para producto #${id_producto}`,
-        });
-      }
-
-      const qtyRequested = existenciaActual - existenciaFinal;
-      if (qtyRequested <= 0) continue;
-
-      const { picks, remaining } = await pickLotsFEFO(conn, id_bodega, id_producto, qtyRequested);
-      if (!picks.length || remaining > 0) {
-        await conn.rollback();
-        return res.status(400).json({ error: `Stock insuficiente para producto #${id_producto}` });
-      }
-
-      const notePrefix = `Conteo final. Sistema: ${existenciaActual}. Final: ${existenciaFinal}. Salida: ${qtyRequested}.`;
-      const extraNote = String(ln?.observacion_linea || "").trim();
-      for (const p of picks) {
-        const costo_unitario = await getLastUnitCost(conn, id_bodega, id_producto, p.lote);
-        const [d] = await conn.query(
-          `INSERT INTO movimiento_detalle
-           (id_movimiento, id_producto, lote, fecha_vencimiento, cantidad, costo_unitario, observacion_linea)
-           VALUES (:id_movimiento, :id_producto, :lote, :fecha_vencimiento, :cantidad, :costo_unitario, :observacion_linea)`,
-          {
-            id_movimiento,
-            id_producto,
-            lote: p.lote || null,
-            fecha_vencimiento: p.fecha_vencimiento || null,
-            cantidad: Number(p.qty || 0),
-            costo_unitario,
-            observacion_linea: extraNote ? `${notePrefix} ${extraNote}` : notePrefix,
-          }
-        );
-        await conn.query(
-          `INSERT INTO kardex
-           (id_movimiento, id_detalle, id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, costo_unitario)
-           VALUES (:id_movimiento, :id_detalle, :id_bodega, :id_producto, :lote, :fecha_vencimiento, :delta_cantidad, :costo_unitario)`,
-          {
-            id_movimiento,
-            id_detalle: Number(d.insertId || 0),
-            id_bodega,
-            id_producto,
-            lote: p.lote || null,
-            fecha_vencimiento: p.fecha_vencimiento || null,
-            delta_cantidad: -Number(p.qty || 0),
-            costo_unitario,
-          }
-        );
-        totalSalida += Number(p.qty || 0);
-      }
-      appliedLines += 1;
-      affectedProducts += 1;
-    }
-
-    if (!appliedLines) {
+    if (!result.appliedLines) {
       await conn.rollback();
       return res.status(400).json({ error: "No hay diferencias para generar salidas" });
     }
 
     await conn.commit();
-    await writeSensitiveActionAudit({
-      req,
-      action_key: "SALIDA_AJUSTE_MANUAL",
-      action_label: "Salida por conteo final",
-      approval,
-      reference_type: "MOVIMIENTO",
-      reference_id: id_movimiento,
-      detail: {
-        id_bodega,
-        id_motivo: Number(motivo.id_motivo || 0),
-        productos: affectedProducts,
-        lineas: appliedLines,
-        total_salida: totalSalida,
-      },
-    });
-
     res.json({
       ok: true,
-      id_movimiento,
+      id_movimiento: result.id_movimiento,
       tipo_movimiento: "AJUSTE",
       direccion: "SALIDA",
       id_bodega,
-      total_productos: affectedProducts,
-      total_salida: totalSalida,
+      total_productos: result.affectedProducts,
+      total_salida: result.totalSalida,
       sensitive_approval: toSensitiveApprovalPayload(approval),
     });
   } catch (e) {
@@ -6684,6 +6735,57 @@ app.post("/api/cierre-dia", auth, requirePermission("action.create_update", "rea
       return res.status(Number(approval.status || 403)).json(approval);
     }
 
+    // ── Conteo final: si la bodega lo permite y el cliente envió conteosFinales,
+    //    generar las salidas automáticas ANTES del cierre (misma transacción).
+    let conteoFinalResult = null;
+    const conteosFinales = Array.isArray(req.body?.conteosFinales) ? req.body.conteosFinales : [];
+    if (conteosFinales.length > 0) {
+      const [[bodCfg]] = await conn.query(
+        `SELECT COALESCE(cb.permite_salida_conteo_final, 0) AS permite_salida_conteo_final,
+                b.nombre_bodega
+         FROM bodegas b
+         LEFT JOIN configuracion_bodega cb ON cb.id_bodega=b.id_bodega
+         WHERE b.id_bodega=:id_bodega
+         LIMIT 1`,
+        { id_bodega }
+      );
+      if (Number(bodCfg?.permite_salida_conteo_final || 0) !== 1) {
+        await conn.rollback();
+        return res.status(400).json({
+          error: "La bodega no tiene habilitada la salida por conteo final. Quite los conteosFinales o habilite la bodega.",
+        });
+      }
+      const [[motivo]] = await conn.query(
+        `SELECT id_motivo, nombre_motivo, tipo_movimiento, activo
+         FROM motivos_movimiento
+         WHERE tipo_movimiento='AJUSTE'
+           AND activo=1
+         ORDER BY
+           (UPPER(nombre_motivo) LIKE '%CONTEO%') DESC,
+           (UPPER(nombre_motivo) LIKE '%INVENTARIO%') DESC,
+           id_motivo ASC
+         LIMIT 1`
+      );
+      if (!motivo) {
+        await conn.rollback();
+        return res.status(400).json({ error: "No existe un motivo activo de AJUSTE para registrar el conteo final" });
+      }
+
+      try {
+        conteoFinalResult = await applyConteoFinalLines(conn, {
+          id_bodega,
+          lines: conteosFinales,
+          motivo,
+          user: req.user,
+          approval,
+          observaciones: `Conteo final del cierre de ${fecha_cierre} - ${bodCfg?.nombre_bodega || `bodega #${id_bodega}`}`,
+        });
+      } catch (conteoErr) {
+        await conn.rollback();
+        return res.status(400).json({ error: String(conteoErr.message || conteoErr) });
+      }
+    }
+
     const cierre = await createDailyCloseForDate(conn, {
       id_bodega,
       fecha_cierre,
@@ -6718,6 +6820,25 @@ app.post("/api/cierre-dia", auth, requirePermission("action.create_update", "rea
     }
 
     await conn.commit();
+    await writeSensitiveActionAudit({
+      req,
+      action_key: "CIERRE_DIA_MANUAL",
+      action_label: "Cierre manual de dia",
+      approval,
+      reference_type: "CIERRE_DIA",
+      reference_id: cierre.id_cierre,
+      detail: {
+        fecha_cierre: cierre.fecha_cierre,
+        total_lineas: Number(cierre.rows?.length || 0),
+        conteo_final: conteoFinalResult && conteoFinalResult.appliedLines > 0
+          ? {
+              id_movimiento: conteoFinalResult.id_movimiento,
+              productos: conteoFinalResult.affectedProducts,
+              total_salida: conteoFinalResult.totalSalida,
+            }
+          : null,
+      },
+    });
     res.json({
       ok: true,
       id_cierre: cierre.id_cierre,
@@ -6727,16 +6848,14 @@ app.post("/api/cierre-dia", auth, requirePermission("action.create_update", "rea
       total_entradas: Number(cierre.total_entradas || 0),
       total_salidas: Number(cierre.total_salidas || 0),
       total_existencia_cierre: Number(cierre.total_existencia_cierre || 0),
+      conteo_final: conteoFinalResult && conteoFinalResult.appliedLines > 0
+        ? {
+            id_movimiento: conteoFinalResult.id_movimiento,
+            productos: conteoFinalResult.affectedProducts,
+            total_salida: conteoFinalResult.totalSalida,
+          }
+        : null,
       sensitive_approval: toSensitiveApprovalPayload(approval),
-    });
-    await writeSensitiveActionAudit({
-      req,
-      action_key: "CIERRE_DIA_MANUAL",
-      action_label: "Cierre manual de dia",
-      approval,
-      reference_type: "CIERRE_DIA",
-      reference_id: cierre.id_cierre,
-      detail: { fecha_cierre: cierre.fecha_cierre, total_lineas: Number(cierre.rows?.length || 0) },
     });
   } catch (e) {
     await conn.rollback();

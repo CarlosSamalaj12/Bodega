@@ -146,6 +146,23 @@ export default function CorteDiarioPage() {
     return rows.filter(r => getConteoErrorMsg(r) !== null).length;
   }, [rows, conteosFinales, data]);
 
+  // Construir payload de conteosFinales para enviar al backend al cerrar.
+  // Solo se incluyen productos con un conteo válido y que tengan diferencia
+  // (los que el helper vaya a procesar). Si la bodega no usa conteo final,
+  // devuelve [] y el backend no hace nada.
+  const conteosFinalesPayload = useMemo(() => {
+    if (!data?.permite_salida_conteo_final) return [];
+    return rows
+      .filter((r) => {
+        const c = conteosFinales[r.id_producto];
+        return c != null && Number.isFinite(Number(c)) && !getConteoErrorMsg(r);
+      })
+      .map((r) => ({
+        id_producto: Number(r.id_producto),
+        existencia_final: Number(conteosFinales[r.id_producto]),
+      }));
+  }, [rows, conteosFinales, data]);
+
   // Verificar antes de cerrar
   const handleCerrarDia = useCallback(async () => {
     if (!cierreStatus || cierreStatus.today_closed) return;
@@ -165,9 +182,15 @@ export default function CorteDiarioPage() {
       const { data: res } = await api.post('/api/cierre-dia', {
         confirmar: 1,
         fecha: cierreStatus?.pending_yesterday_close ? cierreStatus.ayer : cierreStatus?.hoy,
+        conteosFinales: conteosFinalesPayload,
       });
-      toast.success(res?.message || 'Cierre del día realizado correctamente');
+      const msg = res?.conteo_final
+        ? `Cierre realizado. Salida automática por conteo final: ${res.conteo_final.total_salida} unidades (mov #${res.conteo_final.id_movimiento}).`
+        : (res?.message || 'Cierre del día realizado correctamente');
+      toast.success(msg);
       setCierreModalOpen(false);
+      // Limpiar conteos locales para que no se arrastren al siguiente día
+      setConteosFinales({});
       // Refrescar todo
       await Promise.all([fetchData(), fetchCierreStatus()]);
     } catch (e) {
@@ -183,7 +206,7 @@ export default function CorteDiarioPage() {
     } finally {
       setCierreConfirming(false);
     }
-  }, [fetchData, fetchCierreStatus, cierreStatus]);
+  }, [fetchData, fetchCierreStatus, cierreStatus, conteosFinalesPayload]);
 
   const handlePinConfirm = useCallback(async (pin) => {
     setPinConfirming(true);
@@ -192,9 +215,14 @@ export default function CorteDiarioPage() {
         confirmar: 1,
         supervisor_pin: pin,
         fecha: cierreStatus?.pending_yesterday_close ? cierreStatus.ayer : cierreStatus?.hoy,
+        conteosFinales: conteosFinalesPayload,
       });
-      toast.success(res?.message || 'Cierre del día realizado correctamente');
+      const msg = res?.conteo_final
+        ? `Cierre realizado. Salida automática por conteo final: ${res.conteo_final.total_salida} unidades (mov #${res.conteo_final.id_movimiento}).`
+        : (res?.message || 'Cierre del día realizado correctamente');
+      toast.success(msg);
       setPinRequired(false);
+      setConteosFinales({});
       await Promise.all([fetchData(), fetchCierreStatus()]);
     } catch (e) {
       const msg = e?.response?.data?.error || 'No se pudo realizar el cierre del día';
@@ -202,7 +230,7 @@ export default function CorteDiarioPage() {
     } finally {
       setPinConfirming(false);
     }
-  }, [fetchData, fetchCierreStatus, cierreStatus]);
+  }, [fetchData, fetchCierreStatus, cierreStatus, conteosFinalesPayload]);
 
   // Totales
   const totales = useMemo(() => {
