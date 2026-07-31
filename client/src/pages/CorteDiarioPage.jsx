@@ -464,23 +464,32 @@ export default function CorteDiarioPage() {
   // Abre el HTML devuelto por el endpoint en una nueva ventana y dispara print().
   // Usamos este helper en vez de window.open(url) porque el endpoint requiere
   // Authorization y window.open no transmite headers. Hacemos fetch con axios
-  // (que ya inyecta el token) y luego volcamos el HTML en una ventana nueva.
+  // (que ya inyecta el token) y luego abrimos el HTML con un Blob URL.
+  //
+  // ¿Por qué Blob URL en vez de document.write()? Porque con document.write
+  // sobre una ventana about:blank, el `window.onload` del HTML inyectado no
+  // se dispara de forma confiable en Chrome, y el print() quedaba colgado
+  // o la página aparecía en blanco. Con Blob URL, el navegador abre el
+  // documento de forma nativa, el onload se dispara correctamente y el
+  // print() funciona como se espera.
   const openPrintHtml = async (url) => {
     try {
       const { data: html } = await api.get(url, { responseType: 'text' });
-      // Validar que parezca HTML (defensa por si el backend responde JSON de error)
       if (typeof html !== 'string' || !html.includes('<html')) {
         toast.error('La respuesta del servidor no es HTML imprimible');
         return;
       }
-      const win = window.open('', '_blank', 'noopener,noreferrer');
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const blobUrl = URL.createObjectURL(blob);
+      const win = window.open(blobUrl, '_blank', 'noopener,noreferrer');
       if (!win) {
         toast.error('Permite las ventanas emergentes para imprimir');
+        URL.revokeObjectURL(blobUrl);
         return;
       }
-      win.document.open();
-      win.document.write(html);
-      win.document.close();
+      // Liberar el blob URL después de un tiempo prudente (la ventana ya
+      // habrá cargado el documento y el print() se habrá disparado).
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
     } catch (e) {
       const msg = e?.response?.data?.error || e?.message || 'No se pudo generar la impresión';
       toast.error(msg);

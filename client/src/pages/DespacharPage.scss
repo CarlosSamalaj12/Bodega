@@ -194,6 +194,38 @@
     display: block;
   }
 
+  &__stock-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.2;
+    gap: 2px;
+  }
+
+  &__stock {
+    font-variant-numeric: tabular-nums;
+    font-weight: $font-weight-semibold;
+    color: $color-text;
+
+    &--ok {
+      color: $color-success;
+    }
+
+    &--warn {
+      color: $color-warning;
+    }
+
+    &--info {
+      color: $color-info;
+    }
+  }
+
+  &__stock-hint {
+    font-size: $font-size-xs;
+    color: $color-warning;
+    font-style: italic;
+  }
+
   &__actions-cell {
     display: flex;
     align-items: center;

@@ -6701,13 +6701,27 @@ app.get("/api/print/corte-diario", auth, async (req, res) => {
     ${rowsHtml}
   </div>
   <script>
-    // Esperar a que el DOM y los recursos estén listos antes de imprimir.
-    // Sin esto, el print() se ejecuta antes de que el navegador termine de
-    // pintar y la página aparece en blanco.
-    window.onload = function() {
-      setTimeout(function() { window.print(); }, 250);
-    };
-    window.onafterprint = function() { window.close(); };
+    // Esperar a que el documento esté completamente cargado y renderizado
+    // antes de imprimir. Sin esto, el print() se ejecuta antes de que el
+    // navegador termine de pintar y la página aparece en blanco.
+    (function() {
+      function doPrint() {
+        try { window.print(); } catch (e) { /* ignore */ }
+      }
+      function ready() {
+        // Doble seguro: pequeño delay para que se complete el primer paint
+        setTimeout(doPrint, 400);
+      }
+      if (document.readyState === 'complete') {
+        ready();
+      } else {
+        window.addEventListener('load', ready);
+        // Backup por si load no dispara (raro pero pasa con algunos
+        // pipelines de document.write / Blob URL en Safari)
+        setTimeout(ready, 1500);
+      }
+      window.addEventListener('afterprint', function() { window.close(); });
+    })();
   </script>
 </body></html>`;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -8394,7 +8408,25 @@ app.get("/api/orders", auth, async (req, res) => {
            bd.nombre_bodega AS from_warehouse,
            bd.nombre_bodega AS nombre_bodega_surtidor,
            u.nombre_completo AS requester_name,
+           -- Subqueries escalares: SÍ pueden referenciar p (el padre).
+           -- Cada una solo procesa las filas de ESTE pedido, no toda la tabla.
+           -- Mucho más rápido que los LEFT JOINs a subqueries con su propio
+           -- scan de pedido_encabezado + pedido_detalle.
            (SELECT COUNT(*) FROM pedido_detalle pd_tl WHERE pd_tl.id_pedido = p.id_pedido) AS total_lineas,
+           (SELECT COALESCE(SUM(GREATEST(cantidad_solicitada - cantidad_surtida, 0)), 0)
+            FROM pedido_detalle WHERE id_pedido = p.id_pedido) AS cantidad_pendiente_total,
+           (SELECT COALESCE(SUM(vs.stock), 0)
+            FROM pedido_detalle pd
+            JOIN v_stock_resumen vs
+              ON vs.id_producto = pd.id_producto
+             AND vs.id_bodega = p.id_bodega_surtidor
+            WHERE pd.id_pedido = p.id_pedido) AS mi_stock_total,
+           (SELECT COALESCE(SUM(vs.stock), 0)
+            FROM pedido_detalle pd
+            JOIN v_stock_resumen vs
+              ON vs.id_producto = pd.id_producto
+             AND vs.id_bodega = p.id_bodega_solicita
+            WHERE pd.id_pedido = p.id_pedido) AS su_stock_total,
            CASE
              WHEN bsol.tipo_bodega='RECEPTORA' OR cb.modo_despacho_auto='TRANSFERENCIA' THEN 'TRANSFERENCIA'
              ELSE 'SALIDA'

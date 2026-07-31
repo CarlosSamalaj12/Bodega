@@ -361,6 +361,66 @@ export default function DespacharPage() {
       ),
     },
     {
+      key: 'mi_stock',
+      label: 'Mi stock',
+      width: 95,
+      align: 'right',
+      hideOnMobile: true,
+      render: (p) => {
+        const mi = Number(p.mi_stock_total || 0);
+        const pend = Number(p.cantidad_pendiente_total || 0);
+        const alcanza = mi >= pend && pend > 0;
+        const sinSuficiente = mi < pend && pend > 0;
+        return (
+          <div className="despachar-page__stock-cell">
+            <span
+              className={
+                sinSuficiente
+                  ? 'despachar-page__stock despachar-page__stock--warn'
+                  : alcanza
+                  ? 'despachar-page__stock despachar-page__stock--ok'
+                  : 'despachar-page__stock'
+              }
+              title={
+                sinSuficiente
+                  ? `Stock en tu bodega: ${mi} — necesitas ${pend} para surtir. Te faltan ${pend - mi}.`
+                  : alcanza
+                  ? `Stock en tu bodega: ${mi} — alcanzaría para surtir todo.`
+                  : `Stock en tu bodega: ${mi}`
+              }
+            >
+              {mi.toFixed(2)}
+            </span>
+            {sinSuficiente && (
+              <span className="despachar-page__stock-hint" title="Faltan unidades en tu bodega para surtir todo">
+                faltan {(pend - mi).toFixed(2)}
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'su_stock',
+      label: 'Su stock',
+      width: 95,
+      align: 'right',
+      hideOnMobile: true,
+      render: (p) => {
+        const su = Number(p.su_stock_total || 0);
+        return (
+          <div className="despachar-page__stock-cell">
+            <span
+              className="despachar-page__stock despachar-page__stock--info"
+              title={`Stock en la bodega del solicitante: ${su}. Útil para saber cuánto ya tiene antes de despachar.`}
+            >
+              {su.toFixed(2)}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
       key: 'estado',
       label: 'Estado',
       width: 100,
@@ -509,6 +569,8 @@ export default function DespacharPage() {
           { key: 'creado_en', label: 'Fecha' },
           { key: 'requester_name', label: 'Solicitante' },
           { key: 'requester_warehouse', label: 'Su bodega' },
+          { key: 'mi_stock', label: 'Mi stock' },
+          { key: 'su_stock', label: 'Su stock' },
           { key: 'total_lineas', label: 'Líneas' },
           { key: 'estado', label: 'Estado' },
           { key: 'observaciones', label: 'Observaciones' },
