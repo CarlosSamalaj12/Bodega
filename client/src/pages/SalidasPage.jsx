@@ -9,7 +9,7 @@ import { toast } from '@/components/ui/Toast';
 import { useAuthStore } from '@/stores/auth.store';
 import { hasPermission } from '@/utils/permissions';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { catalogosService } from '@/services/catalogos.service';
+import { useCatalogosStore } from '@/stores/catalogos.store';
 import { salidasService } from '@/services/salidas.service';
 import { SalidaForm } from '@/components/salidas/SalidaForm';
 import { MovimientoDetailModal } from '@/components/shared/MovimientoDetailModal';
@@ -29,16 +29,19 @@ export default function SalidasPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const [motivos, setMotivos] = useState([]);
-  const [bodega, setBodega] = useState(null);
-  const [catalogError, setCatalogError] = useState(null);
-  const [loadingCatalogs, setLoadingCatalogs] = useState(true);
+  // Catálogos cacheados globalmente
+  const motivos = useCatalogosStore((s) => s.motivos);
+  const bodega = useCatalogosStore((s) => s.bodegaUser);
+  const catalogError = useCatalogosStore((s) => s.error);
+  const loadingCatalogs = useCatalogosStore((s) => s.isLoading);
+  const fetchCatalogos = useCatalogosStore((s) => s.fetchAll);
 
   const [detailId, setDetailId] = useState(null);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   const [revertPinOpen, setRevertPinOpen] = useState(false);
   const [revertingId, setRevertingId] = useState(null);
   const [showAnulados, setShowAnulados] = useState(false);
+  // reloadKey cambia después de crear/revertir — la tabla hace refresh incremental
   const [reloadKey, setReloadKey] = useState(0);
 
   // Leer ?open=ID de la URL para abrir detalle automáticamente
@@ -48,34 +51,18 @@ export default function SalidasPage() {
       setDetailId(Number(openId));
       setSearchParams({}, { replace: true });
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
-  const loadCatalogs = useCallback(async () => {
-    setLoadingCatalogs(true);
-    setCatalogError(null);
-    try {
-      const [mot, bds] = await Promise.all([
-        catalogosService.getMotivos(),
-        catalogosService.getBodegas(),
-      ]);
-      const motivosValidos = (mot || []).filter((m) =>
-        ['SALIDA', 'AJUSTE'].includes(String(m.tipo_movimiento || '').toUpperCase())
-      );
-      setMotivos(motivosValidos);
-      const idWh = Number(user?.id_warehouse || 0);
-      const found = (bds || []).find((b) => Number(b.id_bodega) === idWh);
-      setBodega(found || null);
-    } catch (e) {
-      const msg = e?.response?.data?.error || e?.message || 'Error desconocido';
-      setCatalogError(msg);
-    } finally {
-      setLoadingCatalogs(false);
-    }
-  }, [user]);
-
+  // Asegurar que los catálogos están cargados
   useEffect(() => {
-    loadCatalogs();
-  }, [loadCatalogs]);
+    fetchCatalogos();
+  }, [fetchCatalogos]);
+
+  // Filtrar motivos válidos para salidas
+  const motivosValidos = useMemo(
+    () => motivos.filter((m) => ['SALIDA', 'AJUSTE'].includes(String(m.tipo_movimiento || '').toUpperCase())),
+    [motivos]
+  );
 
   const handleCreated = () => {
     setModalOpen(false);
@@ -128,6 +115,9 @@ export default function SalidasPage() {
         subtitle="Salidas recientes de la bodega"
         actions={
           <div className="salidas-page__header-actions">
+            <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
+              Exportar
+            </Button>
             {canCreate && (
               <Button size={isMobile ? 'sm' : 'md'} onClick={() => setModalOpen(true)}>
                 + Nueva salida
@@ -171,11 +161,6 @@ export default function SalidasPage() {
           </p>
         </Card>
 
-        <div className="salidas-page__footer-actions">
-          <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-            Exportar (resumen)
-          </Button>
-        </div>
       </div>
 
       <MovimientoDetailModal
@@ -229,7 +214,7 @@ export default function SalidasPage() {
           <div className="salidas-page__catalog-error">
             <p><strong>No se pudieron cargar los catálogos.</strong></p>
             <p className="salidas-page__catalog-error-detail">{catalogError}</p>
-            <Button variant="subtle" onClick={loadCatalogs}>Reintentar</Button>
+            <Button variant="subtle" onClick={fetchCatalogos}>Reintentar</Button>
           </div>
         ) : (
           <>
@@ -239,14 +224,14 @@ export default function SalidasPage() {
               </div>
             )}
             <SalidaForm
-              motivos={motivos}
+              motivos={motivosValidos}
               bodegaNombre={bodegaNombre}
               submitting={submitting}
               onSubmittingChange={setSubmitting}
               onCreated={handleCreated}
               onCancel={() => setModalOpen(false)}
             />
-            {!loadingCatalogs && motivos.length === 0 && (
+            {!loadingCatalogs && motivosValidos.length === 0 && (
               <div className="salidas-page__warn">
                 <p>
                   <strong>No hay motivos de tipo SALIDA o AJUSTE</strong> registrados.

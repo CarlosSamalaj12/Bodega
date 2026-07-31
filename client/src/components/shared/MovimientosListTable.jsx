@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
@@ -14,6 +14,7 @@ import './MovimientosListTable.scss';
  *  - totales por movimiento (cantidad, costo)
  *  - filtrado por búsqueda, ocultamiento de anulados
  *  - botón opcional de revertir movimiento (con confirmación por PIN en el padre)
+ *  - filtro por rango de fechas (from/to)
  *
  * Props:
  *  - service: { list, getDetail, revert } - servicio que expone la API del backend.
@@ -24,6 +25,9 @@ import './MovimientosListTable.scss';
  *              (por ejemplo, abrir su propio PinModal).
  *  - onRevertClick: (id) => void - idem, con el id del movimiento.
  *  - reloadKey: number | string - cuando cambia, se vuelve a fetchar.
+ *  - defaultDateFrom / defaultDateTo: string YYYY-MM-DD para filtrar por rango
+ *    (si no se proveen, se usa el día actual por defecto).
+ *  - showDateFilter: bool - mostrar el filtro de fechas en la barra (default true).
  */
 export function MovimientosListTable({
   service,
@@ -36,39 +40,102 @@ export function MovimientosListTable({
   reloadKey,
   showAnulados = false,
   onToggleAnulados,
+  defaultDateFrom,
+  defaultDateTo,
+  showDateFilter = true,
 }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState(new Set());
-  const fetchIdRef = useRef(0);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Carga de filas planas desde el endpoint de reporte
-  const loadData = async () => {
-    setLoading(true);
-    setError(null);
+  // Fecha por defecto: si se provee use it; si no, hoy
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [dateFrom, setDateFrom] = useState(defaultDateFrom || todayStr);
+  const [dateTo, setDateTo] = useState(defaultDateTo || todayStr);
+
+  // Track reloadKey previo para detectar cambios post-montaje
+  const prevReloadKeyRef = useRef(reloadKey);
+  const fetchIdRef = useRef(0);
+  // Guardamos el ID máximo actual para incremental refresh
+  const maxIdRef = useRef(0);
+
+  // Carga inicial completa — envuelta en useCallback para estabilidad de useEffect
+  const loadData = useCallback(async (opts = {}) => {
+    if (opts.background) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+      setError(null);
+    }
     const fetchId = ++fetchIdRef.current;
     try {
-      // service.list() retorna directamente un array de filas planas.
-      const result = await service.list({ limit: 500 });
+      const result = await service.list({ limit: 500, from: dateFrom, to: dateTo, ...opts });
       const raw = Array.isArray(result) ? result : (result?.rows || []);
       if (fetchId !== fetchIdRef.current) return;
-      setRows(raw);
+
+      if (opts.background) {
+        // Incremental: solo añade filas nuevas sin reemplazar
+        setRows((prev) => {
+          const existingIds = new Set(prev.map((r) => Number(r.id_movimiento)));
+          const newOnly = raw.filter((r) => !existingIds.has(Number(r.id_movimiento)));
+          if (!newOnly.length) return prev;
+          const merged = [...prev, ...newOnly];
+          const maxId = merged.length
+            ? Math.max(...merged.map((r) => Number(r.id_movimiento)), 0)
+            : 0;
+          maxIdRef.current = maxId;
+          return merged;
+        });
+        setRefreshing(false);
+      } else {
+        setRows(raw);
+        const maxId = raw.length
+          ? Math.max(...raw.map((r) => Number(r.id_movimiento)), 0)
+          : 0;
+        maxIdRef.current = maxId;
+      }
     } catch (e) {
       if (fetchId === fetchIdRef.current) {
-        setError(e?.response?.data?.error || e?.message || 'Error al cargar');
-        setRows([]);
+        if (opts.background) {
+          setRefreshing(false);
+        } else {
+          setError(e?.response?.data?.error || e?.message || 'Error al cargar');
+          setRows([]);
+          setLoading(false);
+        }
       }
     } finally {
-      if (fetchId === fetchIdRef.current) setLoading(false);
+      if (!opts.background && fetchId === fetchIdRef.current) {
+        setLoading(false);
+      }
     }
-  };
-
-  useEffect(() => {
-    loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reloadKey]);
+  }, [service, dateFrom, dateTo]);
+
+  // reloadKey: primera carga o refresh en background
+  useEffect(() => {
+    const prev = prevReloadKeyRef.current;
+    if (prev === undefined) {
+      // Primera carga
+      prevReloadKeyRef.current = reloadKey;
+      loadData();
+    } else if (reloadKey !== prev) {
+      // Mutación ocurrió: refresh incremental
+      prevReloadKeyRef.current = reloadKey;
+      loadData({ background: true });
+    }
+  }, [reloadKey, loadData]);
+
+  // Recargar cuando cambia el rango de fechas (sin afectar reloadKey)
+  useEffect(() => {
+    if (prevReloadKeyRef.current !== undefined) {
+      loadData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo]);
 
   // Detecta el nombre del campo "tipo" según el endpoint (tipo_entrada / tipo_salida / tipo_movimiento)
   const tipoField = useMemo(() => {
@@ -178,8 +245,49 @@ export function MovimientosListTable({
 
   return (
     <div className="mov-list">
+      {/* Indicador de refresh en background */}
+      {refreshing && (
+        <div className="mov-list__refreshing" role="status" aria-live="polite">
+          <span className="mov-list__refreshing-dot" />
+          Actualizando…
+        </div>
+      )}
+
       {/* Buscador + chip de anulados */}
       <div className="mov-list__toolbar">
+        {showDateFilter && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => {
+                setDateFrom(e.target.value);
+                if (e.target.value > dateTo) setDateTo(e.target.value);
+              }}
+              max={dateTo || undefined}
+              style={{ width: '120px', fontSize: '12px', padding: '3px 6px', borderRadius: '6px', border: '1px solid #444', background: '#2a2a2a', color: '#e0e0e0' }}
+            />
+            <span style={{ color: '#999', fontSize: '11px' }}>→</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => {
+                setDateTo(e.target.value);
+                if (e.target.value < dateFrom) setDateFrom(e.target.value);
+              }}
+              min={dateFrom || undefined}
+              style={{ width: '120px', fontSize: '12px', padding: '3px 6px', borderRadius: '6px', border: '1px solid #444', background: '#2a2a2a', color: '#e0e0e0' }}
+            />
+            <button
+              type="button"
+              onClick={() => { setDateFrom(todayStr); setDateTo(todayStr); }}
+              title="Hoy"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', padding: '2px 4px', borderRadius: '4px', color: '#666' }}
+            >
+              📅
+            </button>
+          </div>
+        )}
         <input
           type="search"
           className="input mov-list__search"
@@ -337,4 +445,7 @@ MovimientosListTable.propTypes = {
   reloadKey: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   showAnulados: PropTypes.bool,
   onToggleAnulados: PropTypes.func,
+  defaultDateFrom: PropTypes.string,
+  defaultDateTo: PropTypes.string,
+  showDateFilter: PropTypes.bool,
 };

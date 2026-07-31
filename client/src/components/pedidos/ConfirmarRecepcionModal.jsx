@@ -62,7 +62,12 @@ export function ConfirmarRecepcionModal({ open, pedido, onClose, onConfirmed }) 
     try {
       await pedidosService.confirmReceipt(pedido.id_pedido, { pin: clean });
       toast.success(`Recepción del pedido #${pedido.id_pedido} confirmada`);
-      onConfirmed?.();
+      // Pasar el pedido actualizado para update optimista
+      onConfirmed?.({
+        id_pedido: pedido.id_pedido,
+        confirmado_en: new Date().toISOString(),
+        confirmacion_requerida: 0,
+      });
     } catch (e) {
       setError(e?.response?.data?.error || 'No se pudo confirmar la recepción');
     } finally {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Header } from '@/components/layout/Header';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -65,6 +65,11 @@ export default function PedidosPage() {
   const [search, setSearch] = useState('');
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   const debouncedSearch = useDebounce(search, 250);
+  const fetchIdRef = useRef(0);
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [dateFrom, setDateFrom] = useState(todayStr);
+  const [dateTo, setDateTo] = useState(todayStr);
 
   const loadCatalogs = useCallback(async () => {
     setLoadingCatalogs(true);
@@ -80,17 +85,22 @@ export default function PedidosPage() {
     }
   }, []);
 
+  // loadPedidos: usa refetch ID para evitar race conditions
   const loadPedidos = useCallback(async () => {
     setLoadingPedidos(true);
+    const fetchId = ++fetchIdRef.current;
     try {
-      const data = await pedidosService.list();
+      const data = await pedidosService.list({ from: dateFrom, to: dateTo });
+      if (fetchId !== fetchIdRef.current) return; // descartamos respuesta de fetch anterior
       setPedidos(Array.isArray(data) ? data : []);
     } catch (e) {
-      toast.error(e?.response?.data?.error || 'No se pudieron cargar los pedidos');
+      if (fetchId === fetchIdRef.current) {
+        toast.error(e?.response?.data?.error || 'No se pudieron cargar los pedidos');
+      }
     } finally {
-      setLoadingPedidos(false);
+      if (fetchId === fetchIdRef.current) setLoadingPedidos(false);
     }
-  }, []);
+  }, [dateFrom, dateTo]);
 
   useEffect(() => {
     loadCatalogs();
@@ -99,17 +109,25 @@ export default function PedidosPage() {
 
   const handleCreated = async (data) => {
     setModalOpen(false);
-    loadPedidos();
     // Obtener detalles para poder imprimir
     if (data?.id_pedido || data?.id_order) {
       try {
         const id = data.id_pedido || data.id_order;
         const detalles = await pedidosService.getDetails(id);
-        // Los campos ya vienen del endpoint en el formato correcto
+        // Prepend optimístico:插入 nuevo pedido al inicio de la lista sin reload completo
+        setPedidos((prev) => {
+          const exists = prev.some((p) => Number(p.id_pedido) === Number(detalles.id_pedido || id));
+          if (exists) return prev;
+          return [{ ...detalles, id_pedido: detalles.id_pedido || id }, ...prev];
+        });
         setCreatedPedido(detalles);
       } catch (e) {
         toast.error('No se pudieron cargar los detalles del pedido para imprimir');
+        // Fallback: reload completo
+        loadPedidos();
       }
+    } else {
+      loadPedidos();
     }
   };
 
@@ -142,9 +160,20 @@ export default function PedidosPage() {
     }
   };
 
-  const handleConfirmed = () => {
+  const handleConfirmed = (pedidoActualizado) => {
     setConfirmPedido(null);
-    loadPedidos();
+    if (pedidoActualizado) {
+      // Update optimista del pedido confirmado
+      setPedidos((prev) =>
+        prev.map((p) =>
+          Number(p.id_pedido) === Number(pedidoActualizado.id_pedido)
+            ? { ...p, ...pedidoActualizado }
+            : p
+        )
+      );
+    } else {
+      loadPedidos();
+    }
   };
 
   const pedidosSorted = useMemo(() => {
@@ -296,11 +325,46 @@ export default function PedidosPage() {
         </Card>
 
         <Card compact>
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder="Buscar por #, bodega, estado…"
-          />
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por #, bodega, estado…"
+            />
+            <div className="pedidos-page__date-group">
+              <input
+                type="date"
+                className="input"
+                value={dateFrom}
+                onChange={(e) => {
+                  setDateFrom(e.target.value);
+                  if (e.target.value > dateTo) setDateTo(e.target.value);
+                }}
+                max={dateTo || undefined}
+                title="Desde"
+              />
+              <span style={{ color: '#999', fontSize: '11px' }}>→</span>
+              <input
+                type="date"
+                className="input"
+                value={dateTo}
+                onChange={(e) => {
+                  setDateTo(e.target.value);
+                  if (e.target.value < dateFrom) setDateFrom(e.target.value);
+                }}
+                min={dateFrom || undefined}
+                title="Hasta"
+              />
+              <button
+                type="button"
+                className="pedidos-page__today-btn"
+                onClick={() => { setDateFrom(todayStr); setDateTo(todayStr); }}
+                title="Hoy"
+              >
+                Hoy
+              </button>
+            </div>
+          </div>
         </Card>
 
         <DataList

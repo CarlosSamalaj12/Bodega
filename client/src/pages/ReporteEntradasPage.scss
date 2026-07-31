@@ -28,17 +28,32 @@
 
   // ---- Filtros ----
   &__filters {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: $space-3;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: $space-2;
 
-    @media (min-width: 768px) {
-      > * { min-width: 0; }
+    @media (min-width: 640px) {
+      grid-template-columns: repeat(2, 1fr);
     }
 
-    @media (max-width: $bp-md) {
-      gap: $space-2;
+    @media (min-width: 1024px) {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  // Cada item de filtro puede ocupar 1, 2 o 3 columnas
+  &__filter-item {
+    min-width: 0; // evita overflow en grids
+
+    &--span-2 {
+      grid-column: span 2;
+      @media (max-width: 639px) { grid-column: span 1; }
+    }
+
+    &--span-3 {
+      grid-column: span 3;
+      @media (max-width: 1023px) { grid-column: span 2; }
+      @media (max-width: 639px) { grid-column: span 1; }
     }
   }
 
@@ -47,11 +62,15 @@
     align-items: center;
     gap: $space-2;
 
-    @media (max-width: $bp-md) {
-      flex: 1 1 100%;
-      flex-wrap: wrap;
+    input[type='date'] {
+      flex: 1;
+      min-width: 0;
+      max-width: 160px;
 
-      input { flex: 1 1 calc(50% - 8px); min-width: 0; }
+      &::-webkit-calendar-picker-indicator {
+        opacity: 0;
+        width: 0;
+      }
     }
   }
 
@@ -59,13 +78,6 @@
     color: $color-text-muted;
     font-size: $font-size-sm;
     flex-shrink: 0;
-
-    @media (max-width: $bp-md) {
-      flex: 0 0 100%;
-      text-align: center;
-      order: 2;
-      margin-top: $space-1;
-    }
   }
 
   &__rango {
@@ -78,11 +90,7 @@
     overflow-x: auto;
     max-width: 100%;
     flex-wrap: nowrap;
-
-    @media (max-width: $bp-md) {
-      flex: 1 1 100%;
-      justify-content: flex-start;
-    }
+    min-height: 34px;
   }
 
   &__rango-btn {

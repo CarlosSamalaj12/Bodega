@@ -59,6 +59,26 @@
     font-weight: $font-weight-medium;
   }
 
+  &__required {
+    color: $color-danger;
+    font-weight: $font-weight-bold;
+    margin-left: 2px;
+  }
+
+  &__cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__field-error {
+    font-size: $font-size-xs;
+    color: $color-danger;
+    font-weight: $font-weight-medium;
+    line-height: 1.2;
+  }
+
   &__total-label {
     color: $color-text-muted;
     font-weight: $font-weight-semibold;

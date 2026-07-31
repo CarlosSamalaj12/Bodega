@@ -28,6 +28,9 @@ export default function CorteDiarioPage() {
   const [warehouseId, setWarehouseId] = useState(initialWarehouse ? Number(initialWarehouse) : null);
   const [showAll, setShowAll] = useState(false);
 
+  // Fecha que se está navegando en el reporte (default: hoy)
+  const [reportDate, setReportDate] = useState(null); // null = auto (siguiente pendiente)
+
   // Catálogos
   const [bodegas, setBodegas] = useState([]);
 
@@ -70,7 +73,7 @@ export default function CorteDiarioPage() {
   };
 
   const fetchData = useCallback(async () => {
-    if (!cierreStatus) return;
+    // No retornar temprano si no hay cierreStatus — necesitamos cargar con valores por defecto
     setLoading(true);
     try {
       const params = { limit: 2000 };
@@ -78,10 +81,13 @@ export default function CorteDiarioPage() {
       if (warehouseId) params.warehouse = warehouseId;
       if (showAll) params.show_all = 1;
 
-      if (cierreStatus?.pending_yesterday_close) {
-        params.fecha = cierreStatus.ayer;
+      // Si el usuario eligió una fecha manual, usarla; si no, la siguiente pendiente o hoy
+      if (reportDate) {
+        params.fecha = reportDate;
+      } else if (cierreStatus?.required_close_date) {
+        params.fecha = cierreStatus.required_close_date;
       } else {
-        params.fecha = cierreStatus.hoy;
+        params.fecha = cierreStatus?.hoy || new Date().toISOString().slice(0, 10);
       }
 
       const { data: res } = await api.get('/api/reportes/corte-diario', { params });
@@ -92,7 +98,12 @@ export default function CorteDiarioPage() {
     } finally {
       setLoading(false);
     }
-  }, [committedSearch, warehouseId, showAll, cierreStatus]);
+  }, [committedSearch, warehouseId, showAll, cierreStatus, reportDate]);
+
+  // Limpiar fecha manual cuando cambia el estado de cierre (ej: después de cerrar)
+  useEffect(() => {
+    setReportDate(null);
+  }, [cierreStatus?.required_close_date, cierreStatus?.days_missing]);
 
   // Consultar estado del cierre al montar y tras refrescar
   const fetchCierreStatus = useCallback(async () => {
@@ -181,7 +192,7 @@ export default function CorteDiarioPage() {
     try {
       const { data: res } = await api.post('/api/cierre-dia', {
         confirmar: 1,
-        fecha: cierreStatus?.pending_yesterday_close ? cierreStatus.ayer : cierreStatus?.hoy,
+        fecha: cierreStatus?.required_close_date || cierreStatus?.hoy,
         conteosFinales: conteosFinalesPayload,
       });
       const msg = res?.conteo_final
@@ -201,6 +212,17 @@ export default function CorteDiarioPage() {
         setPinRequired(true);
         return;
       }
+      // Si el servidor detecta que hay un día anterior pendiente
+      if (errData?.code === 'PREVIOUS_DAY_PENDING' && errData?.required_close_date) {
+        setCierreModalOpen(false);
+        toast.error(
+          `Primero debes cerrar el día ${formatDate(errData.required_close_date)}. Los días deben cerrarse en orden.`
+        );
+        // Refrescar estado y forzar navegación al día correcto
+        await fetchCierreStatus();
+        setReportDate(null); // null = auto (siguiente pendiente)
+        return;
+      }
       const msg = errData?.error || 'No se pudo realizar el cierre del día';
       toast.error(msg);
     } finally {
@@ -214,7 +236,7 @@ export default function CorteDiarioPage() {
       const { data: res } = await api.post('/api/cierre-dia', {
         confirmar: 1,
         supervisor_pin: pin,
-        fecha: cierreStatus?.pending_yesterday_close ? cierreStatus.ayer : cierreStatus?.hoy,
+        fecha: cierreStatus?.required_close_date || cierreStatus?.hoy,
         conteosFinales: conteosFinalesPayload,
       });
       const msg = res?.conteo_final
@@ -255,6 +277,7 @@ export default function CorteDiarioPage() {
     setCommittedSearch('');
     setWarehouseId(null);
     setShowAll(false);
+    setReportDate(null);
   };
 
   // Helper para cantidad formateada
@@ -418,14 +441,21 @@ export default function CorteDiarioPage() {
         title="Corte Diario"
         subtitle={
           data
-            ? `${data.bodega || 'Todas las bodegas'} · ${formatDate(data.fecha_hoy)} · ${rows.length} producto${rows.length === 1 ? '' : 's'}`
+            ? `${data.bodega || 'Todas las bodegas'} · ${formatDate(data.fecha_hoy)}${reportDate ? ' (navegando)' : cierreStatus?.required_close_date ? ' ← pendiente' : ''} · ${rows.length} producto${rows.length === 1 ? '' : 's'}`
             : 'Cargando…'
         }
         actions={
           <div className="corte-diario__header-actions">
             {canCierre && cierreStatus && !cierreStatus.today_closed && (
               <Button size="sm" variant="primary" onClick={handleCerrarDia}>
-                🔒 Cerrar día
+                🔒 {cierreStatus.required_close_date
+                  ? `Cerrar ${formatDate(cierreStatus.required_close_date)}`
+                  : 'Cerrar día'}
+                {cierreStatus.days_missing > 1 && (
+                  <span style={{ marginLeft: '6px', opacity: 0.85, fontWeight: 400 }}>
+                    ({cierreStatus.days_missing} pendientes)
+                  </span>
+                )}
               </Button>
             )}
             <Button variant="ghost" size="sm" disabled={loading} onClick={fetchData}>
@@ -458,6 +488,15 @@ export default function CorteDiarioPage() {
                   <option key={`cor-bod-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>
                 ))}
               </select>
+              <input
+                type="date"
+                className="input"
+                value={reportDate || ''}
+                max={cierreStatus?.ayer || ''}
+                onChange={(e) => setReportDate(e.target.value || null)}
+                title="Ver reporte de una fecha específica"
+                style={{ fontSize: '13px', padding: '5px 8px' }}
+              />
               <label className="corte-diario__toggle">
                 <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
                 <span>Mostrar todos</span>
@@ -470,6 +509,33 @@ export default function CorteDiarioPage() {
             </div>
           </div>
         </Card>
+
+        {/* Banner de días pendientes */}
+        {canCierre && cierreStatus && cierreStatus.days_missing > 0 && (
+          <Card compact style={{ border: '2px solid #ffc107', background: '#fffbf0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '22px' }}>⚠️</span>
+              <div>
+                <strong style={{ color: '#856404' }}>
+                  {cierreStatus.days_missing === 1
+                    ? `Falta cerrar el día ${cierreStatus.pending_days[0]}`
+                    : `Faltan cerrar ${cierreStatus.days_missing} días: ${cierreStatus.pending_days.join(', ')}`}
+                </strong>
+                <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#856404' }}>
+                  Debes cerrarlos en orden. El reporte muestra el día más antiguo pendiente.
+                  {reportDate && (
+                    <button
+                      onClick={() => setReportDate(null)}
+                      style={{ marginLeft: '8px', background: 'none', border: 'none', color: '#856404', cursor: 'pointer', textDecoration: 'underline', fontSize: '13px', padding: 0 }}
+                    >
+                      Ver fecha pendiente →
+                    </button>
+                  )}
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Cards de resumen */}
         <div className="corte-diario__metrics">
@@ -555,17 +621,35 @@ export default function CorteDiarioPage() {
             </div>
           )}
           <p>
-            <strong>¿Estás seguro de realizar el cierre del día?</strong>
+            <strong>¿Estás seguro de cerrar el día {formatDate(cierreStatus?.required_close_date || cierreStatus?.hoy)}?</strong>
           </p>
+          {cierreStatus && cierreStatus.days_missing > 1 && (
+            <p style={{ marginTop: '4px', fontSize: '13px', color: '#856404' }}>
+              ⚠️ Después de este cierre,{' '}
+              <strong>
+                {cierreStatus.days_missing - 1 === 1
+                  ? `te quedará 1 día más por cerrar: ${formatDate(cierreStatus.next_pending_date)}`
+                  : `te quedarán ${cierreStatus.days_missing - 1} días más por cerrar (próximo: ${formatDate(cierreStatus.next_pending_date)})`}
+              </strong>
+              . Cada cierre debe hacerse en orden, del más antiguo al más reciente.
+            </p>
+          )}
           <p>Este proceso no podrá revertirse. Una vez cerrado el día:</p>
           <ul>
             <li>Se registrarán las existencias finales de todos los productos.</li>
             <li>No se podrán modificar movimientos de esta fecha.</li>
             <li>Se generará el corte oficial del día.</li>
+            {data?.permite_salida_conteo_final && conteosFinalesPayload.length > 0 && (
+              <li>
+                <strong style={{ color: '#6f42c1' }}>
+                  Se generará una salida automática por conteo final ({conteosFinalesPayload.length} producto{conteosFinalesPayload.length === 1 ? '' : 's'}).
+                </strong>
+              </li>
+            )}
           </ul>
           {cierreStatus && (
             <div className="corte-diario__cierre-resumen">
-              <span><strong>Fecha:</strong> {formatDate(cierreStatus.pending_yesterday_close ? cierreStatus.ayer : cierreStatus.hoy)}</span>
+              <span><strong>Fecha a cerrar:</strong> {formatDate(cierreStatus.required_close_date || cierreStatus.hoy)}</span>
               <span><strong>Bodega:</strong> {cierreStatus.id_bodega}</span>
               <span><strong>Productos:</strong> {rows.length}</span>
               <span><strong>Existencia final:</strong> {fmtNum(totales.exActual)}</span>

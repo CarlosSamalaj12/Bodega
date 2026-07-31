@@ -41,6 +41,10 @@ export function EntradaForm({
   const [lines, setLines] = useState([{ ...EMPTY_LINE }]);
   const [submitError, setSubmitError] = useState(null);
   const [duplicateWarn, setDuplicateWarn] = useState(null);
+  // Errores de validación por línea: { [idx]: { cantidad?, precio?, lote?, caducidad? } }
+  const [lineErrors, setLineErrors] = useState({});
+  // Track si el usuario intentó enviar al menos una vez (para mostrar errores solo después de intentar)
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   // Stock por índice de línea (para mostrar "X en existencia" en el chip)
   const [stockMap, setStockMap] = useState({});
 
@@ -98,9 +102,38 @@ export function EntradaForm({
     return { total, lineasValidas };
   }, [lines]);
 
+  // Validar una línea: producto, cantidad > 0, precio, lote y caducidad son obligatorios
+  const validateLine = (l) => {
+    const errors = {};
+    if (!l.id_producto) errors.id_producto = 'Selecciona un producto';
+    if (!l.cantidad || Number(l.cantidad) <= 0) errors.cantidad = 'Cantidad > 0';
+    if (l.precio === '' || l.precio == null || Number(l.precio) < 0) errors.precio = 'Costo requerido';
+    if (!String(l.lote || '').trim()) errors.lote = 'Lote requerido';
+    if (!l.caducidad) errors.caducidad = 'Caducidad requerida';
+    return errors;
+  };
+
+  // Valida todas las líneas; retorna true si todas pasan
+  const validateAll = useCallback(() => {
+    const errs = {};
+    let ok = true;
+    lines.forEach((l, idx) => {
+      const e = validateLine(l);
+      if (Object.keys(e).length) {
+        errs[idx] = e;
+        ok = false;
+      }
+    });
+    setLineErrors(errs);
+    return ok;
+  }, [lines]);
+
   const canSubmit =
     cabecera.id_motivo &&
-    lines.some((l) => l.id_producto && Number(l.cantidad) > 0) &&
+    lines.every((l) => l.id_producto && Number(l.cantidad) > 0) &&
+    lines.every((l) => l.precio !== '' && Number(l.precio) >= 0) &&
+    lines.every((l) => String(l.lote || '').trim()) &&
+    lines.every((l) => l.caducidad) &&
     !submitting;
 
   const handleNoDocumentoBlur = async () => {
@@ -115,6 +148,13 @@ export function EntradaForm({
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitError(null);
+    setAttemptedSubmit(true);
+
+    // Validar todas las líneas
+    if (!validateAll()) {
+      setSubmitError('Completa todos los campos obligatorios de cada línea (producto, cantidad, costo, lote y caducidad).');
+      return;
+    }
 
     if (duplicateWarn?.exists) {
       const ok = window.confirm(
@@ -129,21 +169,14 @@ export function EntradaForm({
       no_documento: cabecera.no_documento.trim() || null,
       observaciones: cabecera.observaciones.trim() || null,
       pagado: cabecera.pagado.trim() || null,
-      lines: lines
-        .filter((l) => l.id_producto && Number(l.cantidad) > 0)
-        .map((l) => ({
-          id_producto: l.id_producto,
-          cantidad: Number(l.cantidad),
-          precio: Number(l.precio) || 0,
-          lote: l.lote.trim() || null,
-          caducidad: l.caducidad || null,
-        })),
+      lines: lines.map((l) => ({
+        id_producto: l.id_producto,
+        cantidad: Number(l.cantidad),
+        precio: Number(l.precio) || 0,
+        lote: l.lote.trim(),
+        caducidad: l.caducidad,
+      })),
     };
-
-    if (payload.lines.length === 0) {
-      setSubmitError('Agrega al menos una línea con producto y cantidad mayor a 0.');
-      return;
-    }
 
     onSubmittingChange?.(true);
     try {
@@ -204,89 +237,130 @@ export function EntradaForm({
     setPendingPayload(null);
   };
 
+  // Helper para mostrar el asterisco de campo obligatorio en la cabecera de columna
+  const requiredLabel = (text) => (
+    <span>
+      {text} <span className="entrada-form__required" aria-label="obligatorio">*</span>
+    </span>
+  );
+
   const columns = [
     {
       key: 'producto',
-      label: 'Producto',
+      label: requiredLabel('Producto'),
       primary: true,
       minWidth: 240,
-      render: (l, idx) => (
-        <ProductPicker
-          value={l.id_producto ? { id_producto: l.id_producto, nombre_producto: l.nombre_producto, sku: l.sku } : null}
-          onChange={(p) => {
-            setLine(idx, {
-              id_producto: p?.id_producto || null,
-              nombre_producto: p?.nombre_producto || '',
-              sku: p?.sku || null,
-            });
-            fetchStock(idx, p?.id_producto || null);
-          }}
-          placeholder="Buscar producto…"
-          stockInfo={stockMap[idx] || null}
-          ultimoPrecio={stockMap[idx]?.ultimo_precio || 0}
-        />
-      ),
+      render: (l, idx) => {
+        const err = lineErrors[idx]?.id_producto;
+        return (
+          <div className="entrada-form__cell">
+            <ProductPicker
+              value={l.id_producto ? { id_producto: l.id_producto, nombre_producto: l.nombre_producto, sku: l.sku } : null}
+              onChange={(p) => {
+                setLine(idx, {
+                  id_producto: p?.id_producto || null,
+                  nombre_producto: p?.nombre_producto || '',
+                  sku: p?.sku || null,
+                });
+                fetchStock(idx, p?.id_producto || null);
+              }}
+              placeholder="Buscar producto…"
+              stockInfo={stockMap[idx] || null}
+              ultimoPrecio={stockMap[idx]?.ultimo_precio || 0}
+            />
+            {err && <span className="entrada-form__field-error">{err}</span>}
+          </div>
+        );
+      },
     },
     {
       key: 'cantidad',
-      label: 'Cantidad',
+      label: requiredLabel('Cantidad'),
       width: 100,
-      render: (l, idx) => (
-        <input
-          type="number"
-          className="input entrada-form__num"
-          min="0"
-          step="0.001"
-          value={l.cantidad}
-          onChange={(e) => setLine(idx, { cantidad: e.target.value })}
-          placeholder="0"
-        />
-      ),
+      render: (l, idx) => {
+        const err = lineErrors[idx]?.cantidad;
+        return (
+          <div className="entrada-form__cell">
+            <input
+              type="number"
+              className={`input entrada-form__num ${err ? 'input--error' : ''}`}
+              min="0"
+              step="0.001"
+              value={l.cantidad}
+              onChange={(e) => setLine(idx, { cantidad: e.target.value })}
+              placeholder="0"
+              required
+            />
+            {err && <span className="entrada-form__field-error">{err}</span>}
+          </div>
+        );
+      },
     },
     {
       key: 'precio',
-      label: 'Costo unit.',
+      label: requiredLabel('Costo unit.'),
       width: 120,
-      render: (l, idx) => (
-        <input
-          type="number"
-          className="input entrada-form__num"
-          min="0"
-          step="0.01"
-          value={l.precio}
-          onChange={(e) => setLine(idx, { precio: e.target.value })}
-          placeholder="0.00"
-        />
-      ),
+      render: (l, idx) => {
+        const err = lineErrors[idx]?.precio;
+        return (
+          <div className="entrada-form__cell">
+            <input
+              type="number"
+              className={`input entrada-form__num ${err ? 'input--error' : ''}`}
+              min="0"
+              step="0.01"
+              value={l.precio}
+              onChange={(e) => setLine(idx, { precio: e.target.value })}
+              placeholder="0.00"
+              required
+            />
+            {err && <span className="entrada-form__field-error">{err}</span>}
+          </div>
+        );
+      },
     },
     {
       key: 'lote',
-      label: 'Lote',
+      label: requiredLabel('Lote'),
       width: 120,
-      render: (l, idx) => (
-        <input
-          type="text"
-          className="input entrada-form__text"
-          value={l.lote}
-          onChange={(e) => setLine(idx, { lote: e.target.value })}
-          placeholder="Lote"
-        />
-      ),
+      render: (l, idx) => {
+        const err = lineErrors[idx]?.lote;
+        return (
+          <div className="entrada-form__cell">
+            <input
+              type="text"
+              className={`input entrada-form__text ${err ? 'input--error' : ''}`}
+              value={l.lote}
+              onChange={(e) => setLine(idx, { lote: e.target.value })}
+              placeholder="Lote"
+              required
+            />
+            {err && <span className="entrada-form__field-error">{err}</span>}
+          </div>
+        );
+      },
     },
     {
       key: 'caducidad',
-      label: 'Caducidad',
+      label: requiredLabel('Caducidad'),
       width: 140,
       // En móvil, ocultamos la fecha (es un input nativo muy ancho y difícil de tocar)
       hideOnMobile: true,
-      render: (l, idx) => (
-        <input
-          type="date"
-          className="input entrada-form__text"
-          value={l.caducidad}
-          onChange={(e) => setLine(idx, { caducidad: e.target.value })}
-        />
-      ),
+      render: (l, idx) => {
+        const err = lineErrors[idx]?.caducidad;
+        return (
+          <div className="entrada-form__cell">
+            <input
+              type="date"
+              className={`input entrada-form__text ${err ? 'input--error' : ''}`}
+              value={l.caducidad}
+              onChange={(e) => setLine(idx, { caducidad: e.target.value })}
+              required
+            />
+            {err && <span className="entrada-form__field-error">{err}</span>}
+          </div>
+        );
+      },
     },
     {
       key: 'subtotal',

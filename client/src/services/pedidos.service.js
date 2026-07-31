@@ -5,10 +5,12 @@ export const pedidosService = {
    * Listar pedidos.
    * @param scope 'mine' (los que pedí) o 'dispatch' (los que debo surtir)
    * @param status filtrar por estado
+   * @param from fecha desde (YYYY-MM-DD)
+   * @param to fecha hasta (YYYY-MM-DD)
    */
-  async list({ scope, status } = {}) {
+  async list({ scope, status, from, to } = {}) {
     const { data } = await api.get('/api/orders', {
-      params: { scope, status },
+      params: { scope, status, from, to },
     });
     return data;
   },

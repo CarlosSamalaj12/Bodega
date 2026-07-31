@@ -143,7 +143,7 @@ export default function ReporteEntradasPage() {
     } finally {
       if (fetchId === fetchIdRef.current) setLoading(false);
     }
-  }, [page, limit]); // Solo cambia cuando cambia page o limit
+  }, [page, limit]);
 
   // Re-fetch cuando cambian los filtros (leídos del ref) o la paginación
   useEffect(() => { fetchData(); }, [
@@ -235,7 +235,7 @@ export default function ReporteEntradasPage() {
     return flat;
   }, [grouped]);
 
-    // Columnas disponibles para exportación
+  // Columnas disponibles para exportación
   const allExportColumns = [
     { key: 'id_movimiento', label: 'ID Mov.' },
     { key: 'fecha', label: 'Fecha' },
@@ -275,7 +275,7 @@ export default function ReporteEntradasPage() {
     setShowColumnSelector(false);
   };
 
-    // Helper para mostrar productos en la fila principal
+  // Helper para mostrar productos en la fila principal
   const renderProductos = (g) => {
     const nombres = [...new Set(g.lineas.map((l) => l.nombre_producto).filter(Boolean))];
     if (nombres.length === 0) return <span className="reporte-entradas__muted">—</span>;
@@ -323,60 +323,77 @@ export default function ReporteEntradasPage() {
       <div className="reporte-entradas">
         <Card>
           <div className="reporte-entradas__filters">
-            <ProductPicker
-              value={selectedProduct}
-              onChange={(p) => { setSelectedProduct(p); setPage(1); }}
-              placeholder="Buscar producto o SKU…"
-            />
-
-            <div className="reporte-entradas__fecha-group">
-              <input type="date" className="input reporte-entradas__date-input"
-                value={dateFrom} max={dateTo}
-                onChange={(e) => { setDateFrom(e.target.value); setRango(null); }} />
-              <span className="reporte-entradas__fecha-sep">→</span>
-              <input type="date" className="input reporte-entradas__date-input"
-                value={dateTo} min={dateFrom} max={hoy}
-                onChange={(e) => { setDateTo(e.target.value); setRango(null); }} />
+            <div className="reporte-entradas__filter-item reporte-entradas__filter-item--span-2">
+              <ProductPicker
+                value={selectedProduct}
+                onChange={(p) => { setSelectedProduct(p); setPage(1); }}
+                placeholder="Buscar producto o SKU…" />
             </div>
 
-            <div className="reporte-entradas__rango">
-              {RANGE_PRESETS.map((p) => (
-                <button
-                  key={`ent-pdays-${p.days}`}
-                  type="button"
-                  className={`reporte-entradas__rango-btn ${rango === p.days ? 'reporte-entradas__rango-btn--active' : ''}`}
-                  onClick={() => handlePreset(p.days)}
-                >
-                  {p.label}
-                </button>
-              ))}
+            <div className="reporte-entradas__filter-item">
+              <div className="reporte-entradas__fecha-group">
+                <input type="date" className="input"
+                  value={dateFrom} max={dateTo}
+                  onChange={(e) => { setDateFrom(e.target.value); setRango(null); }} />
+                <span className="reporte-entradas__fecha-sep">→</span>
+                <input type="date" className="input"
+                  value={dateTo} min={dateFrom} max={hoy}
+                  onChange={(e) => { setDateTo(e.target.value); setRango(null); }} />
+              </div>
             </div>
 
-            <select className="select" value={categoriaId ?? ''} onChange={(e) => { setCategoriaId(e.target.value ? Number(e.target.value) : null); setSubcategoriaId(null); }}>
-              <option value="">Todas las categorías</option>
-              {categorias.map((c) => <option key={`ent-cat-${c.id_categoria}`} value={c.id_categoria}>{c.nombre_categoria}</option>)}
-            </select>
+            <div className="reporte-entradas__filter-item">
+              <div className="reporte-entradas__rango">
+                {RANGE_PRESETS.map((p) => (
+                  <button
+                    key={`ent-pdays-${p.days}`}
+                    type="button"
+                    className={`reporte-entradas__rango-btn ${rango === p.days ? 'reporte-entradas__rango-btn--active' : ''}`}
+                    onClick={() => handlePreset(p.days)}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-            <select className="select" value={subcategoriaId ?? ''} onChange={(e) => setSubcategoriaId(e.target.value ? Number(e.target.value) : null)} disabled={!categoriaId}>
-              <option value="">Todas las subcategorías</option>
-              {subcategoriasFiltradas.map((s) => <option key={`ent-sub-${s.id_subcategoria}`} value={s.id_subcategoria}>{s.nombre_subcategoria}</option>)}
-            </select>
+            <div className="reporte-entradas__filter-item">
+              <select className="select" value={categoriaId ?? ''} onChange={(e) => { setCategoriaId(e.target.value ? Number(e.target.value) : null); setSubcategoriaId(null); }}>
+                <option value="">Todas las categorías</option>
+                {categorias.map((c) => <option key={`ent-cat-${c.id_categoria}`} value={c.id_categoria}>{c.nombre_categoria}</option>)}
+              </select>
+            </div>
 
-            <select className="select" value={motivoId ?? ''} onChange={(e) => setMotivoId(e.target.value ? Number(e.target.value) : null)}>
-              <option value="">Todos los motivos</option>
-              {filteredMotivos.map((m) => <option key={`ent-mot-${m.id_motivo}`} value={m.id_motivo}>{m.nombre_motivo}</option>)}
-            </select>
+            <div className="reporte-entradas__filter-item">
+              <select className="select" value={subcategoriaId ?? ''} onChange={(e) => setSubcategoriaId(e.target.value ? Number(e.target.value) : null)} disabled={!categoriaId}>
+                <option value="">Todas las subcategorías</option>
+                {subcategoriasFiltradas.map((s) => <option key={`ent-sub-${s.id_subcategoria}`} value={s.id_subcategoria}>{s.nombre_subcategoria}</option>)}
+              </select>
+            </div>
 
-            <input type="text" className="input" placeholder="No. Documento…"
-              value={documento} onChange={(e) => setDocumento(e.target.value)} />
+            <div className="reporte-entradas__filter-item">
+              <select className="select" value={motivoId ?? ''} onChange={(e) => setMotivoId(e.target.value ? Number(e.target.value) : null)}>
+                <option value="">Todos los motivos</option>
+                {filteredMotivos.map((m) => <option key={`ent-mot-${m.id_motivo}`} value={m.id_motivo}>{m.nombre_motivo}</option>)}
+              </select>
+            </div>
 
-            <input type="text" className="input" placeholder="Lote…"
-              value={lote} onChange={(e) => setLote(e.target.value)} />
+            <div className="reporte-entradas__filter-item">
+              <input type="text" className="input" placeholder="No. Documento…"
+                value={documento} onChange={(e) => setDocumento(e.target.value)} />
+            </div>
 
-            <select className="select" value={warehouseId ?? ''} onChange={(e) => setWarehouseId(e.target.value ? Number(e.target.value) : null)}>
-              <option value="">Todas las bodegas</option>
-              {bodegas.map((b) => <option key={`ent-bod-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>)}
-            </select>
+            <div className="reporte-entradas__filter-item">
+              <input type="text" className="input" placeholder="Lote…"
+                value={lote} onChange={(e) => setLote(e.target.value)} />
+            </div>
+
+            <div className="reporte-entradas__filter-item">
+              <select className="select" value={warehouseId ?? ''} onChange={(e) => setWarehouseId(e.target.value ? Number(e.target.value) : null)}>
+                <option value="">Todas las bodegas</option>
+                {bodegas.map((b) => <option key={`ent-bod-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>)}
+              </select>
+            </div>
           </div>
         </Card>
 
@@ -461,6 +478,11 @@ export default function ReporteEntradasPage() {
                             </tbody>
                           </table>
                           {g.observaciones && <div className="reporte-entradas__obs">{g.observaciones}</div>}
+                          {g.tipo_entrada && (
+                            <div className="reporte-entradas__obs" style={{ marginTop: '8px' }}>
+                              <strong>Tipo de entrada:</strong> {g.tipo_entrada}
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -470,19 +492,28 @@ export default function ReporteEntradasPage() {
               </tbody>
               <tfoot>
                 <tr className="reporte-entradas__total-row">
-                  <td colSpan={isMobile ? 5 : 8} style={{ textAlign: 'right', fontWeight: 600 }}>Totales</td>
-                  <td style={{ textAlign: 'right', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{totales.totalCantidad.toFixed(2)}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>Q {totales.totalCosto.toFixed(2)}</td>
+                  <td colSpan={isMobile ? 3 : 7} style={{ fontWeight: 600 }}>Total</td>
+                  <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{totales.totalCantidad.toFixed(2)}</td>
+                  <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>Q {totales.totalCosto.toFixed(2)}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
-          <Pagination page={page} totalPages={totalPages} total={total} onChange={setPage} loading={loading} />
-        </>)
-        }
+
+          {totalPages > 1 && (
+            <Card compact>
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onChange={(p) => setPage(p)}
+                label={`${total} movimiento${total === 1 ? '' : 's'}`}
+              />
+            </Card>
+          )}
+        </>
+        )}
       </div>
 
-      {/* === Selector de columnas para exportación === */}
       <ColumnSelectorModal
         open={showColumnSelector}
         onClose={() => setShowColumnSelector(false)}

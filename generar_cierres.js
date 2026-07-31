@@ -134,12 +134,22 @@ async function createDailyCloseForDate(conn, { id_bodega, fecha_cierre, creado_p
   };
 }
 
-async function main() {
-  const fechaInicio = '2026-07-07';
-  const fechaFin = '2026-07-28';
-  const creadoPor = 1; // Usuario admin/sistema (ajustar según sea necesario)
-  const origen = 'MANUAL'; // O 'AUTO' si se prefiere
+// Parsear argumentos CLI: node generar_cierres.js --desde 2026-07-29 --hasta 2026-07-30
+const args = process.argv.slice(2);
+const desdeIdx = args.indexOf('--desde');
+const hastaIdx = args.indexOf('--hasta');
+const fechaInicio = desdeIdx >= 0 && args[desdeIdx + 1] ? args[desdeIdx + 1] : '2026-07-07';
+const fechaFin = hastaIdx >= 0 && args[hastaIdx + 1] ? args[hastaIdx + 1] : '2026-07-28';
+const creadoPor = 1; // Usuario admin/sistema (ajustar según sea necesario)
+const origen = 'MANUAL'; // O 'AUTO' si se prefiere
 
+// Validar formato de fechas
+if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaInicio) || !/^\d{4}-\d{2}-\d{2}$/.test(fechaFin)) {
+  console.error('❌ Formato de fecha inválido. Usar: --desde 2026-07-29 --hasta 2026-07-30');
+  process.exit(1);
+}
+
+async function main() {
   console.log('============================================');
   console.log('🔄 GENERANDO CIERRES DIARIOS RETROACTIVOS');
   console.log(`   Desde: ${fechaInicio}`);

@@ -2565,9 +2565,13 @@ function buildOperationalAlerts() {
  * @param {object} opts.user     - req.user (id_user)
  * @param {object} opts.approval - resultado de verifySensitiveApproval (o sintético)
  * @param {string} [opts.observaciones]
+ * @param {string} [opts.fecha_cierre] - YYYY-MM-DD del día que se está cerrando. Si se omite, usa hoy.
+ *                                       Se usa para backdattar creado_en del AJUSTE y del kardex,
+ *                                       de modo que el conteo final aparezca en el cierre del día
+ *                                       correspondiente (no del día en que se ejecuta).
  * @returns {Promise<{id_movimiento:number, appliedLines:number, affectedProducts:number, totalSalida:number}>}
  */
-async function applyConteoFinalLines(conn, { id_bodega, lines, motivo, user, approval, observaciones }) {
+async function applyConteoFinalLines(conn, { id_bodega, lines, motivo, user, approval, observaciones, fecha_cierre }) {
   if (!Array.isArray(lines) || !lines.length) {
     return { id_movimiento: 0, appliedLines: 0, affectedProducts: 0, totalSalida: 0 };
   }
@@ -2578,16 +2582,26 @@ async function applyConteoFinalLines(conn, { id_bodega, lines, motivo, user, app
     throw new Error("id_bodega requerido para conteo final");
   }
 
+  // Backdattamos al día que se está cerrando (no a hoy) para que las salidas
+  // del conteo final aparezcan reflejadas en el cierre_dia del día correcto.
+  // Hora de cierre: 23:59:59 del día seleccionado.
+  const fechaCierreNorm = String(fecha_cierre || '').trim();
+  const cierreTimestamp = /^\d{4}-\d{2}-\d{2}$/.test(fechaCierreNorm)
+    ? `${fechaCierreNorm} 23:59:59`
+    : 'NOW()';
+
   const obsBase = String(observaciones || "").trim();
   const [mhRes] = await conn.query(
     `INSERT INTO movimiento_encabezado
-     (tipo_movimiento, id_motivo, id_bodega_origen, id_bodega_destino, observaciones, creado_por, confirmado_en, estado)
-     VALUES ('AJUSTE', :id_motivo, :id_bodega_origen, NULL, :observaciones, :creado_por, NOW(), 'CONFIRMADO')`,
+     (tipo_movimiento, id_motivo, id_bodega_origen, id_bodega_destino, observaciones, creado_por, creado_en, confirmado_en, estado)
+     VALUES ('AJUSTE', :id_motivo, :id_bodega_origen, NULL, :observaciones, :creado_por, :creado_en, :confirmado_en, 'CONFIRMADO')`,
     {
       id_motivo: Number(motivo.id_motivo || 0),
       id_bodega_origen: id_bodega,
       observaciones: obsBase || `Salida automatica por conteo final de bodega #${id_bodega}`,
       creado_por: Number(user?.id_user || 0),
+      creado_en: cierreTimestamp,
+      confirmado_en: cierreTimestamp,
     }
   );
   const id_movimiento = Number(mhRes.insertId || 0);
@@ -2651,8 +2665,8 @@ async function applyConteoFinalLines(conn, { id_bodega, lines, motivo, user, app
       );
       await conn.query(
         `INSERT INTO kardex
-         (id_movimiento, id_detalle, id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, costo_unitario)
-         VALUES (:id_movimiento, :id_detalle, :id_bodega, :id_producto, :lote, :fecha_vencimiento, :delta_cantidad, :costo_unitario)`,
+         (id_movimiento, id_detalle, id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, costo_unitario, creado_en)
+         VALUES (:id_movimiento, :id_detalle, :id_bodega, :id_producto, :lote, :fecha_vencimiento, :delta_cantidad, :costo_unitario, :creado_en)`,
         {
           id_movimiento,
           id_detalle: Number(d.insertId || 0),
@@ -2662,6 +2676,7 @@ async function applyConteoFinalLines(conn, { id_bodega, lines, motivo, user, app
           fecha_vencimiento: p.fecha_vencimiento || null,
           delta_cantidad: -Number(p.qty || 0),
           costo_unitario,
+          creado_en: cierreTimestamp,
         }
       );
       totalSalida += Number(p.qty || 0);
@@ -2723,6 +2738,31 @@ async function buildDailyCloseRows(conn, id_bodega, fecha_cierre) {
 }
 
 async function createDailyCloseForDate(conn, { id_bodega, fecha_cierre, creado_por, origen = "MANUAL", observaciones = null }) {
+  // ── Validación secuencial: si hay días anteriores a fecha_cierre sin cerrar,
+  //    rechazamos. Solo se permite cerrar el siguiente día pendiente en orden.
+  const [[prev]] = await conn.query(
+    `SELECT MAX(fecha_cierre) AS last_closed_date
+     FROM cierre_dia
+     WHERE id_bodega=:id_bodega`,
+    { id_bodega }
+  );
+  const lastClosedDate = ymd(prev?.last_closed_date);
+  // Calculamos qué día debería ser el siguiente a cerrar (lastClosedDate + 1)
+  // y verificamos que fecha_cierre coincida o sea anterior a ese día.
+  if (lastClosedDate) {
+    const requiredNext = addDaysYmd(lastClosedDate, 1);
+    if (fecha_cierre > requiredNext) {
+      const err = new Error(
+        `No se puede cerrar ${fecha_cierre} sin haber cerrado primero ${requiredNext}. Debes cerrar los días en orden secuencial.`
+      );
+      err.code = "PREVIOUS_DAY_PENDING";
+      err.status = 409;
+      err.required_close_date = requiredNext;
+      err.last_closed_date = lastClosedDate;
+      throw err;
+    }
+  }
+
   const [[already]] = await conn.query(
     `SELECT id_cierre, fecha_cierre
      FROM cierre_dia
@@ -6645,6 +6685,40 @@ app.get("/api/cierre-dia/estado", auth, async (req, res) => {
     );
     const last_closed_date = ymd(lc?.last_closed_date);
 
+    // Calcular TODOS los días pendientes: desde el día siguiente al último cierre hasta ayer
+    const [pendingRows] = await pool.query(
+      `SELECT fecha_cierre, id_cierre, creado_en, origen
+       FROM cierre_dia
+       WHERE id_bodega=:id_bodega
+         AND fecha_cierre <= DATE_SUB(CURDATE(), INTERVAL 1 DAY)
+       ORDER BY fecha_cierre ASC`,
+      { id_bodega }
+    );
+    const closedDates = new Set((pendingRows || []).map((r) => ymd(r.fecha_cierre)));
+
+    const pending_days = [];
+    if (last_closed_date && last_closed_date < ayer) {
+      let d = addDaysYmd(last_closed_date, 1);
+      while (d <= ayer) {
+        if (!closedDates.has(d)) pending_days.push(d);
+        d = addDaysYmd(d, 1);
+      }
+    } else if (!last_closed_date && ayer) {
+      // Nunca se cerró: los días van desde el primer movimiento hasta ayer
+      const [[firstMov]] = await pool.query(
+        `SELECT DATE(MIN(creado_en)) AS first_date
+         FROM kardex
+         WHERE id_bodega=:id_bodega`,
+        { id_bodega }
+      );
+      const firstDate = ymd(firstMov?.first_date) || ayer;
+      let d = firstDate;
+      while (d <= ayer) {
+        if (!closedDates.has(d)) pending_days.push(d);
+        d = addDaysYmd(d, 1);
+      }
+    }
+
     const [[todayRow]] = await pool.query(
       `SELECT id_cierre, fecha_cierre, creado_en, origen
        FROM cierre_dia
@@ -6660,6 +6734,18 @@ app.get("/api/cierre-dia/estado", auth, async (req, res) => {
       { id_bodega }
     );
 
+    // Mapear días ya cerrados (ayer y anteriores) para mostrarlos igual
+    const closedDaysMap = {};
+    for (const r of (pendingRows || [])) {
+      const key = ymd(r.fecha_cierre);
+      if (key) closedDaysMap[key] = {
+        id_cierre: Number(r.id_cierre || 0),
+        fecha_cierre: key,
+        creado_en: r.creado_en,
+        origen: r.origen,
+      };
+    }
+
     res.json({
       id_bodega,
       hoy,
@@ -6668,20 +6754,26 @@ app.get("/api/cierre-dia/estado", auth, async (req, res) => {
       today_closed: !!todayRow,
       yesterday_closed: !!yesterdayRow,
       pending_yesterday_close: !yesterdayRow,
-      today_close: todayRow
-        ? {
-            id_cierre: Number(todayRow.id_cierre || 0),
-            fecha_cierre: ymd(todayRow.fecha_cierre),
-            creado_en: todayRow.creado_en,
-            origen: todayRow.origen,
-          }
-        : null,
+      // NUEVO: información completa de días pendientes
+      days_missing: pending_days.length,
+      pending_days,
+      required_close_date: pending_days.length > 0 ? pending_days[0] : null,
+      next_pending_date: pending_days.length > 1 ? pending_days[1] : null,
+      // Map de cierres cerrados (para referencia, para no romper compatibilidad)
       yesterday_close: yesterdayRow
         ? {
             id_cierre: Number(yesterdayRow.id_cierre || 0),
             fecha_cierre: ymd(yesterdayRow.fecha_cierre),
             creado_en: yesterdayRow.creado_en,
             origen: yesterdayRow.origen,
+          }
+        : null,
+      today_close: todayRow
+        ? {
+            id_cierre: Number(todayRow.id_cierre || 0),
+            fecha_cierre: ymd(todayRow.fecha_cierre),
+            creado_en: todayRow.creado_en,
+            origen: todayRow.origen,
           }
         : null,
     });
@@ -6779,6 +6871,7 @@ app.post("/api/cierre-dia", auth, requirePermission("action.create_update", "rea
           user: req.user,
           approval,
           observaciones: `Conteo final del cierre de ${fecha_cierre} - ${bodCfg?.nombre_bodega || `bodega #${id_bodega}`}`,
+          fecha_cierre,
         });
       } catch (conteoErr) {
         await conn.rollback();
@@ -6792,7 +6885,22 @@ app.post("/api/cierre-dia", auth, requirePermission("action.create_update", "rea
       creado_por: id_usuario,
       origen: "MANUAL",
       observaciones: String(req.body?.observaciones || "").trim() || null,
+    }).catch((e) => {
+      // Errores con .code/.status son errores controlados de validación
+      if (e && e.code) return { _error: e };
+      throw e;
     });
+
+    if (cierre?._error) {
+      await conn.rollback();
+      const e = cierre._error;
+      return res.status(Number(e.status || 409)).json({
+        error: String(e.message || e),
+        code: e.code,
+        required_close_date: e.required_close_date,
+        last_closed_date: e.last_closed_date,
+      });
+    }
 
     if (cierre.already_exists) {
       const [[cierreInfo]] = await conn.query(
@@ -8117,12 +8225,22 @@ app.get("/api/orders", auth, async (req, res) => {
   const status = req.query.status ? String(req.query.status) : null;
   const scopeParam = req.query.scope ? String(req.query.scope) : null;
   const whParam = Number(req.query.warehouse || 0);
+  const fromDate = String(req.query.from || "").trim() || null;
+  const toDate = String(req.query.to || "").trim() || null;
   const stockScope = await resolveStockScope(req.user);
   const where = [];
   const params = {};
   if (status) {
     where.push("p.estado=:status");
     params.status = status;
+  }
+  if (fromDate) {
+    where.push("DATE(p.creado_en) >= :from_date");
+    params.from_date = fromDate;
+  }
+  if (toDate) {
+    where.push("DATE(p.creado_en) <= :to_date");
+    params.to_date = toDate;
   }
   if (scopeParam === "dispatch") {
     const warehouseScope = getScopedWarehouseFilter(stockScope, whParam);

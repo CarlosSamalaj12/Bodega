@@ -32,6 +32,19 @@
   @include input-base;
 }
 
+// Estado de error para inputs nativos o con clase .input
+.input--error,
+.input.input--error,
+input.input--error {
+  border-color: $color-danger;
+  box-shadow: 0 0 0 1px $color-danger;
+
+  &:focus {
+    border-color: $color-danger;
+    box-shadow: 0 0 0 2px rgba($color-danger, 0.25);
+  }
+}
+
 .textarea {
   min-height: 88px;
   resize: vertical;

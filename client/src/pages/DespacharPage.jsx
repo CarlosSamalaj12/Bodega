@@ -80,17 +80,21 @@ export default function DespacharPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const loadingRef = useRef(false);
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [dateFrom, setDateFrom] = useState(todayStr);
+  const [dateTo, setDateTo] = useState(todayStr);
+
   const loadPedidos = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await pedidosService.list({ scope: 'dispatch' });
+      const data = await pedidosService.list({ scope: 'dispatch', from: dateFrom, to: dateTo });
       setPedidos(Array.isArray(data) ? data : []);
     } catch (e) {
       toast.error(e?.response?.data?.error || 'No se pudieron cargar los pedidos');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [dateFrom, dateTo]);
 
   // Evitar llamadas concurrentes a loadPedidos
   const safeLoadPedidos = useCallback(async () => {
@@ -418,6 +422,39 @@ export default function DespacharPage() {
         {/* Barra de filtros */}
         <Card compact>
           <div className="despachar-page__filters">
+            <div className="despachar-page__date-group">
+              <input
+                type="date"
+                className="input"
+                value={dateFrom}
+                onChange={(e) => {
+                  setDateFrom(e.target.value);
+                  if (e.target.value > dateTo) setDateTo(e.target.value);
+                }}
+                max={dateTo || undefined}
+                title="Desde"
+              />
+              <span style={{ color: '#999', fontSize: '11px' }}>→</span>
+              <input
+                type="date"
+                className="input"
+                value={dateTo}
+                onChange={(e) => {
+                  setDateTo(e.target.value);
+                  if (e.target.value < dateFrom) setDateFrom(e.target.value);
+                }}
+                min={dateFrom || undefined}
+                title="Hasta"
+              />
+              <button
+                type="button"
+                className="despachar-page__today-btn"
+                onClick={() => { setDateFrom(todayStr); setDateTo(todayStr); }}
+                title="Hoy"
+              >
+                Hoy
+              </button>
+            </div>
             <SearchInput
               value={search}
               onChange={setSearch}

@@ -49,6 +49,45 @@
     font-variant-numeric: tabular-nums;
   }
 
+  &__date-group {
+    display: flex;
+    gap: $space-2;
+    align-items: center;
+
+    input[type='date'] {
+      min-width: 130px;
+
+      // Ocultar el calendario nativo del navegador (el ícono azul que rompe la estética)
+      &::-webkit-calendar-picker-indicator {
+        opacity: 0;
+        width: 0;
+      }
+    }
+  }
+
+  &__today-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: $space-1 $space-2;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+    color: $color-text-muted;
+    background: transparent;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+    cursor: pointer;
+    transition: all $transition-fast;
+    white-space: nowrap;
+    min-height: 32px;
+
+    &:hover {
+      background: $color-surface-hover;
+      color: $color-text;
+      border-color: $color-stroke-strong;
+    }
+  }
+
   // ---------- Móvil ----------
   @media (max-width: $bp-md) {
     padding: $space-4;

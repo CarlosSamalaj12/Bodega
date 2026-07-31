@@ -37,6 +37,8 @@ export function SalidaForm({
   });
   const [lines, setLines] = useState([{ ...EMPTY_LINE }]);
   const [submitError, setSubmitError] = useState(null);
+  // Errores de validación por línea: { [idx]: { id_producto?, cantidad?, precio? } }
+  const [lineErrors, setLineErrors] = useState({});
   // Stock por índice de línea (para mostrar "X en existencia" en el chip)
   const [stockMap, setStockMap] = useState({});
 
@@ -94,34 +96,57 @@ export function SalidaForm({
     return { total, lineasValidas };
   }, [lines]);
 
+  // Validar una línea: producto, cantidad > 0 y precio de salida son obligatorios
+  const validateLine = (l) => {
+    const errors = {};
+    if (!l.id_producto) errors.id_producto = 'Selecciona un producto';
+    if (!l.cantidad || Number(l.cantidad) <= 0) errors.cantidad = 'Cantidad > 0';
+    if (l.precio === '' || l.precio == null || Number(l.precio) < 0) errors.precio = 'Precio requerido';
+    return errors;
+  };
+
+  const validateAll = useCallback(() => {
+    const errs = {};
+    let ok = true;
+    lines.forEach((l, idx) => {
+      const e = validateLine(l);
+      if (Object.keys(e).length) {
+        errs[idx] = e;
+        ok = false;
+      }
+    });
+    setLineErrors(errs);
+    return ok;
+  }, [lines]);
+
   const canSubmit =
     cabecera.id_motivo &&
-    lines.some((l) => l.id_producto && Number(l.cantidad) > 0) &&
+    lines.every((l) => l.id_producto && Number(l.cantidad) > 0) &&
+    lines.every((l) => l.precio !== '' && Number(l.precio) >= 0) &&
     !submitting;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitError(null);
 
+    // Validar todas las líneas
+    if (!validateAll()) {
+      setSubmitError('Completa todos los campos obligatorios de cada línea (producto, cantidad y precio de salida).');
+      return;
+    }
+
     const payload = {
       id_motivo: Number(cabecera.id_motivo),
       no_documento: cabecera.no_documento.trim() || null,
       observaciones: cabecera.observaciones.trim() || null,
-      lines: lines
-        .filter((l) => l.id_producto && Number(l.cantidad) > 0)
-        .map((l) => ({
-          id_producto: l.id_producto,
-          cantidad: Number(l.cantidad),
-          // El backend distingue costo_unitario (autocalculado) de
-          // precio_salida (lo que pone el usuario al despachar).
-          precio_salida: Number(l.precio) || 0,
-        })),
+      lines: lines.map((l) => ({
+        id_producto: l.id_producto,
+        cantidad: Number(l.cantidad),
+        // El backend distingue costo_unitario (autocalculado) de
+        // precio_salida (lo que pone el usuario al despachar).
+        precio_salida: Number(l.precio) || 0,
+      })),
     };
-
-    if (payload.lines.length === 0) {
-      setSubmitError('Agrega al menos una línea con producto y cantidad mayor a 0.');
-      return;
-    }
 
     onSubmittingChange?.(true);
     try {
@@ -181,61 +206,88 @@ export function SalidaForm({
     setPendingPayload(null);
   };
 
+  // Helper para mostrar el asterisco de campo obligatorio en la cabecera de columna
+  const requiredLabel = (text) => (
+    <span>
+      {text} <span className="salida-form__required" aria-label="obligatorio">*</span>
+    </span>
+  );
+
   const columns = [
     {
       key: 'producto',
-      label: 'Producto',
+      label: requiredLabel('Producto'),
       primary: true,
       minWidth: 240,
-      render: (l, idx) => (
-        <ProductPicker
-          value={l.id_producto ? { id_producto: l.id_producto, nombre_producto: l.nombre_producto, sku: l.sku } : null}
-          onChange={(p) => {
-            setLine(idx, {
-              id_producto: p?.id_producto || null,
-              nombre_producto: p?.nombre_producto || '',
-              sku: p?.sku || null,
-            });
-            fetchStock(idx, p?.id_producto || null);
-          }}
-          placeholder="Buscar producto…"
-          stockInfo={stockMap[idx] || null}
-          ultimoPrecio={0}
-        />
-      ),
+      render: (l, idx) => {
+        const err = lineErrors[idx]?.id_producto;
+        return (
+          <div className="salida-form__cell">
+            <ProductPicker
+              value={l.id_producto ? { id_producto: l.id_producto, nombre_producto: l.nombre_producto, sku: l.sku } : null}
+              onChange={(p) => {
+                setLine(idx, {
+                  id_producto: p?.id_producto || null,
+                  nombre_producto: p?.nombre_producto || '',
+                  sku: p?.sku || null,
+                });
+                fetchStock(idx, p?.id_producto || null);
+              }}
+              placeholder="Buscar producto…"
+              stockInfo={stockMap[idx] || null}
+              ultimoPrecio={0}
+            />
+            {err && <span className="salida-form__field-error">{err}</span>}
+          </div>
+        );
+      },
     },
     {
       key: 'cantidad',
-      label: 'Cantidad',
+      label: requiredLabel('Cantidad'),
       width: 100,
-      render: (l, idx) => (
-        <input
-          type="number"
-          className="input salida-form__num"
-          min="0"
-          step="0.001"
-          value={l.cantidad}
-          onChange={(e) => setLine(idx, { cantidad: e.target.value })}
-          placeholder="0"
-        />
-      ),
+      render: (l, idx) => {
+        const err = lineErrors[idx]?.cantidad;
+        return (
+          <div className="salida-form__cell">
+            <input
+              type="number"
+              className={`input salida-form__num ${err ? 'input--error' : ''}`}
+              min="0"
+              step="0.001"
+              value={l.cantidad}
+              onChange={(e) => setLine(idx, { cantidad: e.target.value })}
+              placeholder="0"
+              required
+            />
+            {err && <span className="salida-form__field-error">{err}</span>}
+          </div>
+        );
+      },
     },
     {
       key: 'precio',
-      label: 'Precio de salida',
+      label: requiredLabel('Precio de salida'),
       width: 120,
-      render: (l, idx) => (
-        <input
-          type="number"
-          className="input salida-form__num"
-          min="0"
-          step="0.01"
-          value={l.precio}
-          onChange={(e) => setLine(idx, { precio: e.target.value })}
-          placeholder="0.00"
-          title="Precio unitario al que se registra la salida. Si la bodega lo requiere, es obligatorio."
-        />
-      ),
+      render: (l, idx) => {
+        const err = lineErrors[idx]?.precio;
+        return (
+          <div className="salida-form__cell">
+            <input
+              type="number"
+              className={`input salida-form__num ${err ? 'input--error' : ''}`}
+              min="0"
+              step="0.01"
+              value={l.precio}
+              onChange={(e) => setLine(idx, { precio: e.target.value })}
+              placeholder="0.00"
+              title="Precio unitario al que se registra la salida. Si la bodega lo requiere, es obligatorio."
+              required
+            />
+            {err && <span className="salida-form__field-error">{err}</span>}
+          </div>
+        );
+      },
     },
     {
       key: 'subtotal',

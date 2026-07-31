@@ -9,7 +9,7 @@ import { toast } from '@/components/ui/Toast';
 import { useAuthStore } from '@/stores/auth.store';
 import { hasPermission } from '@/utils/permissions';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { catalogosService } from '@/services/catalogos.service';
+import { useCatalogosStore } from '@/stores/catalogos.store';
 import { entradasService } from '@/services/entradas.service';
 import { EntradaForm } from '@/components/entradas/EntradaForm';
 import { MovimientoDetailModal } from '@/components/shared/MovimientoDetailModal';
@@ -29,18 +29,20 @@ export default function EntradasPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const [motivos, setMotivos] = useState([]);
-  const [proveedores, setProveedores] = useState([]);
-  const [bodega, setBodega] = useState(null);
-  const [catalogError, setCatalogError] = useState(null);
-  const [loadingCatalogs, setLoadingCatalogs] = useState(true);
+  // Catálogos cacheados globalmente
+  const motivos = useCatalogosStore((s) => s.motivos);
+  const proveedores = useCatalogosStore((s) => s.proveedores);
+  const bodega = useCatalogosStore((s) => s.bodegaUser);
+  const catalogError = useCatalogosStore((s) => s.error);
+  const loadingCatalogs = useCatalogosStore((s) => s.isLoading);
+  const fetchCatalogos = useCatalogosStore((s) => s.fetchAll);
 
   const [detailId, setDetailId] = useState(null);
   const [showColumnSelector, setShowColumnSelector] = useState(false);
   const [revertPinOpen, setRevertPinOpen] = useState(false);
   const [revertingId, setRevertingId] = useState(null);
   const [showAnulados, setShowAnulados] = useState(false);
-  // reloadKey cambia después de crear/revertir para que la tabla vuelva a fetchear
+  // reloadKey cambia después de crear/revertir — la tabla hace refresh incremental
   const [reloadKey, setReloadKey] = useState(0);
 
   // Leer ?open=ID de la URL para abrir detalle automáticamente
@@ -50,36 +52,18 @@ export default function EntradasPage() {
       setDetailId(Number(openId));
       setSearchParams({}, { replace: true });
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
-  const loadCatalogs = useCallback(async () => {
-    setLoadingCatalogs(true);
-    setCatalogError(null);
-    try {
-      const [mot, prov, bds] = await Promise.all([
-        catalogosService.getMotivos(),
-        catalogosService.getProveedores(),
-        catalogosService.getBodegas(),
-      ]);
-      const motivosValidos = (mot || []).filter((m) =>
-        ['ENTRADA', 'AJUSTE'].includes(String(m.tipo_movimiento || '').toUpperCase())
-      );
-      setMotivos(motivosValidos);
-      setProveedores(prov || []);
-      const idWh = Number(user?.id_warehouse || 0);
-      const found = (bds || []).find((b) => Number(b.id_bodega) === idWh);
-      setBodega(found || null);
-    } catch (e) {
-      const msg = e?.response?.data?.error || e?.message || 'Error desconocido';
-      setCatalogError(msg);
-    } finally {
-      setLoadingCatalogs(false);
-    }
-  }, [user]);
-
+  // Asegurar que los catálogos están cargados
   useEffect(() => {
-    loadCatalogs();
-  }, [loadCatalogs]);
+    fetchCatalogos();
+  }, [fetchCatalogos]);
+
+  // Filtrar motivos válidos para entradas
+  const motivosValidos = useMemo(
+    () => motivos.filter((m) => ['ENTRADA', 'AJUSTE'].includes(String(m.tipo_movimiento || '').toUpperCase())),
+    [motivos]
+  );
 
   const handleCreated = () => {
     setModalOpen(false);
@@ -132,6 +116,9 @@ export default function EntradasPage() {
         subtitle="Entradas recientes de la bodega"
         actions={
           <div className="entradas-page__header-actions">
+            <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
+              Exportar
+            </Button>
             {canCreate && (
               <Button size={isMobile ? 'sm' : 'md'} onClick={() => setModalOpen(true)}>
                 + Nueva entrada
@@ -176,11 +163,6 @@ export default function EntradasPage() {
           </p>
         </Card>
 
-        <div className="entradas-page__footer-actions">
-          <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-            Exportar (resumen)
-          </Button>
-        </div>
       </div>
 
       <MovimientoDetailModal
@@ -240,7 +222,7 @@ export default function EntradasPage() {
           <div className="entradas-page__catalog-error">
             <p><strong>No se pudieron cargar los catálogos.</strong></p>
             <p className="entradas-page__catalog-error-detail">{catalogError}</p>
-            <Button variant="subtle" onClick={loadCatalogs}>Reintentar</Button>
+            <Button variant="subtle" onClick={fetchCatalogos}>Reintentar</Button>
           </div>
         ) : (
           <>
@@ -250,7 +232,7 @@ export default function EntradasPage() {
               </div>
             )}
             <EntradaForm
-              motivos={motivos}
+              motivos={motivosValidos}
               proveedores={proveedores}
               bodegaNombre={bodegaNombre}
               submitting={submitting}
@@ -258,7 +240,7 @@ export default function EntradasPage() {
               onCreated={handleCreated}
               onCancel={() => setModalOpen(false)}
             />
-            {!loadingCatalogs && motivos.length === 0 && (
+            {!loadingCatalogs && motivosValidos.length === 0 && (
               <div className="entradas-page__warn">
                 <p>
                   <strong>No hay motivos de tipo ENTRADA o AJUSTE</strong> registrados.
