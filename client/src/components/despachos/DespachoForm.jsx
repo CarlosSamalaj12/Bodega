@@ -30,7 +30,10 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
           solicitada: Number(l.cantidad_solicitada || 0),
           surtida_anterior: Number(l.cantidad_surtida || 0),
           pendiente: Number(l.pendiente || 0),
-          stock: Number(l.stock || 0),
+          // stock del surtidor (mi bodega): se usa para validar que puedo despachar
+          stock: Number(l.stock_surtidor || 0),
+          // stock de la bodega del solicitante: información para el despachador
+          stock_solicitante: Number(l.stock_solicitante || 0),
           estado: l.estado_linea,
           cantidad: Number(l.pendiente || 0),
           anulada: false,
@@ -42,13 +45,18 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
   const totales = useMemo(() => {
     let surtir = 0;
     let anuladas = 0;
+    let sobreDespacho = 0;
     for (const l of lines) {
       surtir += Number(l.cantidad) || 0;
       if (l.anulada) anuladas += Number(l.pendiente) || 0;
+      const cant = Number(l.cantidad) || 0;
+      const pend = Number(l.pendiente) || 0;
+      if (cant > pend) sobreDespacho += cant - pend;
     }
     const pendienteTotal = lines.reduce((a, l) => a + (Number(l.pendiente) || 0), 0);
-    const esParcial = surtir < pendienteTotal || anuladas > 0;
-    return { surtir, anuladas, esParcial };
+    // Requiere justificación si: se sub-despacha, se anulan líneas, o se sobre-despacha.
+    const esParcial = surtir !== pendienteTotal || anuladas > 0 || sobreDespacho > 0;
+    return { surtir, anuladas, sobreDespacho, esParcial };
   }, [lines]);
 
   const canSubmit = !submitting && (totales.surtir > 0 || totales.anuladas > 0);
@@ -59,9 +67,9 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
 
   const setCantidad = useCallback((idx, value) => {
     const v = String(value).replace(/[^\d]/g, '');
-    const num = v === '' ? 0 : Math.min(parseInt(v, 10) || 0, lines[idx].pendiente);
+    const num = v === '' ? 0 : (parseInt(v, 10) || 0);
     setLine(idx, { cantidad: num });
-  }, [lines, setLine]);
+  }, [setLine]);
 
   const anularLinea = useCallback((idx) => {
     setLine(idx, { cantidad: 0, anulada: true });
@@ -72,7 +80,7 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
     setSubmitError(null);
 
     if (totales.esParcial && !justificacion.trim()) {
-      setSubmitError('Si anulas o no surtirás todo, debes escribir una justificación.');
+      setSubmitError('Si anulas líneas, despacharás de menos o de más, debes escribir una justificación.');
       return;
     }
 
@@ -155,15 +163,28 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
       render: (l) => <span className="despacho-form__num">{l.surtida_anterior}</span>,
     },
     {
-      key: 'stock',
-      label: 'Stock',
-      width: 90,
+      key: 'stock_solicitante',
+      label: 'Stock solicitante',
+      width: 120,
       align: 'right',
       hideOnMobile: true,
       render: (l) => (
-        <span className={l.stock <= 0 ? 'despacho-form__num--warn' : 'despacho-form__num'}>
-          {l.stock}
-        </span>
+        <div className="despacho-form__stock-cell">
+          <span
+            className={l.stock_solicitante <= 0 ? 'despacho-form__num--warn' : 'despacho-form__num'}
+            title={`Stock en bodega del solicitante: ${l.stock_solicitante}`}
+          >
+            {l.stock_solicitante}
+          </span>
+          {l.stock > 0 && (
+            <span
+              className="despacho-form__stock-hint"
+              title={`Stock disponible en tu bodega (surtidor): ${l.stock}`}
+            >
+              disp. {l.stock}
+            </span>
+          )}
+        </div>
       ),
     },
     {
@@ -176,22 +197,28 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
         if (l.anulada) {
           return <span className="despacho-form__pill despacho-form__pill--void">Anulada</span>;
         }
-        const overStock = l.cantidad > l.stock;
+        const cant = Number(l.cantidad) || 0;
+        const pend = Number(l.pendiente) || 0;
+        const overStock = cant > Number(l.stock || 0);
+        const sobreDespacho = cant > pend;
         return (
           <div className="despacho-form__cantidad-cell">
             <input
               type="number"
-              className={`input despacho-form__input ${overStock ? 'despacho-form__input--warn' : ''}`}
+              className={`input despacho-form__input ${overStock ? 'despacho-form__input--warn' : ''} ${sobreDespacho ? 'despacho-form__input--info' : ''}`}
               min="0"
               step="1"
               pattern="[0-9]*"
-              max={l.pendiente}
               value={l.cantidad}
               onChange={(e) => setCantidad(idx, e.target.value)}
               disabled={l.pendiente === 0 || l.anulada}
+              title={sobreDespacho ? `Estás despachando ${cant - pend} unidad(es) de más sobre lo solicitado` : ''}
             />
             {overStock && (
               <div className="despacho-form__warn">Sin stock suficiente</div>
+            )}
+            {!overStock && sobreDespacho && (
+              <div className="despacho-form__hint">+{cant - pend} sobre lo solicitado</div>
             )}
           </div>
         );
@@ -262,6 +289,11 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
           <div className="despacho-form__total-item">
             <span className="despacho-form__total-label">A surtir:</span>
             <span className="despacho-form__total-value despacho-form__total-value--accent">{totales.surtir}</span>
+            {totales.sobreDespacho > 0 && (
+              <span className="despacho-form__total-badge" title={`${totales.sobreDespacho} unidad(es) extra sobre lo solicitado`}>
+                +{totales.sobreDespacho}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -301,10 +333,18 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
 
       {totales.esParcial && (
         <Input
-          label="Justificación (requerida para despacho parcial o con anulaciones)"
+          label={
+            totales.sobreDespacho > 0
+              ? 'Justificación (requerida: despacho parcial, con anulaciones o sobre-despacho)'
+              : 'Justificación (requerida para despacho parcial o con anulaciones)'
+          }
           value={justificacion}
           onChange={(e) => setJustificacion(e.target.value)}
-          placeholder="Ej. Sin stock de 2 productos, se coordina para mañana"
+          placeholder={
+            totales.sobreDespacho > 0
+              ? 'Ej. Cliente pidió 2 pero se le entregan 3 por reposición de stock'
+              : 'Ej. Sin stock de 2 productos, se coordina para mañana'
+          }
           required
         />
       )}
@@ -317,7 +357,7 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
           {submitting ? (
             <Spinner size={14} />
           ) : (
-            `Confirmar despacho${totales.surtir > 0 ? ` (${totales.surtir} u.)` : ''}${totales.anuladas > 0 ? ` + ${totales.anuladas} anulada(s)` : ''}`
+            `Confirmar despacho${totales.surtir > 0 ? ` (${totales.surtir} u.)` : ''}${totales.anuladas > 0 ? ` + ${totales.anuladas} anulada(s)` : ''}${totales.sobreDespacho > 0 ? ` (+${totales.sobreDespacho} extra)` : ''}`
           )}
         </Button>
       </div>

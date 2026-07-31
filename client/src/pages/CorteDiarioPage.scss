@@ -300,4 +300,123 @@
       color: $color-text-muted;
     }
   }
+
+  // ---- Historial de cierres ----
+  &__historial {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+  }
+
+  &__historial-table-wrap {
+    overflow-x: auto;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+  }
+
+  &__historial-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: $font-size-sm;
+
+    th, td {
+      padding: $space-2 $space-3;
+      border-bottom: 1px solid $color-stroke;
+      text-align: left;
+    }
+
+    th {
+      background: $color-bg-2;
+      font-weight: $font-weight-semibold;
+      color: $color-text;
+      font-size: $font-size-xs;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    tbody tr {
+      transition: background $transition-fast;
+    }
+
+    tbody tr:hover {
+      background: rgba(0, 0, 0, 0.02);
+    }
+  }
+
+  &__historial-actions {
+    display: flex;
+    gap: $space-1;
+    justify-content: flex-end;
+  }
+
+  &__chip {
+    display: inline-block;
+    padding: 2px $space-2;
+    background: $color-info-soft;
+    color: $color-info;
+    border-radius: $radius-pill;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+  }
+
+  &__user-cell {
+    color: $color-text-muted;
+    font-size: $font-size-xs;
+  }
+
+  // ---- Detalle de un cierre guardado ----
+  &__detalle-cierre {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+  }
+
+  &__detalle-actions {
+    display: flex;
+    gap: $space-2;
+    justify-content: flex-end;
+  }
+
+  &__obs {
+    padding: $space-2 $space-3;
+    background: $color-bg-2;
+    border-left: 3px solid $color-info;
+    border-radius: $radius-sm;
+    font-size: $font-size-sm;
+    color: $color-text;
+  }
+
+  &__detalle-table-wrap {
+    overflow-x: auto;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  &__detalle-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: $font-size-sm;
+
+    th, td {
+      padding: $space-2 $space-3;
+      border-bottom: 1px solid $color-stroke;
+      text-align: left;
+    }
+
+    th {
+      background: $color-bg-2;
+      position: sticky;
+      top: 0;
+      font-weight: $font-weight-semibold;
+      font-size: $font-size-xs;
+      text-transform: uppercase;
+      color: $color-text;
+    }
+
+    tbody tr:hover {
+      background: rgba(0, 0, 0, 0.02);
+    }
+  }
 }

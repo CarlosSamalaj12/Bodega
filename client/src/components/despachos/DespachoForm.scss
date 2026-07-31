@@ -58,6 +58,20 @@
     }
   }
 
+  &__stock-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    line-height: 1.2;
+  }
+
+  &__stock-hint {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    font-variant-numeric: tabular-nums;
+  }
+
   &__input {
     padding: $space-2 $space-3;
     font-size: $font-size-sm;
@@ -67,6 +81,11 @@
 
     &--warn {
       border-color: $color-warning;
+    }
+
+    &--info {
+      border-color: $color-info;
+      background: $color-info-soft;
     }
   }
 
@@ -80,6 +99,23 @@
   &__warn {
     font-size: $font-size-xs;
     color: $color-warning;
+  }
+
+  &__hint {
+    font-size: $font-size-xs;
+    color: $color-info;
+    font-weight: $font-weight-medium;
+  }
+
+  &__total-badge {
+    display: inline-block;
+    margin-left: $space-1;
+    padding: 1px $space-2;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    color: $color-info;
+    background: $color-info-soft;
+    border-radius: $radius-pill;
   }
 
   &__pill {

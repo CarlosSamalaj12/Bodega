@@ -4399,9 +4399,28 @@ app.get("/api/productos/:id/stock", auth, async (req, res) => {
      LIMIT 1`,
     { id_bodega, id_producto }
   );
+
+  // Último precio al que se SACÓ este producto en esta bodega (ventas,
+  // transferencias, etc.). Sirve como referencia para salidas manuales.
+  const [salidaRows] = await pool.query(
+    `SELECT md.precio_salida
+     FROM movimiento_detalle md
+     JOIN movimiento_encabezado me ON me.id_movimiento=md.id_movimiento
+     WHERE md.id_producto=:id_producto
+       AND me.id_bodega_origen=:id_bodega
+       AND md.precio_salida IS NOT NULL
+       AND md.precio_salida > 0
+       AND me.estado <> 'ANULADO'
+       AND me.tipo_movimiento IN ('SALIDA', 'TRANSFERENCIA')
+     ORDER BY me.creado_en DESC, md.id_detalle DESC
+     LIMIT 1`,
+    { id_bodega, id_producto }
+  );
+
   res.json({
     stock: rows[0]?.stock ?? 0,
     precio_sugerido: Number(priceRows[0]?.costo_unitario || 0),
+    ultimo_precio_salida: Number(salidaRows[0]?.precio_salida || 0),
   });
 });
 
@@ -4933,8 +4952,14 @@ app.post("/api/salidas", auth, requirePermission("action.create_update", "regist
         { id_motivo: Number(id_motivo || 0) }
       );
       mot = motById || null;
-      if (mot && String(mot.tipo_movimiento || "").toUpperCase() !== tipo_mov) {
-        mot = null;
+      if (mot) {
+        // El motivo debe coincidir con el tipo del movimiento, O ser AJUSTE
+        // (los ajustes manuales son válidos tanto en entradas como en salidas
+        // porque son movimientos de corrección).
+        const motType = String(mot.tipo_movimiento || "").toUpperCase();
+        if (motType !== tipo_mov && motType !== "AJUSTE") {
+          mot = null;
+        }
       }
     }
 
@@ -6427,6 +6452,10 @@ app.get("/api/print/corte-diario", auth, async (req, res) => {
   if (warehouseScope.denied || !warehouseScope.selected) return res.status(403).send("Sin permiso");
   const id_bodega = warehouseScope.selected;
   const printFormat = String(req.query.format || "carta").trim().toLowerCase() === "pos80" ? "pos80" : "carta";
+  // Fecha del corte a imprimir. Si no se pasa, usa hoy.
+  // Acepta YYYY-MM-DD. Si es inválida, cae a hoy.
+  const fechaRaw = String(req.query.fecha || "").trim();
+  const fechaCorte = /^\d{4}-\d{2}-\d{2}$/.test(fechaRaw) ? fechaRaw : null;
   const qRaw = String(req.query.q || "").trim();
   const qf = buildTokenizedLikeFilter(qRaw, ["p.nombre_producto", "p.sku"], "pcdq");
   const show_all = String(req.query.show_all || "") === "1" ? 1 : 0;
@@ -6440,12 +6469,25 @@ app.get("/api/print/corte-diario", auth, async (req, res) => {
     { id_bodega }
   );
 
+  // Helpers locales (no se pueden traer de otros endpoints, son scope local)
+  const esc = (v) =>
+    String(v ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+  // Construimos la expresión de la fecha objetivo (CURDATE() si no se pasa).
+  // Usamos DATE(k.creado_en) para que la comparación sea por día, no por timestamp.
+  const fechaExpr = fechaCorte ? "DATE(:fecha_corte)" : "CURDATE()";
+
   const [rows] = await pool.query(
     `SELECT p.nombre_producto,
             p.sku,
-            COALESCE(SUM(CASE WHEN k.creado_en < CURDATE() THEN k.delta_cantidad ELSE 0 END), 0) AS existencia_ayer,
-            COALESCE(SUM(CASE WHEN k.creado_en >= CURDATE() AND k.delta_cantidad > 0 THEN k.delta_cantidad ELSE 0 END), 0) AS entradas_hoy,
-            COALESCE(SUM(CASE WHEN k.creado_en >= CURDATE() AND k.delta_cantidad < 0 THEN ABS(k.delta_cantidad) ELSE 0 END), 0) AS salidas_hoy,
+            COALESCE(SUM(CASE WHEN k.creado_en < ${fechaExpr} THEN k.delta_cantidad ELSE 0 END), 0) AS existencia_ayer,
+            COALESCE(SUM(CASE WHEN k.creado_en >= ${fechaExpr} AND k.delta_cantidad > 0 THEN k.delta_cantidad ELSE 0 END), 0) AS entradas_hoy,
+            COALESCE(SUM(CASE WHEN k.creado_en >= ${fechaExpr} AND k.delta_cantidad < 0 THEN ABS(k.delta_cantidad) ELSE 0 END), 0) AS salidas_hoy,
             COALESCE(SUM(k.delta_cantidad), 0) AS existencia_actual
      FROM productos p
      LEFT JOIN (
@@ -6465,7 +6507,7 @@ app.get("/api/print/corte-diario", auth, async (req, res) => {
              OR ABS(existencia_actual) > 0)
      ORDER BY p.nombre_producto ASC
      LIMIT ${limit}`,
-    { id_bodega, show_all, ...qf.params }
+    { id_bodega, show_all, fecha_corte: fechaCorte, ...qf.params }
   );
 
   const fmtDate = (d) => {
@@ -6560,7 +6602,7 @@ app.get("/api/print/corte-diario", auth, async (req, res) => {
 <!doctype html><html lang="es"><head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Corte diario</title>
+<title>Corte diario — ${esc(fechaCorte || new Date().toISOString().slice(0,10))}</title>
 <style>
   *{box-sizing:border-box;}
   body{
@@ -6652,15 +6694,26 @@ app.get("/api/print/corte-diario", auth, async (req, res) => {
   <div class="page">
     <img class="headLogo" src="${logoSrc}" alt="Hotel Jardines del Lago" />
     <h2 class="headTitle">Corte diario de inventario</h2>
+    <div class="muted"><b>Fecha del corte: ${esc(fechaCorte ? fmtDate(fechaCorte + "T00:00:00") : fmtDate(new Date()))}</b>${fechaCorte ? " — reimpresión histórica" : ""}</div>
     <div class="muted">Formato: ${isPos80 ? "POS 80 mm" : "Carta"}</div>
     <div class="muted">Bodega: ${bod?.nombre_bodega || `#${id_bodega}`}</div>
-    <div class="muted">Ayer: ${fmtDate(new Date(Date.now() - 24 * 60 * 60 * 1000))} | Hoy: ${fmtDate(new Date())}</div>
     ${summaryHtml}
     ${rowsHtml}
   </div>
-  <script>window.print()</script>
+  <script>
+    // Esperar a que el DOM y los recursos estén listos antes de imprimir.
+    // Sin esto, el print() se ejecuta antes de que el navegador termine de
+    // pintar y la página aparece en blanco.
+    window.onload = function() {
+      setTimeout(function() { window.print(); }, 250);
+    };
+    window.onafterprint = function() { window.close(); };
+  </script>
 </body></html>`;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
   res.send(html);
 });
 
@@ -7503,17 +7556,41 @@ app.get("/api/reportes/entradas", auth, async (req, res) => {
       params
     );
 
-    // Get flat detail lines (one row per line, with movement data joined in)
+    // Get flat detail lines (one row per line, with movement data joined in).
+    // IMPORTANTE: se aplican los mismos filtros de categoría/subcategoría/lote/q
+    // que se usaron en el listado de movimientos. Si no, un movimiento que tiene
+    // productos de varias categorías mostraría TODAS sus líneas al filtrar por
+    // una sola categoría.
     let rows = [];
     if (movements.length > 0) {
       const ids = movements.map(function(m) { return m.id_movimiento; });
       const inClause = buildNamedInClause(ids, "entd");
-      const detailWhere = id_producto
-        ? `me.id_movimiento IN (${inClause.sql}) AND md.id_producto=:id_producto_filtro`
-        : `me.id_movimiento IN (${inClause.sql})`;
-      const detailParams = id_producto
-        ? { ...inClause.params, id_producto_filtro: id_producto }
-        : inClause.params;
+
+      const detailClauses = [];
+      const detailParams = { ...inClause.params };
+      if (id_producto) {
+        detailClauses.push("md.id_producto=:id_producto");
+        detailParams.id_producto = id_producto;
+      } else if (qf.clause) {
+        detailClauses.push(qf.clause);
+        Object.assign(detailParams, qf.params);
+      }
+      if (id_categoria) {
+        detailClauses.push("p.id_categoria=:id_categoria");
+        detailParams.id_categoria = id_categoria;
+      }
+      if (id_subcategoria) {
+        detailClauses.push("p.id_subcategoria=:id_subcategoria");
+        detailParams.id_subcategoria = id_subcategoria;
+      }
+      if (lote) {
+        detailClauses.push("md.lote LIKE :lote");
+        detailParams.lote = lote;
+      }
+
+      const detailWhere = `me.id_movimiento IN (${inClause.sql})${
+        detailClauses.length ? " AND " + detailClauses.join(" AND ") : ""
+      }`;
       const [detailRows] = await pool.query(
         `SELECT me.id_movimiento,
                 me.tipo_movimiento AS tipo_entrada,
@@ -7725,17 +7802,41 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
       params
     );
 
-    // Get flat detail lines (one row per line, with movement data joined in)
+    // Get flat detail lines (one row per line, with movement data joined in).
+    // IMPORTANTE: se aplican los mismos filtros de categoría/subcategoría/lote/q
+    // que se usaron en el listado de movimientos. Si no, un movimiento que tiene
+    // productos de varias categorías mostraría TODAS sus líneas al filtrar por
+    // una sola categoría.
     let rows = [];
     if (movements.length > 0) {
       const ids = movements.map(function(m) { return m.id_movimiento; });
       const inClause = buildNamedInClause(ids, "sald");
-      const detailWhere = id_producto
-        ? `me.id_movimiento IN (${inClause.sql}) AND md.id_producto=:id_producto_filtro`
-        : `me.id_movimiento IN (${inClause.sql})`;
-      const detailParams = id_producto
-        ? { ...inClause.params, id_producto_filtro: id_producto }
-        : inClause.params;
+
+      const detailClauses = [];
+      const detailParams = { ...inClause.params };
+      if (id_producto) {
+        detailClauses.push("md.id_producto=:id_producto");
+        detailParams.id_producto = id_producto;
+      } else if (qf.clause) {
+        detailClauses.push(qf.clause);
+        Object.assign(detailParams, qf.params);
+      }
+      if (id_categoria) {
+        detailClauses.push("p.id_categoria=:id_categoria");
+        detailParams.id_categoria = id_categoria;
+      }
+      if (id_subcategoria) {
+        detailClauses.push("p.id_subcategoria=:id_subcategoria");
+        detailParams.id_subcategoria = id_subcategoria;
+      }
+      if (lote) {
+        detailClauses.push("md.lote LIKE :lote");
+        detailParams.lote = lote;
+      }
+
+      const detailWhere = `me.id_movimiento IN (${inClause.sql})${
+        detailClauses.length ? " AND " + detailClauses.join(" AND ") : ""
+      }`;
       const [detailRows] = await pool.query(
         `SELECT me.id_movimiento,
                 me.tipo_movimiento AS tipo_salida,
@@ -7916,11 +8017,35 @@ app.get("/api/reportes/pedidos", auth, async (req, res) => {
       params
     );
 
-    // Get detail lines for those pedidos
+    // Get detail lines for those pedidos.
+    // IMPORTANTE: se aplican los mismos filtros de categoría/subcategoría/qf
+    // que se usaron en el listado de pedidos. Si no, un pedido que tiene
+    // productos de varias categorías mostraría TODAS sus líneas al filtrar
+    // por una sola categoría.
     let rows = [];
     if (pedidos.length > 0) {
       const ids = pedidos.map(function(m) { return m.id_pedido; });
       const inClause = buildNamedInClause(ids, "pedd");
+
+      const detailClauses = [];
+      const detailParams = { ...inClause.params };
+      if (id_categoria) {
+        detailClauses.push("pr.id_categoria=:id_categoria");
+        detailParams.id_categoria = id_categoria;
+      }
+      if (id_subcategoria) {
+        detailClauses.push("pr.id_subcategoria=:id_subcategoria");
+        detailParams.id_subcategoria = id_subcategoria;
+      }
+      if (qf.clause && qf.clause !== "1=1") {
+        detailClauses.push(qf.clause);
+        Object.assign(detailParams, qf.params);
+      }
+
+      const detailWhere = `p.id_pedido IN (${inClause.sql})${
+        detailClauses.length ? " AND " + detailClauses.join(" AND ") : ""
+      }`;
+
       const [detailRows] = await pool.query(
         `SELECT p.id_pedido,
                 d.id_pedido_detalle,
@@ -7948,9 +8073,9 @@ app.get("/api/reportes/pedidos", auth, async (req, res) => {
            JOIN movimiento_encabezado me ON me.id_movimiento=pmv.id_movimiento
            GROUP BY pmv.id_pedido_detalle
          ) mv ON mv.id_pedido_detalle=d.id_pedido_detalle
-         WHERE p.id_pedido IN (${inClause.sql})
+         WHERE ${detailWhere}
          ORDER BY p.id_pedido DESC, d.id_pedido_detalle ASC`,
-        inClause.params
+        detailParams
       );
 
       // Group lines by pedido
@@ -8330,14 +8455,21 @@ app.get("/api/orders/:id/details", auth, async (req, res) => {
               WHEN COALESCE(d.estado_linea, 'PENDIENTE')='ANULADO' THEN 0
               ELSE GREATEST(d.cantidad_solicitada - d.cantidad_surtida, 0)
             END AS pendiente,
-            s.stock
+            s.stock   AS stock_surtidor,
+            ss.stock  AS stock_solicitante
      FROM pedido_detalle d
      JOIN productos p ON p.id_producto=d.id_producto
      LEFT JOIN v_stock_resumen s
-       ON s.id_bodega=:id_bodega AND s.id_producto=d.id_producto
+       ON s.id_bodega=:id_bodega_surtidor AND s.id_producto=d.id_producto
+     LEFT JOIN v_stock_resumen ss
+       ON ss.id_bodega=:id_bodega_solicita AND ss.id_producto=d.id_producto
      WHERE d.id_pedido=:id_pedido
      ORDER BY p.nombre_producto ASC`,
-    { id_pedido, id_bodega: pe.id_bodega_surtidor }
+    {
+      id_pedido,
+      id_bodega_surtidor: pe.id_bodega_surtidor,
+      id_bodega_solicita: pe.id_bodega_solicita || 0,
+    }
   );
 
   res.json({
@@ -8475,9 +8607,13 @@ app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "
 
       const remainingToFill = Number(line.cantidad_solicitada) - Number(line.cantidad_surtida);
       if (remainingToFill <= 0) continue;
-      // Nunca despachar mas de lo pendiente por linea.
-      const requested = Math.min(qtyToFill, remainingToFill);
-      if (requested < remainingToFill) requiresJustificacion = true;
+      // Permitir sobre-despacho: si el operador pide más de lo pendiente, se
+      // respeta su cantidad (típico: "me piden 2 pero le voy a mandar 3").
+      // El stock se valida con pickLotsFEFO más abajo; si no alcanza, la línea
+      // se skipea. Si la cantidad a despachar difiere de la pendiente (sea
+      // sobre o sub), exigimos justificación para tener trazabilidad.
+      const requested = Math.max(Number(qtyToFill || 0), 0);
+      if (requested !== remainingToFill) requiresJustificacion = true;
 
       const { picks } = await pickLotsFEFO(conn, pe.id_bodega_surtidor, line.id_producto, requested, {
         allowExpired: false,
@@ -8563,7 +8699,7 @@ app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "
              END,
              justificacion_linea = CASE
                WHEN :justificacion IS NULL OR :justificacion='' THEN justificacion_linea
-               WHEN (cantidad_surtida + :add) < cantidad_solicitada THEN :justificacion
+               WHEN (cantidad_surtida + :add) != cantidad_solicitada THEN :justificacion
                ELSE justificacion_linea
              END
          WHERE id_pedido_detalle=:id`,

@@ -285,7 +285,7 @@ export function EntradaForm({
               type="number"
               className={`input entrada-form__num ${err ? 'input--error' : ''}`}
               min="0"
-              step="0.001"
+              step="1"
               value={l.cantidad}
               onChange={(e) => setLine(idx, { cantidad: e.target.value })}
               placeholder="0"

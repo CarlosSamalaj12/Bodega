@@ -235,7 +235,7 @@ export function SalidaForm({
               }}
               placeholder="Buscar producto…"
               stockInfo={stockMap[idx] || null}
-              ultimoPrecio={0}
+              ultimoPrecio={stockMap[idx]?.ultimo_precio_salida || 0}
             />
             {err && <span className="salida-form__field-error">{err}</span>}
           </div>
@@ -254,7 +254,7 @@ export function SalidaForm({
               type="number"
               className={`input salida-form__num ${err ? 'input--error' : ''}`}
               min="0"
-              step="0.001"
+              step="1"
               value={l.cantidad}
               onChange={(e) => setLine(idx, { cantidad: e.target.value })}
               placeholder="0"

@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { DataList } from '@/components/ui/DataList';
 import { SearchInput } from '@/components/ui/SearchInput';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Spinner } from '@/components/ui/Spinner';
 import { toast } from '@/components/ui/Toast';
 
 import { useAuthStore } from '@/stores/auth.store';
@@ -57,6 +59,13 @@ export default function CorteDiarioPage() {
 
   // Export
   const [showColumnSelector, setShowColumnSelector] = useState(false);
+
+  // Historial de cierres guardados
+  const [historialOpen, setHistorialOpen] = useState(false);
+  const [historialRows, setHistorialRows] = useState([]);
+  const [historialLoading, setHistorialLoading] = useState(false);
+  const [detalleCierre, setDetalleCierre] = useState(null); // { cierre, rows } cuando el usuario abre uno
+  const [detalleLoading, setDetalleLoading] = useState(false);
 
   // Cargar bodegas
   useEffect(() => {
@@ -435,6 +444,122 @@ export default function CorteDiarioPage() {
     setShowColumnSelector(false);
   };
 
+  // Construye la URL del endpoint de impresión para la fecha que se está viendo.
+  // Si el usuario navegó a una fecha anterior (reportDate), reimprime ese corte.
+  // Si no, imprime el corte del día actual.
+  // El `_t` con timestamp es para que el navegador no use caché: el mismo
+  // endpoint sirve HTML y al cambiar solo el ?fecha= podría reusar la respuesta
+  // cacheada, mostrando la fecha equivocada.
+  const buildPrintUrl = (fecha = null) => {
+    const params = new URLSearchParams();
+    const f = fecha || reportDate || cierreStatus?.hoy;
+    if (f) params.set('fecha', f);
+    if (warehouseId) params.set('warehouse', String(warehouseId));
+    if (showAll) params.set('show_all', '1');
+    if (committedSearch) params.set('q', committedSearch);
+    params.set('_t', String(Date.now()));
+    return `/api/print/corte-diario?${params.toString()}`;
+  };
+
+  // Abre el HTML devuelto por el endpoint en una nueva ventana y dispara print().
+  // Usamos este helper en vez de window.open(url) porque el endpoint requiere
+  // Authorization y window.open no transmite headers. Hacemos fetch con axios
+  // (que ya inyecta el token) y luego volcamos el HTML en una ventana nueva.
+  const openPrintHtml = async (url) => {
+    try {
+      const { data: html } = await api.get(url, { responseType: 'text' });
+      // Validar que parezca HTML (defensa por si el backend responde JSON de error)
+      if (typeof html !== 'string' || !html.includes('<html')) {
+        toast.error('La respuesta del servidor no es HTML imprimible');
+        return;
+      }
+      const win = window.open('', '_blank', 'noopener,noreferrer');
+      if (!win) {
+        toast.error('Permite las ventanas emergentes para imprimir');
+        return;
+      }
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+    } catch (e) {
+      const msg = e?.response?.data?.error || e?.message || 'No se pudo generar la impresión';
+      toast.error(msg);
+    }
+  };
+
+  // Imprime el corte que se está viendo en pantalla.
+  const handlePrint = () => {
+    if (!data) {
+      toast.error('No hay datos para imprimir');
+      return;
+    }
+    openPrintHtml(buildPrintUrl());
+  };
+
+  // Cargar historial de cierres guardados.
+  const fetchHistorial = useCallback(async () => {
+    setHistorialLoading(true);
+    try {
+      const params = { limit: 365 };
+      if (warehouseId) params.warehouse = warehouseId;
+      const { data: res } = await api.get('/api/cierre-dia', { params });
+      setHistorialRows(Array.isArray(res?.rows) ? res.rows : []);
+    } catch (e) {
+      toast.error('Error al cargar el historial de cierres');
+      setHistorialRows([]);
+    } finally {
+      setHistorialLoading(false);
+    }
+  }, [warehouseId]);
+
+  const openHistorial = () => {
+    setHistorialOpen(true);
+    fetchHistorial();
+  };
+
+  const openDetalleCierre = async (cierreRow) => {
+    setDetalleCierre(null);
+    setDetalleLoading(true);
+    try {
+      const params = {};
+      if (warehouseId) params.warehouse = warehouseId;
+      const { data: res } = await api.get(`/api/cierre-dia/${cierreRow.fecha_cierre}`, { params });
+      setDetalleCierre(res);
+    } catch (e) {
+      toast.error('No se pudo cargar el detalle del cierre');
+    } finally {
+      setDetalleLoading(false);
+    }
+  };
+
+  // Imprime un cierre guardado usando su fecha (reimpresión histórica).
+  const handlePrintCierre = (cierreRow) => {
+    openPrintHtml(buildPrintUrl(cierreRow.fecha_cierre));
+  };
+
+  // Exporta el detalle de un cierre guardado (las líneas del cierre_dia_detalle).
+  const handleExportCierre = () => {
+    if (!detalleCierre?.rows?.length) return;
+    const cols = [
+      { key: 'sku', label: 'SKU' },
+      { key: 'nombre_producto', label: 'Producto' },
+      { key: 'existencia_inicial', label: 'Exist. Inicial' },
+      { key: 'entradas_dia', label: 'Entradas' },
+      { key: 'salidas_dia', label: 'Salidas' },
+      { key: 'existencia_cierre', label: 'Exist. Cierre' },
+    ];
+    downloadCSV(detalleCierre.rows, {
+      filename: `cierre_${detalleCierre.cierre.fecha_cierre}_${detalleCierre.cierre.nombre_bodega || 'bodega'}`,
+      columns: cols,
+      format: (row, col) => {
+        if (['existencia_inicial', 'entradas_dia', 'salidas_dia', 'existencia_cierre'].includes(col.key)) {
+          return Number(row[col.key] || 0).toFixed(2);
+        }
+        return row[col.key];
+      },
+    });
+  };
+
   return (
     <>
       <Header
@@ -458,6 +583,12 @@ export default function CorteDiarioPage() {
                 )}
               </Button>
             )}
+            <Button variant="ghost" size="sm" onClick={openHistorial} title="Ver cierres guardados de días anteriores">
+              📜 Historial
+            </Button>
+            <Button variant="ghost" size="sm" disabled={loading || !data} onClick={handlePrint} title={reportDate ? `Imprimir el corte de ${formatDate(reportDate)}` : 'Imprimir este corte'}>
+              🖨️ Imprimir
+            </Button>
             <Button variant="ghost" size="sm" disabled={loading} onClick={fetchData}>
               ↻ Refrescar
             </Button>
@@ -688,6 +819,143 @@ export default function CorteDiarioPage() {
         onConfirm={handlePinConfirm}
         onCancel={() => setPinRequired(false)}
       />
+
+      {/* Modal: Historial de cierres guardados */}
+      <Modal
+        open={historialOpen && !detalleCierre && !detalleLoading}
+        onClose={() => setHistorialOpen(false)}
+        title="Historial de cierres"
+        subtitle="Cierres de días anteriores guardados en el sistema"
+        size="xl"
+      >
+        <div className="corte-diario__historial">
+          {historialLoading ? (
+            <Spinner size={18} label="Cargando cierres…" />
+          ) : historialRows.length === 0 ? (
+            <EmptyState
+              icon="◷"
+              title="Sin cierres guardados"
+              message="Aún no se ha realizado ningún cierre de día para esta bodega."
+            />
+          ) : (
+            <div className="corte-diario__historial-table-wrap">
+              <table className="corte-diario__historial-table">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Bodega</th>
+                    <th>Origen</th>
+                    <th style={{ textAlign: 'right' }}>Líneas</th>
+                    <th style={{ textAlign: 'right' }}>Entradas</th>
+                    <th style={{ textAlign: 'right' }}>Salidas</th>
+                    <th style={{ textAlign: 'right' }}>Exist. Cierre</th>
+                    <th>Cerrado por</th>
+                    <th style={{ width: 140 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historialRows.map((c) => (
+                    <tr key={`hc-${c.id_cierre}`}>
+                      <td><strong>{formatDate(c.fecha_cierre)}</strong></td>
+                      <td>{c.nombre_bodega || '—'}</td>
+                      <td>
+                        <span className="corte-diario__chip">{c.origen || '—'}</span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>{c.total_lineas || 0}</td>
+                      <td style={{ textAlign: 'right' }} className="corte-diario__num corte-diario__num--pos">
+                        +{Number(c.total_entradas || 0).toFixed(2)}
+                      </td>
+                      <td style={{ textAlign: 'right' }} className="corte-diario__num corte-diario__num--neg">
+                        −{Number(c.total_salidas || 0).toFixed(2)}
+                      </td>
+                      <td style={{ textAlign: 'right' }} className="corte-diario__num">
+                        {Number(c.total_existencia_cierre || 0).toFixed(2)}
+                      </td>
+                      <td className="corte-diario__user-cell">{c.creado_por_nombre || '—'}</td>
+                      <td>
+                        <div className="corte-diario__historial-actions">
+                          <Button size="sm" variant="ghost" onClick={() => openDetalleCierre(c)} title="Ver detalle">
+                            👁 Ver
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => handlePrintCierre(c)} title="Reimprimir este corte">
+                            🖨
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* Modal: Detalle de un cierre guardado */}
+      <Modal
+        open={(detalleCierre != null || detalleLoading) && historialOpen}
+        onClose={() => { setDetalleCierre(null); setHistorialOpen(false); }}
+        title={detalleCierre ? `Cierre del ${formatDate(detalleCierre.cierre.fecha_cierre)}` : 'Cargando detalle…'}
+        subtitle={detalleCierre ? `${detalleCierre.cierre.nombre_bodega} · cerrado por ${detalleCierre.cierre.creado_por || '—'} · origen: ${detalleCierre.cierre.origen || '—'}` : ''}
+        size="xl"
+      >
+        <div className="corte-diario__detalle-cierre">
+          {detalleLoading ? (
+            <Spinner size={18} label="Cargando detalle…" />
+          ) : detalleCierre ? (
+            <>
+              <div className="corte-diario__detalle-actions">
+                <Button size="sm" variant="ghost" onClick={() => setDetalleCierre(null)}>← Volver al historial</Button>
+                <Button size="sm" variant="ghost" onClick={() => handlePrintCierre({ fecha_cierre: detalleCierre.cierre.fecha_cierre })}>🖨️ Imprimir</Button>
+                <Button size="sm" variant="ghost" onClick={handleExportCierre}>📥 Exportar CSV</Button>
+              </div>
+              {detalleCierre.cierre.observaciones && (
+                <div className="corte-diario__obs">Observaciones: {detalleCierre.cierre.observaciones}</div>
+              )}
+              <div className="corte-diario__metrics" style={{ marginTop: 12 }}>
+                <Card compact className="corte-diario__metric-card corte-diario__metric-card--success">
+                  <span className="corte-diario__metric-label">Total Entradas</span>
+                  <span className="corte-diario__metric-value">+{Number(detalleCierre.cierre.total_entradas || 0).toFixed(2)}</span>
+                </Card>
+                <Card compact className="corte-diario__metric-card corte-diario__metric-card--danger">
+                  <span className="corte-diario__metric-label">Total Salidas</span>
+                  <span className="corte-diario__metric-value">−{Number(detalleCierre.cierre.total_salidas || 0).toFixed(2)}</span>
+                </Card>
+                <Card compact className="corte-diario__metric-card corte-diario__metric-card--accent">
+                  <span className="corte-diario__metric-label">Exist. Cierre</span>
+                  <span className="corte-diario__metric-value">{Number(detalleCierre.cierre.total_existencia_cierre || 0).toFixed(2)}</span>
+                </Card>
+              </div>
+              <div className="corte-diario__detalle-table-wrap" style={{ marginTop: 12 }}>
+                <table className="corte-diario__detalle-table">
+                  <thead>
+                    <tr>
+                      <th>Producto</th>
+                      <th>SKU</th>
+                      <th style={{ textAlign: 'right' }}>Exist. Inicial</th>
+                      <th style={{ textAlign: 'right' }}>Entradas</th>
+                      <th style={{ textAlign: 'right' }}>Salidas</th>
+                      <th style={{ textAlign: 'right' }}>Exist. Cierre</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detalleCierre.rows.map((r) => (
+                      <tr key={`dcr-${r.id_producto}`}>
+                        <td>{r.nombre_producto}</td>
+                        <td><code>{r.sku || '—'}</code></td>
+                        <td style={{ textAlign: 'right' }}>{Number(r.existencia_inicial || 0).toFixed(2)}</td>
+                        <td style={{ textAlign: 'right' }} className="corte-diario__num corte-diario__num--pos">+{Number(r.entradas_dia || 0).toFixed(2)}</td>
+                        <td style={{ textAlign: 'right' }} className="corte-diario__num corte-diario__num--neg">−{Number(r.salidas_dia || 0).toFixed(2)}</td>
+                        <td style={{ textAlign: 'right' }} className="corte-diario__num"><strong>{Number(r.existencia_cierre || 0).toFixed(2)}</strong></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
+        </div>
+      </Modal>
     </>
   );
 }
