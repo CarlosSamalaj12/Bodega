@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import { useRouteError } from 'react-router-dom';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 
@@ -49,4 +50,38 @@ export class ErrorBoundary extends Component {
 
     return this.props.children;
   }
+}
+
+/**
+ * Fallback de error para `errorElement` de React Router (rutas top-level).
+ * Se usa en el router para que fallas de renderizado/loader/action de una ruta
+ * raíz (login, layout, catch-all) caigan en una UI de respaldo de la app en
+ * lugar del default genérico de React Router. Reutiliza la misma UI del
+ * ErrorBoundary (Card + botón de reintento).
+ */
+export function RouteErrorFallback() {
+  const error = useRouteError();
+  const message =
+    error?.message || error?.statusText || 'Ocurrió un error al cargar esta página.';
+
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '1.5rem',
+      }}
+    >
+      <Card accent style={{ padding: '1.5rem', textAlign: 'center', maxWidth: 420 }}>
+        <p style={{ color: 'var(--color-text-muted)', marginBottom: '0.75rem' }}>
+          {message}
+        </p>
+        <Button variant="subtle" size="sm" onClick={() => window.location.reload()}>
+          Reintentar
+        </Button>
+      </Card>
+    </div>
+  );
 }

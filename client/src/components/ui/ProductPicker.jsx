@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
 import { Spinner } from '@/components/ui/Spinner';
@@ -58,6 +58,7 @@ export function ProductPicker({
   const inputRef = useRef(null);
   const listRef = useRef(null);
   const [mounted, setMounted] = useState(false);
+  const listboxId = useId();
 
   const { productos, loading, query, setQuery } = useProductSearch();
 
@@ -233,6 +234,7 @@ export function ProductPicker({
             className="product-picker__dropdown"
             ref={listRef}
             role="listbox"
+            id={listboxId}
             style={{
               position: 'fixed',
               top: coords.flipUp ? undefined : coords.top,
@@ -338,6 +340,7 @@ export function ProductPicker({
             role="combobox"
             aria-expanded={showDropdown}
             aria-autocomplete="list"
+            aria-controls={listboxId}
           />
           {query && (
             <button

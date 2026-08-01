@@ -17,6 +17,15 @@ export const pedidosService = {
   },
 
   /**
+   * Contar pedidos pendientes de despacho (PENDIENTE/APROBADO/PARCIAL).
+   * Más liviano que descargar la lista completa solo para contar.
+   */
+  async countPendientes() {
+    const { data } = await api.get('/api/pedidos/count-pendientes');
+    return data;
+  },
+
+  /**
    * Detalle de un pedido con sus líneas y stock disponible.
    */
   async getDetails(id) {

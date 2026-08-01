@@ -1,30 +1,34 @@
 {
-    "name": "bodega-app",
-    "version": "1.0.0",
-    "type": "module",
-    "main": "server.js",
-    "scripts": {
-        "dev": "node server.js",
-        "start": "node server.js",
-        "client": "cd client && npm run dev",
-        "dev:all": "concurrently -n server,client -c blue,magenta \"node server.js\" \"cd client && npm run dev\"",
-        "build:client": "cd client && npm run build"
-    },
-    "dependencies": {
-        "bcryptjs": "^2.4.3",
-        "cors": "^2.8.6",
-        "dotenv": "^16.6.1",
-        "express": "^4.22.1",
-        "jsonwebtoken": "^9.0.3",
-        "mysql2": "^3.16.3",
-        "socket.io": "^4.8.3",
-        "web-push": "^3.6.7"
-    },
-    "description": "",
-    "keywords": [],
-    "author": "",
-    "license": "ISC",
-    "devDependencies": {
-        "concurrently": "^10.0.3"
-    }
+  "name": "bodega-app",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "client": "cd client && npm run dev",
+    "dev:all": "concurrently -n server,client -c blue,magenta \"node server.js\" \"cd client && npm run dev\"",
+    "build:client": "cd client && npm run build",
+    "test:stock": "node test_reconcile_stock.cjs && node test_kardex_triggers.cjs && node test_reversa_e2e.cjs && node test_despacho_rapido.cjs && node test_bench_reportes.cjs && node test_stock_history.cjs",
+    "test:stock:fix": "node test_reconcile_stock.cjs --fix && node test_kardex_triggers.cjs && node test_reversa_e2e.cjs && node test_despacho_rapido.cjs && node test_bench_reportes.cjs && node test_stock_history.cjs",
+    "deploy:stock": "npm run test:stock:fix",        "doctor": "cd client && npx react-doctor@latest"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "compression": "^1.8.1",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "jsonwebtoken": "^9.0.3",
+    "mysql2": "^3.16.3",
+    "socket.io": "^4.8.3",
+    "web-push": "^3.6.7"
+  },
+  "description": "",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^10.0.3"
+  }
 }

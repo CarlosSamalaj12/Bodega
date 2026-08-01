@@ -67,9 +67,14 @@ export default function AuditoriaSensiblesPage() {
     if (e.key === 'Enter') handleSearch();
   };
 
-  // Ref con filtros actuales para evitar recrear fetchData
+  // Ref con filtros actuales para evitar recrear fetchData.
+  // Se actualiza en un efecto (declarado ANTES del efecto de fetch, así que
+  // React lo ejecuta primero) y no durante el render, que React puede
+  // descartar o repetir.
   const filtersRef = useRef({});
-  filtersRef.current = { dateFrom, dateTo, committedSearch, actionKey };
+  useEffect(() => {
+    filtersRef.current = { dateFrom, dateTo, committedSearch, actionKey };
+  }, [dateFrom, dateTo, committedSearch, actionKey]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);

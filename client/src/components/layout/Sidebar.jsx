@@ -238,12 +238,15 @@ export function Sidebar({ isDesktop = true, isOpen = false, onClose }) {
   });
 
   const handleToggle = () => {
-    setCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem('sidebar-collapsed', String(next));
-      return next;
-    });
+    setCollapsed((prev) => !prev);
   };
+
+  // Persistir el estado colapsado en un efecto, no dentro del updater
+  // (React puede ejecutar el updater más de una vez y el side effect
+  // de localStorage se repetiría con estado inconsistente).
+  useEffect(() => {
+    localStorage.setItem('sidebar-collapsed', String(collapsed));
+  }, [collapsed]);
 
   // ---------- Móvil: drawer temporal ----------
   if (!isDesktop) {

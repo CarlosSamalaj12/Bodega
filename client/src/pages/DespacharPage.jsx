@@ -80,11 +80,17 @@ export default function DespacharPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const loadingRef = useRef(false);
 
-  const todayStr = new Date().toISOString().slice(0, 10);
-  // Filtro de fecha OPCIONAL. Vacío = "todos los pendientes" (sin importar
-  // cuándo se crearon). El usuario puede acotar por rango si quiere.
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  // Fecha local (evita el corrimiento UTC: con toISOString, de noche en
+  // zonas UTC-x el "hoy" caería en el día siguiente y no se verían pedidos).
+  const todayStr = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
+  // Por defecto se muestran solo los pedidos de la fecha actual.
+  // El usuario puede ampliar el rango o vaciarlo (botón ✕ Todos) para ver
+  // todos los pendientes sin importar cuándo se crearon.
+  const [dateFrom, setDateFrom] = useState(todayStr);
+  const [dateTo, setDateTo] = useState(todayStr);
 
   const loadPedidos = useCallback(async () => {
     setLoading(true);
@@ -305,7 +311,9 @@ export default function DespacharPage() {
   // Sincronizar el ref con el valor actual de `visibles` para que el
   // handler del socket (suscrito una sola vez al montar) siempre vea
   // el valor más reciente sin re-suscribirse.
-  visiblesRef.current = visibles;
+  useEffect(() => {
+    visiblesRef.current = visibles;
+  }, [visibles]);
 
   const handlePrintPos = useCallback(async (p) => {
     try {
@@ -554,7 +562,7 @@ export default function DespacharPage() {
                 placeholder="Desde"
                 title="Desde (opcional — dejar vacío para ver todos)"
               />
-              <span style={{ color: '#999', fontSize: '11px' }}>→</span>
+              <span className="despachar-page__sep">→</span>
               <input
                 type="date"
                 className="input"
@@ -578,10 +586,9 @@ export default function DespacharPage() {
               {(dateFrom || dateTo) && (
                 <button
                   type="button"
-                  className="despachar-page__today-btn"
+                  className="despachar-page__today-btn despachar-page__today-btn--danger"
                   onClick={() => { setDateFrom(''); setDateTo(''); }}
                   title="Quitar filtro de fecha — ver todos los pendientes"
-                  style={{ background: '#fff5f5', color: '#dc3545', borderColor: '#dc3545' }}
                 >
                   ✕ Todos
                 </button>
@@ -686,6 +693,7 @@ export default function DespacharPage() {
               onSubmittingChange={setSubmitting}
               onDone={handleDone}
               onCancel={handleClose}
+              onDetailsChange={setActiveDetails}
             />
             {activeDetails && (
               <RevertPanel

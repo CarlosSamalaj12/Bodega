@@ -215,6 +215,66 @@
     }
   }
 
+  &__row-actions {
+    display: flex;
+    align-items: center;
+    gap: $space-1;
+    justify-content: flex-end;
+  }
+
+  &__quick {
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    color: $color-accent;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-pill;
+    cursor: pointer;
+    font-size: $font-size-sm;
+    line-height: 1;
+    transition: background $transition-fast, color $transition-fast, border-color $transition-fast;
+
+    &:hover:not(:disabled) {
+      background: $color-accent-soft;
+      color: $color-accent;
+      border-color: $color-accent;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  &__mobile-row {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+  }
+
+  &__quick-mobile-btn {
+    @include button-base;
+    background: $color-accent-soft;
+    color: $color-accent;
+    border-color: $color-accent;
+    font-size: $font-size-sm;
+    padding: $space-2 $space-3;
+    min-height: 40px;
+    justify-content: flex-start;
+
+    &:hover:not(:disabled) {
+      background: $color-accent;
+      color: $color-text-inverse;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
   &__anular-mobile {
     display: none;
     flex-direction: column;

@@ -2,7 +2,7 @@ import { lazy, Suspense, useState } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
+import { ErrorBoundary, RouteErrorFallback } from '@/components/shared/ErrorBoundary';
 import { PermissionGuard } from '@/components/shared/PermissionGuard';
 
 // Carga diferida de todas las páginas
@@ -76,6 +76,7 @@ export const router = createBrowserRouter([
   {
     path: '/login',
     element: wrap(<LoginPage />),
+    errorElement: <RouteErrorFallback />,
   },
   {
     path: '/',
@@ -84,6 +85,7 @@ export const router = createBrowserRouter([
         <AppLayout />
       </ProtectedRoute>
     ),
+    errorElement: <RouteErrorFallback />,
     children: [
       { index: true, element: wrap(<HomePage />) },
       { path: 'entradas', element: wrap(<EntradasPage />) },
@@ -125,5 +127,6 @@ export const router = createBrowserRouter([
   {
     path: '*',
     element: <Navigate to="/" replace />,
+    errorElement: <RouteErrorFallback />,
   },
 ]);

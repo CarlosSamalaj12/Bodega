@@ -112,9 +112,13 @@ export default function ProductosPage() {
     return () => ctrl.abort();
   }, []);
 
-  // Ref con filtros actuales para evitar recrear fetchProductos
+  // Ref con filtros actuales para evitar recrear fetchProductos.
+  // Se actualiza en un efecto (declarado ANTES del efecto de fetch) y no
+  // durante el render, que React puede descartar o repetir.
   const filtersRef = useRef({});
-  filtersRef.current = { debouncedSearch, showInactive, categoriaId, medidaId };
+  useEffect(() => {
+    filtersRef.current = { debouncedSearch, showInactive, categoriaId, medidaId };
+  }, [debouncedSearch, showInactive, categoriaId, medidaId]);
 
   // Carga productos cuando cambian filtros o página
   const fetchProductos = useCallback(async (silent = false) => {

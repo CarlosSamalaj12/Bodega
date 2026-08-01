@@ -110,8 +110,10 @@ export default function TransferenciasPage() {
       // Preseleccionar bodega del usuario
       if (Array.isArray(data) && data.length > 0) {
         try {
-          const tokenPayload = JSON.parse(atob(localStorage.getItem('token')?.split('.')[1] || '{}'));
-          const userWh = Number(tokenPayload?.id_warehouse || 0);
+          // El JWT ya no está en localStorage (cookie HttpOnly); el perfil
+          // guardado sí tiene id_warehouse.
+          const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+          const userWh = Number(storedUser?.id_warehouse || 0);
           if (userWh && data.some((b) => Number(b.id_bodega) === userWh)) {
             setFormData((p) => ({ ...p, id_bodega_origen: String(userWh) }));
           }

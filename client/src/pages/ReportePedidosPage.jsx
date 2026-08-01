@@ -108,8 +108,12 @@ export default function ReportePedidosPage() {
     if (e.key === 'Enter') handleSearch();
   };
 
-  // Mantener ref actualizada con los filtros (no triggea re-renders)
-  filtersRef.current = { dateFrom, dateTo, dateMode, committedSearch, estado, categoriaId, subcategoriaId, bodegaSolicitaId, bodegaDespachoId };
+  // Mantener ref actualizada con los filtros (no triggea re-renders).
+  // Se actualiza en un efecto (declarado ANTES del efecto de fetch) y no
+  // durante el render, que React puede descartar o repetir.
+  useEffect(() => {
+    filtersRef.current = { dateFrom, dateTo, dateMode, committedSearch, estado, categoriaId, subcategoriaId, bodegaSolicitaId, bodegaDespachoId };
+  }, [dateFrom, dateTo, dateMode, committedSearch, estado, categoriaId, subcategoriaId, bodegaSolicitaId, bodegaDespachoId]);
 
   // Cargar reporte (server-side pagination)
   const fetchData = useCallback(async () => {

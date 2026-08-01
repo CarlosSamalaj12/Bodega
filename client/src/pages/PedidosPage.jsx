@@ -343,7 +343,7 @@ export default function PedidosPage() {
                 max={dateTo || undefined}
                 title="Desde"
               />
-              <span style={{ color: '#999', fontSize: '11px' }}>→</span>
+              <span className="pedidos-page__sep">→</span>
               <input
                 type="date"
                 className="input"

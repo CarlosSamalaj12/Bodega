@@ -26,6 +26,9 @@
     @media (min-width: $bp-md) {
       flex-direction: row;
       align-items: center;
+      // Permite que el date-group (flex: 1 1 100%) ocupe su propia línea
+      // y search + chips pasen a la siguiente.
+      flex-wrap: wrap;
     }
   }
 
@@ -100,16 +103,36 @@
     display: flex;
     gap: $space-2;
     align-items: center;
-    flex-wrap: wrap;
+    // Línea propia (ancho completo) para que los dos inputs queden lado a lado
+    // y no se apilen uno encima del otro.
+    flex: 1 1 100%;
+    flex-wrap: nowrap;
 
     input[type='date'] {
-      min-width: 130px;
+      flex: 1;
+      min-width: 0;
+    }
 
-      // Ocultar el calendario nativo del navegador (el ícono azul que rompe la estética)
-      &::-webkit-calendar-picker-indicator {
-        opacity: 0;
-        width: 0;
+    @media (max-width: $bp-md) {
+      flex-wrap: wrap;
+
+      input[type='date'] {
+        flex: 1 1 calc(50% - 8px);
+        min-width: 0;
       }
+    }
+  }
+
+  &__sep {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    flex-shrink: 0;
+
+    @media (max-width: $bp-md) {
+      flex: 0 0 100%;
+      text-align: center;
+      order: 2;
+      margin-top: $space-1;
     }
   }
 
@@ -133,6 +156,17 @@
       background: $color-surface-hover;
       color: $color-text;
       border-color: $color-stroke-strong;
+    }
+
+    &--danger {
+      background: $color-danger-soft;
+      color: $color-danger;
+      border-color: $color-danger;
+
+      &:hover {
+        background: $color-danger;
+        color: $color-text-inverse;
+      }
     }
   }
 

@@ -103,8 +103,12 @@ export default function ExistenciasPage() {
     if (e.key === 'Enter') handleSearch();
   };
 
-  // Mantener ref actualizada con los filtros (no triggea re-renders)
-  filtersRef.current = { committedSearch, categoriaId, subcategoriaId, bodegaId, showZeroStock };
+  // Mantener ref actualizada con los filtros (no triggea re-renders).
+  // Se actualiza en un efecto (declarado ANTES del efecto de fetch) y no
+  // durante el render, que React puede descartar o repetir.
+  useEffect(() => {
+    filtersRef.current = { committedSearch, categoriaId, subcategoriaId, bodegaId, showZeroStock };
+  }, [committedSearch, categoriaId, subcategoriaId, bodegaId, showZeroStock]);
 
   const fetchExistencias = useCallback(async () => {
     setLoading(true);

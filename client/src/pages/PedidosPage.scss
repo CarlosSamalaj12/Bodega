@@ -56,12 +56,29 @@
 
     input[type='date'] {
       min-width: 130px;
+    }
 
-      // Ocultar el calendario nativo del navegador (el ícono azul que rompe la estética)
-      &::-webkit-calendar-picker-indicator {
-        opacity: 0;
-        width: 0;
+    @media (max-width: $bp-md) {
+      flex: 1 1 100%;
+      flex-wrap: wrap;
+
+      input[type='date'] {
+        flex: 1 1 calc(50% - 8px);
+        min-width: 0;
       }
+    }
+  }
+
+  &__sep {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    flex-shrink: 0;
+
+    @media (max-width: $bp-md) {
+      flex: 0 0 100%;
+      text-align: center;
+      order: 2;
+      margin-top: $space-1;
     }
   }
 

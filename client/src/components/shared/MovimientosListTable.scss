@@ -32,6 +32,68 @@
     flex-wrap: wrap;
   }
 
+  // ---------- Grupo de fechas (diseño unificado con Transferencias) ----------
+  &__fecha-group {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    flex-shrink: 0;
+
+    input[type='date'] {
+      width: 160px;
+      min-width: 0;
+
+      // Más espacio para que el año completo sea visible (dd/mm/aaaa)
+      padding-right: $space-2;
+    }
+
+    @media (max-width: $bp-md) {
+      flex: 1 1 100%;
+      flex-wrap: wrap;
+
+      input[type='date'] {
+        flex: 1 1 calc(50% - 8px);
+        width: auto;
+      }
+    }
+  }
+
+  &__sep {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    flex-shrink: 0;
+
+    @media (max-width: $bp-md) {
+      flex: 0 0 100%;
+      text-align: center;
+      order: 2;
+      margin-top: $space-1;
+    }
+  }
+
+  &__today-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: $space-1 $space-2;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+    color: $color-text-muted;
+    background: transparent;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+    cursor: pointer;
+    transition: all $transition-fast;
+    white-space: nowrap;
+    min-height: 32px;
+
+    &:hover {
+      background: $color-surface-hover;
+      color: $color-text;
+      border-color: $color-stroke-strong;
+    }
+  }
+
   &__search {
     flex: 1;
     min-width: 220px;

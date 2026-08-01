@@ -37,29 +37,27 @@ export default function HomePage() {
     setTrendLoading(true);
     setTrendData(null);
     try {
-      const [dash, entradas, salidas, pedidos] = await Promise.all([
+      const [dash, entradas, salidas, pendientesRes] = await Promise.all([
         dashboardService.resumen({ days: d, mov_days: d }),
         // listAgrupado devuelve objetos con id_movimiento, total_cantidad, total_costo
-        // (necesario para mostrar el resumen en la Home).
-        entradasService.listAgrupado({ limit: 100 }),
-        salidasService.listAgrupado({ limit: 100 }),
-        pedidosService.list({ scope: 'dispatch', limit: 2000 }),
+        // (necesario para mostrar el resumen en la Home). Solo se muestran 5,
+        // así que ya no tiene sentido descargar 100 movimientos completos.
+        entradasService.listAgrupado({ limit: 5 }),
+        salidasService.listAgrupado({ limit: 5 }),
+        // Contador liviano en el backend en vez de descargar 2000 pedidos.
+        pedidosService.countPendientes().catch(() => ({ count: 0 })),
       ]);
 
       setResumen(dash);
-      setRecentEntradas(Array.isArray(entradas) ? entradas.slice(0, 5) : []);
-      setRecentSalidas(Array.isArray(salidas) ? salidas.slice(0, 5) : []);
+      setRecentEntradas(Array.isArray(entradas) ? entradas : []);
+      setRecentSalidas(Array.isArray(salidas) ? salidas : []);
 
-      // Cargar tendencia de movimientos
+      // Cargar tendencia de movimientos (el backend agrega por día en SQL)
       dashboardService.trends(Math.min(d, 90)).then((td) => {
         if (Array.isArray(td)) setTrendData(td);
       }).catch(() => {}).finally(() => setTrendLoading(false));
 
-      const pending = (Array.isArray(pedidos) ? pedidos : []).filter((p) => {
-        const est = String(p.estado || '').toUpperCase();
-        return ['PENDIENTE', 'APROBADO', 'PARCIAL'].includes(est);
-      });
-      setPedidosPendientes(pending.length);
+      setPedidosPendientes(Number(pendientesRes?.count) || 0);
     } catch (e) {
       const errMsg = e?.response?.data?.error;
       toast.error(typeof errMsg === 'string' ? errMsg : 'No se pudo cargar el dashboard');

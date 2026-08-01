@@ -99,8 +99,12 @@ export default function ReporteEntradasPage() {
     setPage(1);
   };
 
-  // Mantener ref actualizada con los filtros (no triggea re-renders)
-  filtersRef.current = { dateFrom, dateTo, selectedProduct, committedDocumento, committedLote, categoriaId, subcategoriaId, motivoId, warehouseId };
+  // Mantener ref actualizada con los filtros (no triggea re-renders).
+  // Se actualiza en un efecto (declarado ANTES del efecto de fetch) y no
+  // durante el render, que React puede descartar o repetir.
+  useEffect(() => {
+    filtersRef.current = { dateFrom, dateTo, selectedProduct, committedDocumento, committedLote, categoriaId, subcategoriaId, motivoId, warehouseId };
+  }, [dateFrom, dateTo, selectedProduct, committedDocumento, committedLote, categoriaId, subcategoriaId, motivoId, warehouseId]);
 
   // Cargar reporte (server-side pagination)
   const fetchData = useCallback(async () => {

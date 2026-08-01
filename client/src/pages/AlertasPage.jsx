@@ -106,9 +106,14 @@ export default function AlertasPage() {
     if (e.key === 'Enter') handleSearch();
   };
 
-  // Ref con filtros actuales para evitar recrear los callbacks
+  // Ref con filtros actuales para evitar recrear los callbacks.
+  // Se actualiza en un efecto (declarado ANTES del efecto de re-fetch,
+  // así que React lo ejecuta primero) y no durante el render, que React
+  // puede descartar o repetir.
   const filtersRef = useRef({});
-  filtersRef.current = { committedSearch, dias, categoriaId, subcategoriaId, showZeroStock };
+  useEffect(() => {
+    filtersRef.current = { committedSearch, dias, categoriaId, subcategoriaId, showZeroStock };
+  }, [committedSearch, dias, categoriaId, subcategoriaId, showZeroStock]);
 
   const fetchAlertas = useCallback(async () => {
     setLoading(true);

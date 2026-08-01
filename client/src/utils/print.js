@@ -1,4 +1,18 @@
 /**
+ * Escapa HTML en valores dinámicos antes de inyectarlos en la plantilla de
+ * impresión (document.write). Evita XSS si un campo (producto, observaciones,
+ * nombres) contiene caracteres/HTML malicioso.
+ */
+const esc = (v) =>
+  String(v ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[c]));
+
+/**
  * printPedidoPos80mm — Abre una ventana de impresión con formato
  * para impresora térmica POS de 80mm.
  *
@@ -29,7 +43,7 @@ export function printPedidoPos80mm(pedido, opts = {}) {
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>${title} #${pedido.id_pedido}</title>
+  <title>${esc(title)} #${pedido.id_pedido}</title>
   <style>
     * {
       margin: 0;
@@ -230,24 +244,24 @@ export function printPedidoPos80mm(pedido, opts = {}) {
     <table class="info-table">
       <tr>
         <td class="label">Estado:</td>
-        <td class="value"><span class="estado-badge">${pedido.estado || '—'}</span></td>
+        <td class="value"><span class="estado-badge">${esc(pedido.estado) || '—'}</span></td>
       </tr>
       <tr>
         <td class="label">Solicitante:</td>
-        <td class="value">${pedido.requester_name || '—'}</td>
+        <td class="value">${esc(pedido.requester_name) || '—'}</td>
       </tr>
       <tr>
         <td class="label">Bodega solicita:</td>
-        <td class="value">${pedido.requester_warehouse || '—'}</td>
+        <td class="value">${esc(pedido.requester_warehouse) || '—'}</td>
       </tr>
       <tr>
         <td class="label">Bodega surtidor:</td>
-        <td class="value">${pedido.from_warehouse || pedido.nombre_bodega_surtidor || '—'}</td>
+        <td class="value">${esc(pedido.from_warehouse) || esc(pedido.nombre_bodega_surtidor) || '—'}</td>
       </tr>
       ${pedido.observaciones ? `
       <tr>
         <td class="label">Observaciones:</td>
-        <td class="value">${pedido.observaciones}</td>
+        <td class="value">${esc(pedido.observaciones)}</td>
       </tr>` : ''}
     </table>
 
@@ -266,7 +280,7 @@ export function printPedidoPos80mm(pedido, opts = {}) {
       <tbody>
         ${lines.map(l => `
         <tr>
-          <td class="product-name">${l.nombre_producto || '—'}</td>
+          <td class="product-name">${esc(l.nombre_producto) || '—'}</td>
           <td class="right">${Number(l.cantidad_solicitada || 0)}</td>
           <td class="right">${Number(l.cantidad_surtida || 0) || ''}</td>
           <td class="right">${Number(l.pendiente || 0)}</td>
@@ -383,7 +397,7 @@ export function printPedidoLetterSize(pedido, opts = {}) {
   const totalPendiente = lines.reduce((a, l) => a + Number(l.pendiente || 0), 0);
 
   const logoHtml = logoApp
-    ? `<img src="${logoApp}" alt="Logo" class="logo" />`
+    ? `<img src="${esc(logoApp)}" alt="Logo" class="logo" />`
     : '<div class="logo-placeholder">B</div>';
 
   const html = `
@@ -391,7 +405,7 @@ export function printPedidoLetterSize(pedido, opts = {}) {
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>${title} - Pedido #${pedido.id_pedido}</title>
+  <title>${esc(title)} - Pedido #${pedido.id_pedido}</title>
   <style>
     @page {
       size: letter;
@@ -677,13 +691,13 @@ export function printPedidoLetterSize(pedido, opts = {}) {
     <div class="header">
       ${logoHtml}
       <div class="header-text">
-        <h1>${title}</h1>
-        <div class="subtitle">Sistema de Inventario · ${warehouseName || 'Bodega'}</div>
+        <h1>${esc(title)}</h1>
+        <div class="subtitle">Sistema de Inventario · ${esc(warehouseName) || 'Bodega'}</div>
       </div>
       <div class="header-right">
         <strong>Pedido #${pedido.id_pedido}</strong><br />
         ${formatearFecha(pedido.creado_en)}<br />
-        Estado: <strong>${pedido.estado || '—'}</strong>
+        Estado: <strong>${esc(pedido.estado) || '—'}</strong>
       </div>
     </div>
 
@@ -692,11 +706,11 @@ export function printPedidoLetterSize(pedido, opts = {}) {
       <h2>Datos del Pedido</h2>
       <div class="info-grid">
         <span class="label">Solicitante:</span>
-        <span class="value">${pedido.requester_name || '—'}</span>
+        <span class="value">${esc(pedido.requester_name) || '—'}</span>
         <span class="label">Bodega solicita:</span>
-        <span class="value">${pedido.requester_warehouse || '—'}</span>
+        <span class="value">${esc(pedido.requester_warehouse) || '—'}</span>
         <span class="label">Bodega despacha:</span>
-        <span class="value">${pedido.from_warehouse || pedido.nombre_bodega_surtidor || '—'}</span>
+        <span class="value">${esc(pedido.from_warehouse) || esc(pedido.nombre_bodega_surtidor) || '—'}</span>
         <span class="label">Impreso:</span>
         <span class="value">${today}</span>
       </div>
@@ -704,7 +718,7 @@ export function printPedidoLetterSize(pedido, opts = {}) {
 
     ${pedido.observaciones ? `
     <div class="obs-text">
-      <strong>Obs.:</strong> ${pedido.observaciones}
+      <strong>Obs.:</strong> ${esc(pedido.observaciones)}
     </div>` : ''}
 
     <!-- ===== Tabla de productos ===== -->
@@ -724,7 +738,7 @@ export function printPedidoLetterSize(pedido, opts = {}) {
           ${lines.map((l, i) => `
           <tr>
             <td>${i + 1}</td>
-            <td>${l.nombre_producto || '—'}</td>
+            <td>${esc(l.nombre_producto) || '—'}</td>
             <td class="r">${Number(l.cantidad_solicitada || 0)}</td>
             <td class="r">${Number(l.cantidad_surtida || 0) || ''}</td>
             <td class="r">${Number(l.pendiente || 0) || ''}</td>
@@ -749,16 +763,16 @@ export function printPedidoLetterSize(pedido, opts = {}) {
           <div class="sig-title">Quién Despacha / Entrega</div>
           <div class="sig-line"></div>
           <div class="sig-label">Firma</div>
-          <div class="sig-name">${dispatcherName || '______________________'}</div>
-          <div class="sig-role">${dispatcherRole || '______________________'}</div>
+          <div class="sig-name">${esc(dispatcherName) || '______________________'}</div>
+          <div class="sig-role">${esc(dispatcherRole) || '______________________'}</div>
           <div class="sig-date">Fecha: ${today}</div>
         </div>
         <div class="signature-block">
           <div class="sig-title">Quién Solicita</div>
           <div class="sig-line"></div>
           <div class="sig-label">Firma</div>
-          <div class="sig-name">${pedido.requester_name || '______________________'}</div>
-          <div class="sig-role">${pedido.requester_warehouse || '______________________'}</div>
+          <div class="sig-name">${esc(pedido.requester_name) || '______________________'}</div>
+          <div class="sig-role">${esc(pedido.requester_warehouse) || '______________________'}</div>
           <div class="sig-date">Fecha: ______________</div>
         </div>
       </div>
@@ -816,7 +830,7 @@ export function printOrderListPos80mm(pedidos = [], opts = {}) {
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>${title}</title>
+  <title>${esc(title)}</title>
   <style>
     @page { size: 80mm auto; margin: 0; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -836,7 +850,7 @@ export function printOrderListPos80mm(pedidos = [], opts = {}) {
   </style>
 </head>
 <body>
-  <h1>${title}</h1>
+  <h1>${esc(title)}</h1>
   <div style="text-align:center;font-size:9px;margin-bottom:3mm;">${new Date().toLocaleString('es-GT')}</div>
   <div class="sep"></div>
   <table>
@@ -849,10 +863,10 @@ export function printOrderListPos80mm(pedidos = [], opts = {}) {
     <tbody>
       ${pedidos.map(p => `
       <tr>
-        <td>${p.id_pedido}</td>
-        <td>${p.requester_name || '—'}</td>
-        <td class="r">${p.total_lineas || '—'}</td>
-        <td class="c">${p.estado || '—'}</td>
+        <td>${esc(p.id_pedido)}</td>
+        <td>${esc(p.requester_name) || '—'}</td>
+        <td class="r">${esc(p.total_lineas) || '—'}</td>
+        <td class="c">${esc(p.estado) || '—'}</td>
       </tr>`).join('')}
     </tbody>
   </table>

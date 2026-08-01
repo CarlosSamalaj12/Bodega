@@ -80,8 +80,12 @@ export default function KardexPage() {
     if (e.key === 'Enter') handleSearch();
   };
 
-  // Mantener ref actualizada con los filtros (no triggea re-renders)
-  filtersRef.current = { committedSearch, tipo, categoriaId, fromDate, toDate };
+  // Mantener ref actualizada con los filtros (no triggea re-renders).
+  // Se actualiza en un efecto (declarado ANTES del efecto de fetch) y no
+  // durante el render, que React puede descartar o repetir.
+  useEffect(() => {
+    filtersRef.current = { committedSearch, tipo, categoriaId, fromDate, toDate };
+  }, [committedSearch, tipo, categoriaId, fromDate, toDate]);
 
   const fetchKardex = useCallback(async () => {
     setLoading(true);

@@ -66,11 +66,6 @@
       flex: 1;
       min-width: 0;
       max-width: 160px;
-
-      &::-webkit-calendar-picker-indicator {
-        opacity: 0;
-        width: 0;
-      }
     }
   }
 

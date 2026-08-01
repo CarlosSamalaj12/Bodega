@@ -281,6 +281,11 @@ CREATE TABLE pedido_movimiento_vinculo (
 -- =========================
 --  10) VISTAS DE STOCK
 -- =========================
+-- ADVERTENCIA: al arrancar, server.js redefine estas vistas para leer de la
+-- tabla materializada `stock_actual` (Fase 4 de optimización), que mantienen
+-- los triggers trg_kardex_stock_ai/ad/au. Si re-ejecutas este script completo,
+-- las vistas volverán a agregar kardex en cada consulta (más lento) y quedarán
+-- desincronizadas con stock_actual. Para reconciliar: node test_reconcile_stock.cjs
 CREATE OR REPLACE VIEW v_stock_por_lote AS
 SELECT
   k.id_bodega,

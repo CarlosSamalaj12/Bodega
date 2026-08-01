@@ -403,8 +403,9 @@ export default function CuadreCajaPage() {
   const submitPrintForm = (format) => {
     const form = document.createElement('form');
     form.method = 'POST';
-    const token = localStorage.getItem('token') || '';
-    form.action = '/api/print/cuadre-caja?token=' + encodeURIComponent(token);
+    // La sesión viaja en la cookie HttpOnly (mismo origin) — no hace falta
+    // exponer el token en la URL.
+    form.action = '/api/print/cuadre-caja';
     form.target = '_blank';
     const fields = {
       fecha: formFecha,
@@ -431,8 +432,9 @@ export default function CuadreCajaPage() {
   const submitDetailPrintForm = (format) => {
     const form = document.createElement('form');
     form.method = 'POST';
-    const token = localStorage.getItem('token') || '';
-    form.action = '/api/print/cuadre-caja?token=' + encodeURIComponent(token);
+    // La sesión viaja en la cookie HttpOnly (mismo origin) — no hace falta
+    // exponer el token en la URL.
+    form.action = '/api/print/cuadre-caja';
     form.target = '_blank';
     const fields = {
       fecha: detailRow.fecha,

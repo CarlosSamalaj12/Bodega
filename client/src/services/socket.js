@@ -7,10 +7,10 @@ let socket = null;
 export function getSocket() {
   if (socket) return socket;
 
-  const token = localStorage.getItem('token');
   socket = io({
     path: '/socket.io',
-    auth: { token: token || '' },
+    // La sesión viaja en la cookie HttpOnly; el server la lee del handshake.
+    withCredentials: true,
     transports: ['websocket', 'polling'],
     autoConnect: true,
   });

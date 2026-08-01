@@ -1,6 +1,7 @@
 import express from "express";
 import ExpressLayer from "express/lib/router/layer.js";
 import cors from "cors";
+import compression from "compression";
 import { createServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
 import path from "path";
@@ -23,6 +24,9 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 }
 
 const app = express();
+
+// ── Compresión gzip de respuestas (reduce el payload JSON de reportes y listados) ──
+app.use(compression());
 
 // ── Parche Express 4: reenviar rechazos async al middleware de errores ──
 // Express 4 no captura promesas rechazadas dentro de handlers async: sin este
@@ -52,6 +56,12 @@ const app = express();
 const httpServer = createServer(app);
 const HOST = String(process.env.HOST || "0.0.0.0").trim() || "0.0.0.0";
 const PORT = Number(process.env.PORT || 3001) || 3001;
+// Cookie JWT (HttpOnly + SameSite=Lax): `Secure` se activa en producción (HTTPS)
+// o si se fuerza con COOKIE_SECURE=1 (p. ej. dev detrás de TLS/proxy).
+const COOKIE_SECURE =
+  String(process.env.COOKIE_SECURE || "").trim() === "1" ||
+  String(process.env.COOKIE_SECURE || "").trim() === "true" ||
+  process.env.NODE_ENV === "production";
 const allowedOrigins = new Set(
   String(process.env.ALLOWED_ORIGINS || "")
     .split(",")
@@ -107,6 +117,18 @@ const OPS_BACKUP_BASE_DIR = path.join(__dirname, "backups", "daily");
 const OPS_RECOVERY_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const IDEMPOTENCY_WINDOW_MS = Math.max(3000, Number(process.env.IDEMPOTENCY_WINDOW_MS || 15000));
 const recentRequestSignatures = new Map();
+// Healthcheck periódico de la tabla materializada stock_actual (Fase 4): compara
+// contra el agregado real de kardex, loguea y emite "stock:desync" si hay
+// desviaciones. NO reconstruye automáticamente (la reparación es deliberada vía
+// `npm run deploy:stock`). Configurable por env:
+//   STOCK_HC_ENABLED=0         deshabilita el healthcheck
+//   STOCK_HC_INTERVAL_MS=...   intervalo en ms (mínimo 1 minuto)
+const STOCK_HC_ENABLED = String(process.env.STOCK_HC_ENABLED || "1") !== "0";
+const STOCK_HC_INTERVAL_MS = Math.max(60 * 1000, Number(process.env.STOCK_HC_INTERVAL_MS || 30 * 60 * 1000));
+const STOCK_HC_MAX_DETAILS = 10;
+// N máximas corridas guardadas en opsMetrics.stock_actual.history (para detectar
+// desalineación intermitente en /api/ops/metrics).
+const STOCK_HC_HISTORY_LIMIT = 50;
 
 const opsMetrics = {
   started_at: new Date().toISOString(),
@@ -134,6 +156,15 @@ const opsMetrics = {
     approved_by_special_permission: 0,
     approved_by_supervisor_pin: 0,
     blocked: 0,
+  },
+  stock_actual: {
+    status: "unknown", // "ok" | "desync" | "error"
+    last_check_at: null,
+    expected_groups: 0,
+    actual_groups: 0,
+    mismatches: 0,
+    last_error: null,
+    history: [], // últimas STOCK_HC_HISTORY_LIMIT corridas: { at, status, mismatches, expected_groups, actual_groups, ms }
   },
 };
 
@@ -419,12 +450,25 @@ async function ensurePerformanceIndexes() {
       name: "ix_me_origen_tipo_creado",
       sql: "ALTER TABLE movimiento_encabezado ADD INDEX ix_me_origen_tipo_creado (id_bodega_origen, tipo_movimiento, creado_en)",
     },
+    // Búsquedas exactas por SKU (antes sin índice → full scan)
+    {
+      name: "ix_producto_sku",
+      sql: "ALTER TABLE productos ADD INDEX ix_producto_sku (sku)",
+    },
+    // Índice covering para las vistas de stock y el derived table fecha_entrada_lote
+    // (reportes de existencias/próximos a vencer): permite index-only scan del
+    // GROUP BY (id_bodega, id_producto, lote, fecha_vencimiento) + SUM(delta) +
+    // MIN(DATE(creado_en)) sin tocar filas de la tabla kardex (que crece sin límite).
+    {
+      name: "ix_kardex_covering",
+      sql: "ALTER TABLE kardex ADD INDEX ix_kardex_covering (id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, creado_en)",
+    },
   ];
   const [existing] = await pool.query(
     `SELECT INDEX_NAME
      FROM information_schema.STATISTICS
      WHERE TABLE_SCHEMA=DATABASE()
-       AND INDEX_NAME IN ('ix_pe_bodsurt_creado','ix_pe_solicita_creado','ix_me_destino_tipo_creado','ix_me_origen_tipo_creado')
+       AND INDEX_NAME IN ('ix_pe_bodsurt_creado','ix_pe_solicita_creado','ix_me_destino_tipo_creado','ix_me_origen_tipo_creado','ix_producto_sku','ix_kardex_covering')
      GROUP BY INDEX_NAME`
   );
   const existingSet = new Set((existing || []).map((r) => String(r?.INDEX_NAME || "")));
@@ -437,6 +481,438 @@ async function ensurePerformanceIndexes() {
         console.error(`No se pudo crear índice ${idx.name}:`, String(e?.message || e));
       }
     }
+  }
+
+  // ix_kardex_covering necesita creado_en al final para el MIN(DATE(creado_en))
+  // de fecha_entrada_lote. Si existe con la definición vieja (sin creado_en),
+  // se recrea; el chequeo por nombre solo no basta porque el índice ya existe.
+  // El DROP se gatea por existencia previa para que, si el índice no existe en
+  // absoluto, el ADD igual se ejecute (no romper en el DROP).
+  const [[cov]] = await pool.query(
+    `SELECT COUNT(*) AS c
+     FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA=DATABASE()
+       AND TABLE_NAME='kardex'
+       AND INDEX_NAME='ix_kardex_covering'
+       AND COLUMN_NAME='creado_en'`
+  );
+  if (Number(cov?.c || 0) === 0) {
+    try {
+      const [[hasIdx]] = await pool.query(
+        `SELECT COUNT(*) AS c
+         FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA=DATABASE()
+           AND TABLE_NAME='kardex'
+           AND INDEX_NAME='ix_kardex_covering'`
+      );
+      if (Number(hasIdx?.c || 0) > 0) {
+        await pool.query(`ALTER TABLE kardex DROP INDEX ix_kardex_covering`);
+      }
+      await pool.query(`ALTER TABLE kardex ADD INDEX ix_kardex_covering (id_bodega, id_producto, lote, fecha_vencimiento, delta_cantidad, creado_en)`);
+      console.log("Índice asegurado: ix_kardex_covering (con creado_en)");
+    } catch (e) {
+      console.error(`No se pudo recrear índice ix_kardex_covering:`, String(e?.message || e));
+    }
+  }
+}
+
+// ── Fase 4: tabla materializada stock_actual ─────────────────────────────────
+// v_stock_por_lote / v_stock_resumen agregaban TODO el kardex (que crece sin
+// límite) en cada consulta. Ahora el stock por (bodega, producto, lote, fecha)
+// vive en stock_actual, mantenida transaccionalmente por triggers sobre kardex
+// (misma transacción que el movimiento: si se revierte el movimiento, se
+// revierte el efecto del trigger). Las vistas se redefinen para leer de
+// stock_actual y ya no agregan kardex.
+async function ensureStockActualTable() {
+  // Clave NULL-safe: lote/fecha_vencimiento pueden ser NULL, y un UNIQUE con
+  // columnas NULLables dejaría filas duplicadas (NULL != NULL). Se usan columnas
+  // generadas STORED con prefijo 'N'/'Y' que distinguen NULL de cualquier valor.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS stock_actual (
+      id_bodega INT NOT NULL,
+      id_producto INT NOT NULL,
+      lote VARCHAR(60) NULL,
+      fecha_vencimiento DATE NULL,
+      stock DECIMAL(18,3) NOT NULL DEFAULT 0,
+      fecha_entrada_lote DATE NULL,
+      lote_key VARCHAR(61)
+        GENERATED ALWAYS AS (CONCAT(IF(lote IS NULL, 'N', 'Y'), COALESCE(lote, ''))) STORED,
+      fecha_key DATE
+        GENERATED ALWAYS AS (IF(fecha_vencimiento IS NULL, '1000-01-01', fecha_vencimiento)) STORED,
+      UNIQUE KEY uq_stock_actual (id_bodega, id_producto, lote_key, fecha_key),
+      KEY ix_sa_base (id_bodega, id_producto, lote, fecha_vencimiento)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+  // Índice base para los lookups de los triggers (matchean por columnas base con
+  // <=>). Idempotente por si la tabla ya existía sin él.
+  const [saIdx] = await pool.query(`
+    SELECT INDEX_NAME
+    FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA=DATABASE()
+      AND TABLE_NAME='stock_actual'
+      AND INDEX_NAME='ix_sa_base'
+    GROUP BY INDEX_NAME`);
+  if (!saIdx.length) {
+    await pool.query(`ALTER TABLE stock_actual ADD INDEX ix_sa_base (id_bodega, id_producto, lote, fecha_vencimiento)`);
+  }
+
+  // Columna materializada fecha_entrada_lote = MIN(DATE(creado_en)) de las filas
+  // con delta_cantidad > 0 del lote (la usan los reportes de existencias/alertas
+  // sin tener que agregar kardex por request). Idempotente por si la tabla ya
+  // existía sin ella; si se añade sobre datos existentes, se fuerza el backfill.
+  let forceBackfill = false;
+  const [[felCol]] = await pool.query(`
+    SELECT COUNT(*) AS c
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA=DATABASE()
+      AND TABLE_NAME='stock_actual'
+      AND COLUMN_NAME='fecha_entrada_lote'`);
+  if (Number(felCol?.c || 0) === 0) {
+    await pool.query(`ALTER TABLE stock_actual ADD COLUMN fecha_entrada_lote DATE NULL AFTER stock`);
+    forceBackfill = true; // la columna es nueva: hay que repoblar la tabla completa
+  }
+
+  // Alineación de collation: stock_actual debe usar la MISMA collation que kardex
+  // en la columna lote. La tabla se creó con el COLLATE por defecto de la BD
+  // (en MariaDB 12.x: utf8mb4_uca1400_ai_ci), mientras kardex usa
+  // utf8mb4_unicode_ci; si difieren, cualquier `<=>` entre ambas columnas lote
+  // (triggers ad/au, subconsultas k2/k3 del reporte de existencias) lanza
+  // ER_CANT_AGGREGATE_2COLLATIONS. Idempotente: solo actúa si hay desalineación.
+  const [[kardexLote]] = await pool.query(`
+    SELECT COLLATION_NAME
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA=DATABASE()
+      AND TABLE_NAME='kardex'
+      AND COLUMN_NAME='lote'`);
+  const [[stockLote]] = await pool.query(`
+    SELECT COLLATION_NAME
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA=DATABASE()
+      AND TABLE_NAME='stock_actual'
+      AND COLUMN_NAME='lote'`);
+  const kardexCollation = kardexLote?.COLLATION_NAME || "utf8mb4_unicode_ci";
+  if (stockLote?.COLLATION_NAME && stockLote.COLLATION_NAME !== kardexCollation) {
+    await pool.query(`
+      ALTER TABLE stock_actual
+        MODIFY lote VARCHAR(60) CHARACTER SET utf8mb4 COLLATE ${kardexCollation} NULL,
+        MODIFY lote_key VARCHAR(61) CHARACTER SET utf8mb4 COLLATE ${kardexCollation}
+          GENERATED ALWAYS AS (CONCAT(IF(lote IS NULL, 'N', 'Y'), COALESCE(lote, ''))) STORED`);
+    console.log(`stock_actual.lote alineada a collation ${kardexCollation}`);
+  }
+
+  // Triggers de mantenimiento transaccional sobre kardex.
+  // IMPORTANTE: se crean ANTES del backfill. Los ensure* se lanzan fire-and-forget
+  // en module-load mientras httpServer.listen arranca de inmediato; si el backfill
+  // corriera antes que los triggers, una escritura de kardex en esa ventana quedaría
+  // fuera de stock_actual para siempre. Con triggers primero, todo INSERT/DELETE/
+  // UPDATE queda contabilizado y el backfill (bajo LOCK TABLES) rellena el
+  // histórico sin huecos.
+  await pool.query(`DROP TRIGGER IF EXISTS trg_kardex_stock_ai`);
+  await pool.query(`
+    CREATE TRIGGER trg_kardex_stock_ai
+    AFTER INSERT ON kardex
+    FOR EACH ROW
+    BEGIN
+      INSERT INTO stock_actual (id_bodega, id_producto, lote, fecha_vencimiento, stock, fecha_entrada_lote)
+      VALUES (NEW.id_bodega, NEW.id_producto, NEW.lote, NEW.fecha_vencimiento, NEW.delta_cantidad,
+              IF(NEW.delta_cantidad > 0, DATE(NEW.creado_en), NULL))
+      ON DUPLICATE KEY UPDATE
+        stock = stock + NEW.delta_cantidad,
+        fecha_entrada_lote = IF(NEW.delta_cantidad > 0,
+                                LEAST(COALESCE(fecha_entrada_lote, DATE(NEW.creado_en)), DATE(NEW.creado_en)),
+                                fecha_entrada_lote);
+    END
+  `);
+  await pool.query(`DROP TRIGGER IF EXISTS trg_kardex_stock_ad`);
+  await pool.query(`
+    CREATE TRIGGER trg_kardex_stock_ad
+    AFTER DELETE ON kardex
+    FOR EACH ROW
+    BEGIN
+      UPDATE stock_actual
+         SET stock = stock - OLD.delta_cantidad
+       WHERE id_bodega = OLD.id_bodega
+         AND id_producto = OLD.id_producto
+         AND (lote <=> OLD.lote)
+         AND (fecha_vencimiento <=> OLD.fecha_vencimiento);
+      IF OLD.delta_cantidad > 0 THEN
+        UPDATE stock_actual sa
+           SET sa.fecha_entrada_lote = (
+             SELECT MIN(DATE(k.creado_en)) FROM kardex k
+              WHERE k.id_bodega = OLD.id_bodega
+                AND k.id_producto = OLD.id_producto
+                AND (k.lote <=> OLD.lote)
+                AND (k.fecha_vencimiento <=> OLD.fecha_vencimiento)
+                AND k.delta_cantidad > 0
+           )
+         WHERE sa.id_bodega = OLD.id_bodega
+           AND sa.id_producto = OLD.id_producto
+           AND (sa.lote <=> OLD.lote)
+           AND (sa.fecha_vencimiento <=> OLD.fecha_vencimiento);
+      END IF;
+      DELETE FROM stock_actual
+       WHERE id_bodega = OLD.id_bodega
+         AND id_producto = OLD.id_producto
+         AND (lote <=> OLD.lote)
+         AND (fecha_vencimiento <=> OLD.fecha_vencimiento)
+         AND stock = 0
+         AND NOT EXISTS (
+           SELECT 1 FROM kardex k
+            WHERE k.id_bodega = OLD.id_bodega
+              AND k.id_producto = OLD.id_producto
+              AND (k.lote <=> OLD.lote)
+              AND (k.fecha_vencimiento <=> OLD.fecha_vencimiento)
+         );
+    END
+  `);
+  await pool.query(`DROP TRIGGER IF EXISTS trg_kardex_stock_au`);
+  await pool.query(`
+    CREATE TRIGGER trg_kardex_stock_au
+    AFTER UPDATE ON kardex
+    FOR EACH ROW
+    BEGIN
+      UPDATE stock_actual
+         SET stock = stock - OLD.delta_cantidad
+       WHERE id_bodega = OLD.id_bodega
+         AND id_producto = OLD.id_producto
+         AND (lote <=> OLD.lote)
+         AND (fecha_vencimiento <=> OLD.fecha_vencimiento);
+      IF OLD.delta_cantidad > 0 THEN
+        UPDATE stock_actual sa
+           SET sa.fecha_entrada_lote = (
+             SELECT MIN(DATE(k.creado_en)) FROM kardex k
+              WHERE k.id_bodega = OLD.id_bodega
+                AND k.id_producto = OLD.id_producto
+                AND (k.lote <=> OLD.lote)
+                AND (k.fecha_vencimiento <=> OLD.fecha_vencimiento)
+                AND k.delta_cantidad > 0
+           )
+         WHERE sa.id_bodega = OLD.id_bodega
+           AND sa.id_producto = OLD.id_producto
+           AND (sa.lote <=> OLD.lote)
+           AND (sa.fecha_vencimiento <=> OLD.fecha_vencimiento);
+      END IF;
+      DELETE FROM stock_actual
+       WHERE id_bodega = OLD.id_bodega
+         AND id_producto = OLD.id_producto
+         AND (lote <=> OLD.lote)
+         AND (fecha_vencimiento <=> OLD.fecha_vencimiento)
+         AND stock = 0
+         AND NOT EXISTS (
+           SELECT 1 FROM kardex k
+            WHERE k.id_bodega = OLD.id_bodega
+              AND k.id_producto = OLD.id_producto
+              AND (k.lote <=> OLD.lote)
+              AND (k.fecha_vencimiento <=> OLD.fecha_vencimiento)
+         );
+      INSERT INTO stock_actual (id_bodega, id_producto, lote, fecha_vencimiento, stock, fecha_entrada_lote)
+      VALUES (NEW.id_bodega, NEW.id_producto, NEW.lote, NEW.fecha_vencimiento, NEW.delta_cantidad,
+              IF(NEW.delta_cantidad > 0, DATE(NEW.creado_en), NULL))
+      ON DUPLICATE KEY UPDATE
+        stock = stock + NEW.delta_cantidad,
+        fecha_entrada_lote = IF(NEW.delta_cantidad > 0,
+                                LEAST(COALESCE(fecha_entrada_lote, DATE(NEW.creado_en)), DATE(NEW.creado_en)),
+                                fecha_entrada_lote);
+    END
+  `);
+
+  // Backfill solo si la tabla está vacía (idempotente entre reinicios). Se hace bajo
+  // LOCK TABLES para que ninguna escritura de kardex quede fuera del agregado: con
+  // los triggers ya activos, todo write es contabilizado, y el lock cierra la ventana
+  // entre el snapshot y el cierre del INSERT...SELECT.
+  const [[{ c }]] = await pool.query(`SELECT COUNT(*) AS c FROM stock_actual`);
+  if (Number(c) === 0 || forceBackfill) {
+    const conn = await pool.getConnection();
+    try {
+      await conn.query(`LOCK TABLES kardex WRITE, stock_actual WRITE`);
+      await conn.query(`DELETE FROM stock_actual`);
+      await conn.query(`
+        INSERT INTO stock_actual (id_bodega, id_producto, lote, fecha_vencimiento, stock, fecha_entrada_lote)
+        SELECT k.id_bodega, k.id_producto, k.lote, k.fecha_vencimiento, SUM(k.delta_cantidad),
+               MIN(IF(k.delta_cantidad > 0, DATE(k.creado_en), NULL))
+        FROM kardex k
+        GROUP BY k.id_bodega, k.id_producto, k.lote, k.fecha_vencimiento
+      `);
+    } finally {
+      await conn.query(`UNLOCK TABLES`).catch(() => {});
+      conn.release();
+    }
+  } else {
+    console.warn(
+      `stock_actual ya tiene ${c} filas: se omite el backfill. ` +
+      `Si los datos están incorrectos, corre: node test_reconcile_stock.cjs --fix`
+    );
+  }
+
+  // Vistas: ahora leen de stock_actual en lugar de agregar kardex. v_stock_disponible
+  // ya lee de v_stock_por_lote, así que hereda el cambio automáticamente.
+  await pool.query(`
+    CREATE OR REPLACE VIEW v_stock_por_lote AS
+    SELECT id_bodega, id_producto, lote, fecha_vencimiento, stock, fecha_entrada_lote
+    FROM stock_actual
+  `);
+  await pool.query(`
+    CREATE OR REPLACE VIEW v_stock_disponible AS
+    SELECT s.*,
+      CASE
+        WHEN s.fecha_vencimiento IS NULL THEN 1
+        WHEN s.fecha_vencimiento >= CURDATE() THEN 1
+        ELSE 0
+      END AS no_vencido
+    FROM v_stock_por_lote s
+    WHERE s.stock > 0
+  `);
+  await pool.query(`
+    CREATE OR REPLACE VIEW v_stock_resumen AS
+    SELECT id_bodega, id_producto, SUM(stock) AS stock
+    FROM stock_actual
+    GROUP BY id_bodega, id_producto
+  `);
+}
+
+// ── Healthcheck en runtime: desalineación de stock_actual ───────────────────
+// Misma lógica de comparación que test_reconcile_stock.cjs, pero corriendo en
+// el servidor de forma fire-and-forget (nunca bloquea ni tira el proceso). Si
+// detecta desviaciones (p.ej. un INSERT manual en kardex, un trigger roto o un
+// restore de backup viejo), loguea el detalle, actualiza opsMetrics.stock_actual
+// y emite un evento socket "stock:desync" para que los clientes conectados
+// puedan alertar. NO reconstruye la tabla: eso queda para `npm run deploy:stock`.
+const STOCK_HC_KEY_EXPR =
+  "CONCAT(IF(lote IS NULL,'N','Y'),COALESCE(lote,'')) AS lote_key, " +
+  "IF(fecha_vencimiento IS NULL, '1000-01-01', DATE_FORMAT(fecha_vencimiento,'%Y-%m-%d')) AS fecha_key";
+const STOCK_HC_FEL_EXPR = "COALESCE(DATE_FORMAT(fecha_entrada_lote, '%Y-%m-%d'), '')";
+// Agregado esperado desde kardex (misma expresión que test_reconcile_stock.cjs).
+const STOCK_HC_EXPECTED_SQL = `
+  SELECT id_bodega, id_producto, ${STOCK_HC_KEY_EXPR}, SUM(delta_cantidad) AS stock,
+         COALESCE(DATE_FORMAT(MIN(IF(delta_cantidad > 0, DATE(creado_en), NULL)), '%Y-%m-%d'), '') AS fel
+  FROM kardex
+  GROUP BY id_bodega, id_producto, lote_key, fecha_key`;
+// Snapshot actual de stock_actual (misma forma que en el reconcile).
+const STOCK_HC_ACTUAL_SQL = `
+  SELECT id_bodega, id_producto, lote_key,
+         DATE_FORMAT(fecha_key, '%Y-%m-%d') AS fecha_key, stock, ${STOCK_HC_FEL_EXPR} AS fel
+  FROM stock_actual`;
+
+// Diff 100% SQL-side: LEFT JOIN en ambas direcciones devuelve SOLO las claves
+// divergentes (esperado sin actual, actual sin esperado, o stock/fel distintos).
+// En estado alineado devuelve 0 filas: el agregado de kardex no viaja a JS.
+const STOCK_HC_DIFF_SQL = `
+  SELECT e.id_bodega, e.id_producto, e.lote_key, e.fecha_key,
+         e.stock AS exp_stock, e.fel AS exp_fel,
+         a.stock AS act_stock, a.fel AS act_fel
+  FROM (${STOCK_HC_EXPECTED_SQL}) e
+  LEFT JOIN (${STOCK_HC_ACTUAL_SQL}) a
+    ON a.id_bodega = e.id_bodega AND a.id_producto = e.id_producto
+   AND a.lote_key = e.lote_key AND a.fecha_key = e.fecha_key
+  WHERE a.id_bodega IS NULL
+     OR ABS(COALESCE(a.stock, 0) - e.stock) > 1e-9
+     OR a.fel <> e.fel
+  UNION ALL
+  SELECT a2.id_bodega, a2.id_producto, a2.lote_key, a2.fecha_key,
+         CAST(NULL AS DECIMAL(18,3)) AS exp_stock, CAST(NULL AS CHAR) AS exp_fel,
+         a2.stock AS act_stock, a2.fel AS act_fel
+  FROM (${STOCK_HC_ACTUAL_SQL}) a2
+  LEFT JOIN (${STOCK_HC_EXPECTED_SQL}) e2
+    ON e2.id_bodega = a2.id_bodega AND e2.id_producto = a2.id_producto
+   AND e2.lote_key = a2.lote_key AND e2.fecha_key = a2.fecha_key
+  WHERE e2.id_bodega IS NULL`;
+
+async function checkStockActualConsistency() {
+  const t0 = Date.now();
+  // Medición única de duración, compartida por logs e historial: se asigna una
+  // sola vez por corrida (en el try tras las queries, y en el catch hasta el fallo)
+  // y tanto pushHistory como los console.* la leen. Evita que el historial use un
+  // Date.now() distinto al de los logs.
+  let ms = 0;
+  // Registra cada corrida en opsMetrics.stock_actual.history (últimas
+  // STOCK_HC_HISTORY_LIMIT) para detectar patrones de desalineación intermitente
+  // en /api/ops/metrics. Definida a nivel de función para que el catch la reúse.
+  const pushHistory = (status, entry = {}) => {
+    opsMetrics.stock_actual.history.push({
+      ...entry, // primero: permite sobrescribir campos computados por el caller si hiciera falta
+      at: new Date().toISOString(),
+      status,
+      mismatches: opsMetrics.stock_actual.mismatches,
+      expected_groups: opsMetrics.stock_actual.expected_groups,
+      actual_groups: opsMetrics.stock_actual.actual_groups,
+      ms,
+    });
+    if (opsMetrics.stock_actual.history.length > STOCK_HC_HISTORY_LIMIT) {
+      opsMetrics.stock_actual.history.splice(0, opsMetrics.stock_actual.history.length - STOCK_HC_HISTORY_LIMIT);
+    }
+  };
+  try {
+    // Espera a que Fase 4 termine de arrancar (tabla + triggers + backfill) antes
+    // de comparar: evita falsos desync por leer una tabla aún en backfill.
+    await stockActualReadyPromise;
+
+    // Conteos livianos (escalares, sin traer filas a JS) + diff de claves
+    // divergentes, en paralelo. El agregado de kardex solo viaja en el diff
+    // cuando hay desviaciones (0 filas si todo está alineado).
+    const [countResults, diffResults] = await Promise.all([
+      pool.query(`
+        SELECT
+          (SELECT COUNT(*) FROM stock_actual) AS actual_groups,
+          (SELECT COUNT(*) FROM (
+             SELECT 1 FROM kardex
+             GROUP BY id_bodega, id_producto, lote, fecha_vencimiento
+           ) e) AS expected_groups
+      `),
+      pool.query(STOCK_HC_DIFF_SQL),
+    ]);
+    // pool.query() resuelve a [rows, fields]: extraemos el array de filas real.
+    const [countRows] = countResults;
+    const [diffRows] = diffResults;
+    const [counts] = countRows; // countRows es el array de filas; su única fila es el objeto de conteos
+    const actual_groups = Number(counts?.actual_groups || 0);
+    const expected_groups = Number(counts?.expected_groups || 0);
+
+    const mismatches = diffRows.map((r) => {
+      const key = `${r.id_bodega}|${r.id_producto}|${r.lote_key}|${r.fecha_key}`;
+      const expected =
+        r.exp_stock == null ? "AUSENTE" : { stock: Number(r.exp_stock), fel: r.exp_fel };
+      const actual =
+        r.act_stock == null ? "AUSENTE" : { stock: Number(r.act_stock), fel: r.act_fel };
+      return { key, expected, actual };
+    });
+
+    ms = Date.now() - t0;
+    opsMetrics.stock_actual.last_check_at = new Date().toISOString();
+    opsMetrics.stock_actual.expected_groups = expected_groups;
+    opsMetrics.stock_actual.actual_groups = actual_groups;
+    opsMetrics.stock_actual.mismatches = mismatches.length;
+    opsMetrics.stock_actual.last_error = null;
+
+    if (mismatches.length > 0) {
+      opsMetrics.stock_actual.status = "desync";
+      pushHistory("desync");
+      console.warn(
+        `[stock_actual] ⚠️ DESALINEACIÓN detectada: ${mismatches.length} desviación(es) ` +
+        `(esperados=${expected_groups}, reales=${actual_groups}) en ${ms}ms. Reparar con: npm run deploy:stock`
+      );
+      for (const m of mismatches.slice(0, STOCK_HC_MAX_DETAILS)) {
+        console.warn(`  - ${m.key}: esperado=${JSON.stringify(m.expected)} actual=${JSON.stringify(m.actual)}`);
+      }
+      io.emit("stock:desync", {
+        at: opsMetrics.stock_actual.last_check_at,
+        mismatches: mismatches.length,
+        sample: mismatches.slice(0, STOCK_HC_MAX_DETAILS),
+      });
+    } else {
+      opsMetrics.stock_actual.status = "ok";
+      pushHistory("ok");
+      console.log(`[stock_actual] ✅ alineada (${expected_groups} grupos) en ${ms}ms`);
+    }
+  } catch (e) {
+    ms = Date.now() - t0; // misma medición única: tiempo transcurrido hasta el fallo
+    opsMetrics.stock_actual.status = "error";
+    opsMetrics.stock_actual.last_check_at = new Date().toISOString();
+    opsMetrics.stock_actual.last_error = { code: e?.code || null, message: String(e?.message || e) };
+    // Reúsa pushHistory: la corrida fallida se registra con los últimos conteos
+    // conocidos y el mensaje de error.
+    opsMetrics.stock_actual.mismatches = 0;
+    pushHistory("error", { error: String(e?.message || e) });
+    console.error("[stock_actual] Healthcheck falló:", e?.code || "", e?.message || e);
   }
 }
 
@@ -635,10 +1111,32 @@ function signToken(user) {
   );
 }
 
+// Extrae cookies del header Cookie sin dependencias externas.
+function parseCookies(header = "") {
+  const out = {};
+  for (const part of header.split(";")) {
+    const idx = part.indexOf("=");
+    if (idx === -1) continue;
+    const key = part.slice(0, idx).trim();
+    const val = part.slice(idx + 1).trim();
+    if (key) {
+      try {
+        out[key] = decodeURIComponent(val);
+      } catch {
+        out[key] = val;
+      }
+    }
+  }
+  return out;
+}
+
 function auth(req, res, next) {
   const h = req.headers.authorization || "";
   const qt = req.query && req.query.token ? String(req.query.token) : "";
-  const token = h.startsWith("Bearer ") ? h.slice(7) : (qt || null);
+  // Doble canal: header Authorization (compat), query ?token= (prints/legacy) y
+  // cookie HttpOnly "token" (nuevo, no legible por JS).
+  const cookieToken = parseCookies(req.headers.cookie || "").token || "";
+  const token = h.startsWith("Bearer ") ? h.slice(7) : (qt || cookieToken || null);
   if (!token) return res.status(401).json({ error: "No token" });
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET);
@@ -652,7 +1150,9 @@ io.use((socket, next) => {
   try {
     const authToken = socket.handshake?.auth?.token ? String(socket.handshake.auth.token) : "";
     const queryToken = socket.handshake?.query?.token ? String(socket.handshake.query.token) : "";
-    const token = authToken || queryToken;
+    // Cookie HttpOnly enviada por socket.io-client (withCredentials) en el handshake.
+    const cookieToken = parseCookies(socket.handshake?.headers?.cookie || "").token || "";
+    const token = authToken || queryToken || cookieToken;
     if (!token) return next(new Error("No token"));
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     socket.user = payload;
@@ -1776,6 +2276,12 @@ ensureRecepcionConfirmacionSchema().catch((e) => {
 });
 ensurePerformanceIndexes().catch((e) => {
   console.error("No se pudieron crear índices de rendimiento:", e);
+});
+// Promesa del arranque de Fase 4: el healthcheck en runtime la espera antes de
+// comparar, para no reportar un falso desync si el backfill (fire-and-forget bajo
+// LOCK TABLES) aún está en curso cuando dispara el primer check.
+const stockActualReadyPromise = ensureStockActualTable().catch((e) => {
+  console.error("No se pudo crear/verificar la tabla materializada stock_actual:", e);
 });
 
 async function ensureConteoCiclicoTables() {
@@ -3113,6 +3619,11 @@ async function buildDashboardResumenPayload({ id_bodega, bodega_nombre, scope, d
     { id_bodega, days }
   );
 
+  // total_dinero con subconsultas correlacionadas (preferido + fallback).
+  // NOTA: se revirtió el refactor a ROW_NUMBER() porque el benchmark con datos
+  // reales (test_bench_detalle.cjs) mostró que las ventanas eran MÁS LENTAS
+  // (~50-60%) en este MariaDB 12.2 con el índice actual: el filesort por
+  // partición sobre todo el kardex supera a los index lookups puntuales.
   const moneyPromise = pool.query(
     `SELECT
         SUM(
@@ -3301,6 +3812,18 @@ async function prewarmDashboardCache() {
 /* =========================
    AUTH
 ========================= */
+// Cierra la sesión: elimina la cookie HttpOnly en el servidor.
+// No requiere auth (un token expirado también debe poder desloguear).
+app.post("/api/auth/logout", (req, res) => {
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: COOKIE_SECURE,
+    sameSite: "lax",
+    path: "/",
+  });
+  res.json({ ok: true });
+});
+
 app.post("/api/auth/login", async (req, res) => {
   try {
     const { username, password } = req.body || {};
@@ -3352,6 +3875,15 @@ app.post("/api/auth/login", async (req, res) => {
     if (!ok) return res.status(401).json({ error: "Contrasena incorrecta" });
 
     const token = signToken(u);
+    // Sesión en cookie HttpOnly (no legible por JS): protege el JWT contra XSS.
+    // SameSite=Lax evita el envío cross-site (CSRF) en peticiones de navegación.
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: COOKIE_SECURE,
+      sameSite: "lax",
+      maxAge: 12 * 60 * 60 * 1000, // 12h, igual que el JWT
+      path: "/",
+    });
     const permisos = await getUserPermissionsMap(u.id_user);
     res.json({
       token,
@@ -3547,10 +4079,10 @@ app.get("/api/productos", auth, async (req, res) => {
   var id_medida = Number(req.query.medida || 0) || null;
   var id_bodega_usuario = Number(req.user?.id_warehouse || 0) || null;
 
-  var [[{ total }]] = await pool.query(
-    "SELECT COUNT(*) AS total FROM productos p JOIN medidas m ON m.id_medida=p.id_medida JOIN categorias c ON c.id_categoria=p.id_categoria WHERE (:all=1 OR p.activo=1) AND " + qf.clause + " AND (:id_categoria IS NULL OR p.id_categoria=:id_categoria) AND (:id_medida IS NULL OR p.id_medida=:id_medida)",
-    { all: all ? 1 : 0, id_categoria, id_medida, ...qf.params }
-  );
+  var countSql =
+    "SELECT COUNT(*) AS total FROM productos p JOIN medidas m ON m.id_medida=p.id_medida JOIN categorias c ON c.id_categoria=p.id_categoria WHERE (:all=1 OR p.activo=1) AND "
+    + qf.clause
+    + " AND (:id_categoria IS NULL OR p.id_categoria=:id_categoria) AND (:id_medida IS NULL OR p.id_medida=:id_medida)";
 
   var sql = "SELECT p.id_producto,"
     + " p.nombre_producto, p.sku,"
@@ -3571,7 +4103,13 @@ app.get("/api/productos", auth, async (req, res) => {
   sql += " ORDER BY p.nombre_producto ASC";
   sql += " LIMIT " + limit + " OFFSET " + offset;
 
-  var [rows] = await pool.query(sql, { all: all ? 1 : 0, id_bodega_usuario, id_categoria, id_medida, ...qf.params });
+  // COUNT y SELECT en paralelo (antes secuenciales → el listado tardaba el doble).
+  var params = { all: all ? 1 : 0, id_bodega_usuario, id_categoria, id_medida, ...qf.params };
+  var [[countRows], [rows]] = await Promise.all([
+    pool.query(countSql, params),
+    pool.query(sql, params),
+  ]);
+  var total = countRows?.[0]?.total || 0;
 
   res.json({
     rows,
@@ -5496,14 +6034,14 @@ const [rows] = await pool.query(
             END AS dias_para_vencer,
             rs.max_dias_vida,
             rs.dias_alerta_antes,
-            e.fecha_entrada_lote,
+            v.fecha_entrada_lote,
             CASE
-              WHEN e.fecha_entrada_lote IS NULL THEN NULL
-              ELSE DATEDIFF(CURDATE(), e.fecha_entrada_lote)
+              WHEN v.fecha_entrada_lote IS NULL THEN NULL
+              ELSE DATEDIFF(CURDATE(), v.fecha_entrada_lote)
             END AS dias_en_bodega,
             CASE
-              WHEN COALESCE(rs.max_dias_vida,0) <= 0 OR e.fecha_entrada_lote IS NULL THEN NULL
-              ELSE rs.max_dias_vida - DATEDIFF(CURDATE(), e.fecha_entrada_lote)
+              WHEN COALESCE(rs.max_dias_vida,0) <= 0 OR v.fecha_entrada_lote IS NULL THEN NULL
+              ELSE rs.max_dias_vida - DATEDIFF(CURDATE(), v.fecha_entrada_lote)
             END AS dias_restantes_regla
             ,
             (
@@ -5565,15 +6103,6 @@ const [rows] = await pool.query(
            AND lpb.id_producto=v.id_producto
            AND lpb.activo=1
      LEFT JOIN reglas_subcategoria rs ON rs.id_subcategoria=p.id_subcategoria AND rs.activo=1
-     LEFT JOIN (
-       SELECT id_bodega, id_producto, lote, fecha_vencimiento, MIN(DATE(creado_en)) AS fecha_entrada_lote
-       FROM kardex
-       WHERE delta_cantidad > 0
-       GROUP BY id_bodega, id_producto, lote, fecha_vencimiento
-     ) e ON e.id_bodega=v.id_bodega
-         AND e.id_producto=v.id_producto
-         AND (e.lote <=> v.lote)
-         AND (e.fecha_vencimiento <=> v.fecha_vencimiento)
      WHERE ${show_zero ? "v.stock >= 0" : "v.stock > 0"}
        AND ${accessFilter ? `v.id_bodega IN (${accessFilter.sql})` : "1=1"}
        AND (:id_bodega IS NULL OR v.id_bodega=:id_bodega)
@@ -5691,36 +6220,27 @@ app.get("/api/reportes/existencias/alertas", auth, async (req, res) => {
             DATEDIFF(v.fecha_vencimiento, CURDATE()) AS dias_para_vencer,
             rs.max_dias_vida,
             rs.dias_alerta_antes,
-            e.fecha_entrada_lote,
+            v.fecha_entrada_lote,
             CASE
-              WHEN e.fecha_entrada_lote IS NULL THEN NULL
-              ELSE DATEDIFF(CURDATE(), e.fecha_entrada_lote)
+              WHEN v.fecha_entrada_lote IS NULL THEN NULL
+              ELSE DATEDIFF(CURDATE(), v.fecha_entrada_lote)
             END AS dias_en_bodega,
             CASE
-              WHEN COALESCE(rs.max_dias_vida,0) <= 0 OR e.fecha_entrada_lote IS NULL THEN NULL
-              ELSE rs.max_dias_vida - DATEDIFF(CURDATE(), e.fecha_entrada_lote)
+              WHEN COALESCE(rs.max_dias_vida,0) <= 0 OR v.fecha_entrada_lote IS NULL THEN NULL
+              ELSE rs.max_dias_vida - DATEDIFF(CURDATE(), v.fecha_entrada_lote)
             END AS dias_restantes_regla
      FROM v_stock_por_lote v
      JOIN bodegas b ON b.id_bodega=v.id_bodega
      JOIN productos p ON p.id_producto=v.id_producto
      LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
      LEFT JOIN reglas_subcategoria rs ON rs.id_subcategoria=p.id_subcategoria AND rs.activo=1
-     LEFT JOIN (
-       SELECT id_bodega, id_producto, lote, fecha_vencimiento, MIN(DATE(creado_en)) AS fecha_entrada_lote
-       FROM kardex
-       WHERE delta_cantidad > 0
-       GROUP BY id_bodega, id_producto, lote, fecha_vencimiento
-     ) e ON e.id_bodega=v.id_bodega
-         AND e.id_producto=v.id_producto
-         AND (e.lote <=> v.lote)
-         AND (e.fecha_vencimiento <=> v.fecha_vencimiento)
      WHERE ${show_zero ? "v.stock >= 0" : "v.stock > 0"}
        AND (
          (v.fecha_vencimiento IS NOT NULL AND DATEDIFF(v.fecha_vencimiento, CURDATE()) <= :days)
          OR (
            COALESCE(rs.max_dias_vida,0) > 0
-           AND e.fecha_entrada_lote IS NOT NULL
-           AND (rs.max_dias_vida - DATEDIFF(CURDATE(), e.fecha_entrada_lote)) <= GREATEST(COALESCE(rs.dias_alerta_antes,0),0)
+           AND v.fecha_entrada_lote IS NOT NULL
+           AND (rs.max_dias_vida - DATEDIFF(CURDATE(), v.fecha_entrada_lote)) <= GREATEST(COALESCE(rs.dias_alerta_antes,0),0)
          )
        )
        AND ${accessFilter ? `v.id_bodega IN (${accessFilter.sql})` : "1=1"}
@@ -7422,6 +7942,11 @@ app.get("/api/dashboard/detalle", auth, async (req, res) => {
 
     if (Object.prototype.hasOwnProperty.call(stockKinds, kind)) {
       const whereKind = stockKinds[kind];
+      // Costo último con subconsultas correlacionadas (preferido + fallback).
+      // NOTA: se revirtió el refactor a ROW_NUMBER() por el benchmark con datos
+      // reales (test_bench_detalle.cjs): las ventanas eran ~50-60% MÁS LENTAS
+      // en este MariaDB 12.2 (filesort por partición de todo el kardex vs index
+      // lookups puntuales ix_k_bod_prod de las subconsultas).
       const [rows] = await pool.query(
         `SELECT v.id_bodega,
                 b.nombre_bodega,
@@ -8131,6 +8656,83 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
 });
 
 
+// Tendencia diaria de entradas vs salidas para el dashboard (agregado en SQL).
+// Antes el cliente bajaba 2 reportes con limit=2000 filas de detalle y agregaba
+// en JS; ahora el backend devuelve una fila por día (máx. `days` filas).
+app.get("/api/reportes/trends", auth, async (req, res) => {
+  try {
+    const scope = await resolveStockScope(req.user);
+    if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
+    if (!scope.can_view_existencias) return res.json([]);
+
+    const days = Math.max(1, Math.min(90, Number(req.query.days || 7)));
+    const toDate = new Date();
+    const fromDate = new Date(toDate);
+    fromDate.setDate(fromDate.getDate() - (days - 1));
+    const from_dt = `${localYmd(fromDate)} 00:00:00`;
+    const to_dt = `${localYmd(toDate)} 23:59:59`;
+
+    const warehouseScope = getScopedWarehouseFilter(scope, req.query.warehouse);
+    if (warehouseScope.denied) return res.json([]);
+    let id_bodega = warehouseScope.selected;
+    if (!scope.can_all_bodegas) id_bodega = scope.id_bodega;
+    const accessFilter =
+      warehouseScope.restrictedIds.length && !id_bodega
+        ? buildNamedInClause(warehouseScope.restrictedIds, "trnw")
+        : null;
+
+    const entradasSql = `SELECT DATE(me.creado_en) AS fecha, SUM(md.cantidad) AS cantidad
+      FROM movimiento_encabezado me
+      JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
+      WHERE me.tipo_movimiento IN ('ENTRADA','TRANSFERENCIA')
+        AND me.estado<>'ANULADO'
+        ${accessFilter ? `AND me.id_bodega_destino IN (${accessFilter.sql})` : ""}
+        AND (:id_bodega IS NULL OR me.id_bodega_destino=:id_bodega)
+        AND me.creado_en >= :from_dt
+        AND me.creado_en <= :to_dt
+      GROUP BY DATE(me.creado_en)`;
+
+    const salidasSql = `SELECT DATE(me.creado_en) AS fecha, SUM(md.cantidad) AS cantidad
+      FROM movimiento_encabezado me
+      JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
+      WHERE me.tipo_movimiento IN ('SALIDA','TRANSFERENCIA')
+        AND me.estado<>'ANULADO'
+        ${accessFilter ? `AND me.id_bodega_origen IN (${accessFilter.sql})` : ""}
+        AND (:id_bodega IS NULL OR me.id_bodega_origen=:id_bodega)
+        AND me.creado_en >= :from_dt
+        AND me.creado_en <= :to_dt
+      GROUP BY DATE(me.creado_en)`;
+
+    const params = { id_bodega, from_dt, to_dt, ...(accessFilter?.params || {}) };
+    const [entradasRes, salidasRes] = await Promise.all([
+      pool.query(entradasSql, params),
+      pool.query(salidasSql, params),
+    ]);
+
+    const entradasByDay = new Map(
+      (entradasRes[0] || []).map((r) => [String(r.fecha || "").slice(0, 10), Number(r.cantidad || 0)])
+    );
+    const salidasByDay = new Map(
+      (salidasRes[0] || []).map((r) => [String(r.fecha || "").slice(0, 10), Number(r.cantidad || 0)])
+    );
+
+    const rows = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = localYmd(d);
+      rows.push({
+        fecha: key,
+        entradas: entradasByDay.get(key) || 0,
+        salidas: salidasByDay.get(key) || 0,
+      });
+    }
+    res.json(rows);
+  } catch (e) {
+    return res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
 app.get("/api/reportes/pedidos", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
@@ -8661,8 +9263,12 @@ app.get("/api/orders", auth, async (req, res) => {
               vs.id_bodega,
               SUM(vs.stock) AS stock
        FROM pedido_detalle pd
-       JOIN v_stock_resumen vs
-         ON vs.id_producto = pd.id_producto
+       JOIN (
+         SELECT id_bodega, id_producto, SUM(stock) AS stock
+         FROM v_stock_disponible
+         WHERE no_vencido = 1
+         GROUP BY id_bodega, id_producto
+       ) vs ON vs.id_producto = pd.id_producto
        WHERE pd.id_pedido IN (${inClause.sql})
        GROUP BY pd.id_pedido, vs.id_bodega`,
       inClause.params
@@ -8682,6 +9288,38 @@ app.get("/api/orders", auth, async (req, res) => {
   }
 
   res.json(rows);
+});
+
+// Contador de pedidos pendientes de despacho (PENDIENTE/APROBADO/PARCIAL).
+// Reemplaza descargar hasta 2000 pedidos solo para contarlos en el cliente.
+app.get("/api/pedidos/count-pendientes", auth, async (req, res) => {
+  try {
+    const stockScope = await resolveStockScope(req.user);
+    const where = [];
+    const params = {};
+    const whParam = Number(req.query.warehouse || 0);
+    const warehouseScope = getScopedWarehouseFilter(stockScope, whParam);
+    if (warehouseScope.denied) return res.json({ count: 0 });
+    if (!stockScope.can_all_bodegas) {
+      where.push("p.id_bodega_surtidor=:wh");
+      params.wh = req.user.id_warehouse;
+    } else if (warehouseScope.selected) {
+      where.push("p.id_bodega_surtidor=:wh");
+      params.wh = warehouseScope.selected;
+    } else if (warehouseScope.restrictedIds.length) {
+      const inClause = buildNamedInClause(warehouseScope.restrictedIds, "cntw");
+      where.push(`p.id_bodega_surtidor IN (${inClause.sql})`);
+      Object.assign(params, inClause.params);
+    }
+    where.push("p.estado IN ('PENDIENTE','APROBADO','PARCIAL')");
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(*) AS total FROM pedido_encabezado p WHERE ${where.join(" AND ")}`,
+      params
+    );
+    res.json({ count: Number(total || 0) });
+  } catch (e) {
+    return res.status(500).json({ error: String(e.message || e) });
+  }
 });
 
 app.get("/api/orders/:id/details", auth, async (req, res) => {
@@ -8730,10 +9368,18 @@ app.get("/api/orders/:id/details", auth, async (req, res) => {
             ss.stock  AS stock_solicitante
      FROM pedido_detalle d
      JOIN productos p ON p.id_producto=d.id_producto
-     LEFT JOIN v_stock_resumen s
-       ON s.id_bodega=:id_bodega_surtidor AND s.id_producto=d.id_producto
-     LEFT JOIN v_stock_resumen ss
-       ON ss.id_bodega=:id_bodega_solicita AND ss.id_producto=d.id_producto
+     LEFT JOIN (
+       SELECT id_bodega, id_producto, SUM(stock) AS stock
+       FROM v_stock_disponible
+       WHERE no_vencido = 1
+       GROUP BY id_bodega, id_producto
+     ) s ON s.id_bodega=:id_bodega_surtidor AND s.id_producto=d.id_producto
+     LEFT JOIN (
+       SELECT id_bodega, id_producto, SUM(stock) AS stock
+       FROM v_stock_disponible
+       WHERE no_vencido = 1
+       GROUP BY id_bodega, id_producto
+     ) ss ON ss.id_bodega=:id_bodega_solicita AND ss.id_producto=d.id_producto
      WHERE d.id_pedido=:id_pedido
      ORDER BY p.nombre_producto ASC`,
     {
@@ -8893,6 +9539,19 @@ app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "
         requiresJustificacion = true;
         skipped.push({ id_pedido_detalle, id_producto: line.id_producto, motivo: "SIN_STOCK_NO_VIGENTE" });
         continue;
+      }
+      // Reportar faltantes parciales: el stock alcanzó para parte del pedido.
+      const pickedQty = picks.reduce((a, b) => a + Number(b.qty || 0), 0);
+      if (pickedQty < requested) {
+        requiresJustificacion = true;
+        skipped.push({
+          id_pedido_detalle,
+          id_producto: line.id_producto,
+          motivo: "SIN_STOCK_PARCIAL",
+          solicitado: requested,
+          despachado: pickedQty,
+          faltante: requested - pickedQty,
+        });
       }
 
       anyFulfilled = true;
@@ -10820,6 +11479,7 @@ app.get("/api/ops/metrics", auth, requirePermission("action.manage_permissions",
         supervisor_15m: opsMetrics.pin_failures.supervisor.length,
       },
       sensitive_actions: opsMetrics.sensitive_actions,
+      stock_actual: opsMetrics.stock_actual,
       alerts,
     });
   } catch (e) {
@@ -12110,7 +12770,7 @@ app.get("/api/health", async (req, res) => {
     await pool.query("SELECT 1");
     const db_ping_ms = Date.now() - t0;
     const alerts = buildOperationalAlerts();
-    res.json({ ok: true, db_ping_ms, alerts });
+    res.json({ ok: true, db_ping_ms, alerts, stock_actual: opsMetrics.stock_actual });
   } catch (e) {
     return res.status(500).json({
       ok: false,
@@ -12159,5 +12819,15 @@ httpServer.listen(PORT, HOST, () => {
     }, DASHBOARD_PREWARM_MS);
   } else {
     console.log("Dashboard prewarm deshabilitado por DASHBOARD_PREWARM=0");
+  }
+  if (STOCK_HC_ENABLED) {
+    setTimeout(() => {
+      checkStockActualConsistency().catch((e) => console.error("Healthcheck stock inicial fallo:", e));
+    }, 15000);
+    setInterval(() => {
+      checkStockActualConsistency().catch((e) => console.error("Healthcheck stock programado fallo:", e));
+    }, STOCK_HC_INTERVAL_MS);
+  } else {
+    console.log("Healthcheck stock_actual deshabilitado por STOCK_HC_ENABLED=0");
   }
 });

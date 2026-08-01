@@ -256,35 +256,37 @@ export function MovimientosListTable({
       {/* Buscador + chip de anulados */}
       <div className="mov-list__toolbar">
         {showDateFilter && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+          <div className="mov-list__fecha-group">
             <input
               type="date"
+              className="input"
               value={dateFrom}
               onChange={(e) => {
                 setDateFrom(e.target.value);
                 if (e.target.value > dateTo) setDateTo(e.target.value);
               }}
               max={dateTo || undefined}
-              style={{ width: '120px', fontSize: '12px', padding: '3px 6px', borderRadius: '6px', border: '1px solid #444', background: '#2a2a2a', color: '#e0e0e0' }}
+              title="Desde"
             />
-            <span style={{ color: '#999', fontSize: '11px' }}>→</span>
+            <span className="mov-list__sep">→</span>
             <input
               type="date"
+              className="input"
               value={dateTo}
               onChange={(e) => {
                 setDateTo(e.target.value);
                 if (e.target.value < dateFrom) setDateFrom(e.target.value);
               }}
               min={dateFrom || undefined}
-              style={{ width: '120px', fontSize: '12px', padding: '3px 6px', borderRadius: '6px', border: '1px solid #444', background: '#2a2a2a', color: '#e0e0e0' }}
+              title="Hasta"
             />
             <button
               type="button"
+              className="mov-list__today-btn"
               onClick={() => { setDateFrom(todayStr); setDateTo(todayStr); }}
-              title="Hoy"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', padding: '2px 4px', borderRadius: '4px', color: '#666' }}
+              title="Filtrar solo por hoy"
             >
-              📅
+              Hoy
             </button>
           </div>
         )}
