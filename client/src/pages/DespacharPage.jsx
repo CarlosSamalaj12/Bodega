@@ -81,13 +81,18 @@ export default function DespacharPage() {
   const loadingRef = useRef(false);
 
   const todayStr = new Date().toISOString().slice(0, 10);
-  const [dateFrom, setDateFrom] = useState(todayStr);
-  const [dateTo, setDateTo] = useState(todayStr);
+  // Filtro de fecha OPCIONAL. Vacío = "todos los pendientes" (sin importar
+  // cuándo se crearon). El usuario puede acotar por rango si quiere.
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const loadPedidos = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await pedidosService.list({ scope: 'dispatch', from: dateFrom, to: dateTo });
+      const params = { scope: 'dispatch', limit: 500 };
+      if (dateFrom) params.from = dateFrom;
+      if (dateTo) params.to = dateTo;
+      const data = await pedidosService.list(params);
       setPedidos(Array.isArray(data) ? data : []);
     } catch (e) {
       toast.error(e?.response?.data?.error || 'No se pudieron cargar los pedidos');
@@ -131,25 +136,58 @@ export default function DespacharPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, pedidos]);
 
-  // Socket.IO: Actualización en tiempo real
+  // Ref para acceder a `visibles` desde el socket handler sin problemas
+  // de orden de declaración ni de stale closure. El handler del socket
+  // se suscribe una sola vez al montar, y esta ref siempre apunta al
+  // valor actual de `visibles`.
+  const visiblesRef = useRef([]);
+  // Lo actualizamos en cada render (después del useMemo de visibles).
+  // Verifico que se setee más abajo; por ahora declaro solo el ref.
+
+  // Socket.IO: Actualización en tiempo real.
+  // IMPORTANTE: NO recargamos la lista completa en cada evento. Eso causaba
+  // esperas de ~40s porque el listado pesa aunque el query esté optimizado
+  // (cada refresco fuerza re-render + re-cálculo de stocks). En lugar de eso:
+  //   - Si el pedido cambió a un estado "abierto" (PENDIENTE/PARCIAL/APROBADO)
+  //     y NO está visible en la lista, lo agregamos optimistamente.
+  //   - Si cambió a un estado "cerrado" (COMPLETADO/CANCELADO) y está visible,
+  //     lo removemos optimistamente.
+  //   - Solo si el usuario hace clic en "Refrescar" o después del propio
+  //     despacho (handleDone) se recarga la lista completa.
   useEffect(() => {
     const socket = getSocket();
 
     const handler = (payload) => {
       const idPedido = Number(payload?.id_pedido || 0);
       const status = String(payload?.status || '').toUpperCase();
+      if (!idPedido || !status) return;
 
       setLastUpdate(new Date());
 
-      // Si es un pedido que nos interesa, refrescamos
-      if (['PENDIENTE', 'APROBADO', 'PARCIAL', 'COMPLETADO', 'COMPLETADO_JUSTIFICADO', 'CANCELADO'].includes(status)) {
-        safeLoadPedidos();
+      const visibleIds = new Set((visiblesRef.current || []).map((p) => Number(p.id_pedido)));
+      const isVisible = visibleIds.has(idPedido);
+      const isOpenState = ['PENDIENTE', 'APROBADO', 'PARCIAL'].includes(status);
+      const isClosedState = ['COMPLETADO', 'COMPLETADO_JUSTIFICADO', 'CANCELADO'].includes(status);
 
-        // Si tenemos el modal abierto con este pedido, refrescamos detalles también
-        if (activeId === idPedido && status && !['PENDIENTE', 'APROBADO', 'PARCIAL'].includes(status)) {
-          handleClose();
-          toast.info(`Pedido #${idPedido} actualizado a ${status}`);
-        }
+      if (isOpenState && !isVisible) {
+        // Hay un pedido nuevo/abierto que no estaba visible → refrescar para traerlo
+        safeLoadPedidos();
+      } else if (isClosedState && isVisible) {
+        // El pedido se cerró/canceló → removerlo de la lista local sin recargar
+        setPedidos((prev) => prev.filter((p) => Number(p.id_pedido) !== idPedido));
+        toast.info(`Pedido #${idPedido} ${status === 'CANCELADO' ? 'cancelado' : 'completado'}`);
+      } else if (isOpenState && isVisible) {
+        // Sigue abierto pero cambió (ej. PARCIAL → PENDIENTE). Actualizar local
+        setPedidos((prev) =>
+          prev.map((p) =>
+            Number(p.id_pedido) === idPedido ? { ...p, estado: status } : p
+          )
+        );
+      }
+
+      // Si el modal abierto es este pedido y se cerró, cerrarlo
+      if (activeId === idPedido && isClosedState) {
+        handleClose();
       }
     };
 
@@ -189,17 +227,33 @@ export default function DespacharPage() {
   const handleDone = async () => {
     const id = activeId;
     handleClose();
-    loadPedidos();
-    // Si la bodega exige confirmacion de recepcion, ofrecerla de inmediato:
-    // el solicitante ve el preview de lo despachado y captura su PIN.
     if (!id) return;
+
+    // Actualización optimista LOCAL: marcamos el pedido como "completado" o
+    // "parcial" según lo que el backend nos indique. Si quedó completado,
+    // lo removemos de la lista para limpiar la vista. Esto evita el
+    // loadPedidos() completo que tardaba ~40s.
     try {
       const det = await pedidosService.getDetails(id);
+      const newStatus = String(det?.estado || '').toUpperCase();
+      const isClosed = ['COMPLETADO', 'COMPLETADO_JUSTIFICADO', 'CANCELADO'].includes(newStatus);
+      if (isClosed) {
+        setPedidos((prev) => prev.filter((p) => Number(p.id_pedido) !== id));
+      } else {
+        setPedidos((prev) =>
+          prev.map((p) =>
+            Number(p.id_pedido) === id ? { ...p, estado: newStatus, ...(det?.total_lineas ? { total_lineas: det.total_lineas } : {}) } : p
+          )
+        );
+      }
+      // Si la bodega exige confirmación, ofrecerla de inmediato.
       if (needsConfirmation(det)) {
         setConfirmPedido({ ...det, id_pedido: id });
       }
     } catch {
-      /* si falla la carga, la confirmacion queda disponible desde la lista */
+      // Si falla la carga optimista, fallback: recargar la lista completa.
+      // (Mejor mostrar datos viejos que quedarse colgado)
+      safeLoadPedidos();
     }
   };
 
@@ -247,6 +301,11 @@ export default function DespacharPage() {
 
     return filtered;
   }, [pedidos, statusFilter, debouncedSearch]);
+
+  // Sincronizar el ref con el valor actual de `visibles` para que el
+  // handler del socket (suscrito una sola vez al montar) siempre vea
+  // el valor más reciente sin re-suscribirse.
+  visiblesRef.current = visibles;
 
   const handlePrintPos = useCallback(async (p) => {
     try {
@@ -489,10 +548,11 @@ export default function DespacharPage() {
                 value={dateFrom}
                 onChange={(e) => {
                   setDateFrom(e.target.value);
-                  if (e.target.value > dateTo) setDateTo(e.target.value);
+                  if (e.target.value && dateTo && e.target.value > dateTo) setDateTo(e.target.value);
                 }}
                 max={dateTo || undefined}
-                title="Desde"
+                placeholder="Desde"
+                title="Desde (opcional — dejar vacío para ver todos)"
               />
               <span style={{ color: '#999', fontSize: '11px' }}>→</span>
               <input
@@ -501,19 +561,31 @@ export default function DespacharPage() {
                 value={dateTo}
                 onChange={(e) => {
                   setDateTo(e.target.value);
-                  if (e.target.value < dateFrom) setDateFrom(e.target.value);
+                  if (e.target.value && dateFrom && e.target.value < dateFrom) setDateFrom(e.target.value);
                 }}
                 min={dateFrom || undefined}
-                title="Hasta"
+                placeholder="Hasta"
+                title="Hasta (opcional — dejar vacío para ver todos)"
               />
               <button
                 type="button"
                 className="despachar-page__today-btn"
                 onClick={() => { setDateFrom(todayStr); setDateTo(todayStr); }}
-                title="Hoy"
+                title="Filtrar solo por hoy"
               >
                 Hoy
               </button>
+              {(dateFrom || dateTo) && (
+                <button
+                  type="button"
+                  className="despachar-page__today-btn"
+                  onClick={() => { setDateFrom(''); setDateTo(''); }}
+                  title="Quitar filtro de fecha — ver todos los pendientes"
+                  style={{ background: '#fff5f5', color: '#dc3545', borderColor: '#dc3545' }}
+                >
+                  ✕ Todos
+                </button>
+              )}
             </div>
             <SearchInput
               value={search}

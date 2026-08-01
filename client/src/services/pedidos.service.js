@@ -7,10 +7,11 @@ export const pedidosService = {
    * @param status filtrar por estado
    * @param from fecha desde (YYYY-MM-DD)
    * @param to fecha hasta (YYYY-MM-DD)
+   * @param limit máximo de filas (por defecto el servidor usa 500)
    */
-  async list({ scope, status, from, to } = {}) {
+  async list({ scope, status, from, to, limit } = {}) {
     const { data } = await api.get('/api/orders', {
-      params: { scope, status, from, to },
+      params: { scope, status, from, to, limit },
     });
     return data;
   },

@@ -394,6 +394,52 @@ async function ensureRecepcionConfirmacionSchema() {
   }
 }
 
+async function ensurePerformanceIndexes() {
+  // Índices compuestos para las consultas de listados/reportes más usadas.
+  // Cada uno se verifica contra information_schema y se crea solo si falta,
+  // para que sea idempotente entre reinicios.
+  const wanted = [
+    // Pedidos por despachar: p.id_bodega_surtidor=:wh ORDER BY p.creado_en DESC
+    {
+      name: "ix_pe_bodsurt_creado",
+      sql: "ALTER TABLE pedido_encabezado ADD INDEX ix_pe_bodsurt_creado (id_bodega_surtidor, creado_en)",
+    },
+    // Pedidos "míos": p.id_usuario_solicita=:uid ORDER BY p.creado_en DESC
+    {
+      name: "ix_pe_solicita_creado",
+      sql: "ALTER TABLE pedido_encabezado ADD INDEX ix_pe_solicita_creado (id_usuario_solicita, creado_en)",
+    },
+    // Reporte entradas: bodega destino + rango de fecha + tipo
+    {
+      name: "ix_me_destino_tipo_creado",
+      sql: "ALTER TABLE movimiento_encabezado ADD INDEX ix_me_destino_tipo_creado (id_bodega_destino, tipo_movimiento, creado_en)",
+    },
+    // Reporte salidas: bodega origen + rango de fecha + tipo
+    {
+      name: "ix_me_origen_tipo_creado",
+      sql: "ALTER TABLE movimiento_encabezado ADD INDEX ix_me_origen_tipo_creado (id_bodega_origen, tipo_movimiento, creado_en)",
+    },
+  ];
+  const [existing] = await pool.query(
+    `SELECT INDEX_NAME
+     FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA=DATABASE()
+       AND INDEX_NAME IN ('ix_pe_bodsurt_creado','ix_pe_solicita_creado','ix_me_destino_tipo_creado','ix_me_origen_tipo_creado')
+     GROUP BY INDEX_NAME`
+  );
+  const existingSet = new Set((existing || []).map((r) => String(r?.INDEX_NAME || "")));
+  for (const idx of wanted) {
+    if (!existingSet.has(idx.name)) {
+      try {
+        await pool.query(idx.sql);
+        console.log(`Índice creado: ${idx.name}`);
+      } catch (e) {
+        console.error(`No se pudo crear índice ${idx.name}:`, String(e?.message || e));
+      }
+    }
+  }
+}
+
 async function ensureMovimientoDetallePrecioSalidaColumn() {
   const [rows] = await pool.query(
     `SELECT COUNT(*) AS c
@@ -1727,6 +1773,9 @@ ensureOrderDispatchColumns().catch((e) => {
 });
 ensureRecepcionConfirmacionSchema().catch((e) => {
   console.error("No se pudo crear esquema de confirmacion de recepcion:", e);
+});
+ensurePerformanceIndexes().catch((e) => {
+  console.error("No se pudieron crear índices de rendimiento:", e);
 });
 
 async function ensureConteoCiclicoTables() {
@@ -7485,6 +7534,114 @@ app.get("/api/dashboard/detalle", auth, async (req, res) => {
   }
 });
 
+/* =========================
+   DETALLE DE UN MOVIMIENTO (ENTRADA/SALIDA) — una sola consulta indexada
+   ========================= */
+app.get("/api/movimientos/:id", auth, async (req, res) => {
+  const idMovimiento = Number(req.params.id || 0);
+  if (!idMovimiento) return res.status(400).json({ error: "Movimiento invalido" });
+
+  const scope = await resolveStockScope(req.user);
+  if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
+  if (!scope.can_view_existencias) return res.status(403).json({ error: "Sin permisos" });
+
+  const [[head]] = await pool.query(
+    `SELECT me.id_movimiento,
+            me.tipo_movimiento,
+            me.estado,
+            me.anulado_por,
+            me.anulado_en,
+            u_anul.nombre_completo AS anulado_por_usuario,
+            me.creado_en,
+            me.no_documento,
+            me.observaciones,
+            bo.id_bodega AS id_bodega_origen,
+            bo.nombre_bodega AS nombre_bodega_origen,
+            bd.id_bodega AS id_bodega_destino,
+            bd.nombre_bodega AS nombre_bodega_destino,
+            -- Para salidas vinculadas a un pedido, la bodega destino real vive
+            -- en el pedido (bodega solicitante), no en el movimiento.
+            bped.id_bodega AS id_bodega_destino_pedido,
+            bped.nombre_bodega AS nombre_bodega_destino_pedido,
+            m.id_motivo,
+            m.nombre_motivo,
+            u.nombre_completo AS usuario_creador
+     FROM movimiento_encabezado me
+     LEFT JOIN bodegas bo ON bo.id_bodega=me.id_bodega_origen
+     LEFT JOIN bodegas bd ON bd.id_bodega=me.id_bodega_destino
+     LEFT JOIN (SELECT pmv.id_movimiento, MIN(pd.id_pedido) AS id_pedido
+                FROM pedido_movimiento_vinculo pmv
+                JOIN pedido_detalle pd ON pd.id_pedido_detalle=pmv.id_pedido_detalle
+                WHERE pmv.id_movimiento=:id_movimiento
+                GROUP BY pmv.id_movimiento
+                LIMIT 1) pm ON pm.id_movimiento=me.id_movimiento
+     LEFT JOIN pedido_encabezado pe ON pe.id_pedido=pm.id_pedido
+     LEFT JOIN bodegas bped ON bped.id_bodega=pe.id_bodega_solicita
+     LEFT JOIN motivos_movimiento m ON m.id_motivo=me.id_motivo
+     LEFT JOIN usuarios u ON u.id_usuario=me.creado_por
+     LEFT JOIN usuarios u_anul ON u_anul.id_usuario=me.anulado_por
+     WHERE me.id_movimiento=:id_movimiento
+     LIMIT 1`,
+    { id_movimiento: idMovimiento }
+  );
+  if (!head) return res.status(404).json({ error: "Movimiento no existe" });
+
+  // Acceso: el movimiento pertenece a las bodegas origen/destino. Para salidas
+  // vinculadas a un pedido, la bodega solicitante (destino real) también cuenta.
+  const movWhs = [
+    Number(head.id_bodega_origen || 0),
+    Number(head.id_bodega_destino || 0),
+    Number(head.id_bodega_destino_pedido || 0),
+  ].filter((x) => x > 0);
+  if (scope.has_warehouse_restrictions) {
+    const allowed = normalizeWarehouseIdList(scope.allowed_warehouse_ids);
+    if (!movWhs.some((id) => allowed.includes(id))) {
+      return res.status(403).json({ error: "No tienes acceso a este movimiento" });
+    }
+  } else if (!scope.can_all_bodegas && !movWhs.includes(Number(scope.id_bodega || 0))) {
+    return res.status(403).json({ error: "No tienes acceso a este movimiento" });
+  }
+
+  const [lines] = await pool.query(
+    `SELECT md.id_detalle,
+            md.id_producto,
+            p.nombre_producto,
+            p.sku,
+            c.nombre_categoria,
+            sc.nombre_subcategoria,
+            md.lote,
+            md.fecha_vencimiento,
+            md.cantidad,
+            md.costo_unitario,
+            md.precio_salida,
+            (md.cantidad * COALESCE(md.precio_salida, md.costo_unitario)) AS total_linea
+     FROM movimiento_detalle md
+     JOIN productos p ON p.id_producto=md.id_producto
+     LEFT JOIN categorias c ON c.id_categoria=p.id_categoria
+     LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
+     WHERE md.id_movimiento=:id_movimiento
+     ORDER BY md.id_detalle ASC`,
+    { id_movimiento: idMovimiento }
+  );
+
+  res.json({
+    id_movimiento: head.id_movimiento,
+    fecha: head.creado_en,
+    tipo: head.tipo_movimiento,
+    no_documento: head.no_documento,
+    observaciones: head.observaciones,
+    estado: head.estado || null,
+    anulado_por: head.anulado_por || null,
+    anulado_en: head.anulado_en || null,
+    anulado_por_usuario: head.anulado_por_usuario || null,
+    nombre_motivo: head.nombre_motivo,
+    id_motivo: head.id_motivo,
+    usuario_creador: head.usuario_creador,
+    bodega: head.nombre_bodega_destino || head.nombre_bodega_destino_pedido || head.nombre_bodega_origen || null,
+    lines: lines || [],
+  });
+});
+
 app.get("/api/reportes/entradas", auth, async (req, res) => {
   try {
     const scope = await resolveStockScope(req.user);
@@ -7509,6 +7666,10 @@ app.get("/api/reportes/entradas", auth, async (req, res) => {
     const documento = documentoRaw ? `%${documentoRaw}%` : null;
     const from_date = String(req.query.from || "").trim() || null;
     const to_date = String(req.query.to || "").trim() || null;
+    // Rango sargable sobre la columna DATETIME (NO DATE(col)) para que MySQL
+    // pueda usar el índice ix_me_creado. DATE(col) impedía el uso del índice.
+    const from_dt = from_date ? `${from_date} 00:00:00` : null;
+    const to_dt = to_date ? `${to_date} 23:59:59` : null;
     const id_categoria = Number(req.query.categoria || 0) || null;
     const id_subcategoria = Number(req.query.subcategoria || 0) || null;
     const motivoRaw = String(req.query.motivo || "").trim().toUpperCase();
@@ -7518,55 +7679,77 @@ app.get("/api/reportes/entradas", auth, async (req, res) => {
     const page = Math.max(1, Number(req.query.page || 1));
     const offset = (page - 1) * limit;
 
-    const whereClauses = [
+    // Solo se agregan los JOINs a detalle/producto si el filtro los necesita.
+    // El caso común (listado por fecha) se resuelve SOLO contra el encabezado,
+    // que está indexado por creado_en → milisegundos en vez de escanear todo.
+    const needsProductJoin = Boolean(
+      id_producto || qf.hasTokens || lote || id_categoria || id_subcategoria
+    );
+
+    const headerClauses = [
       "me.tipo_movimiento IN ('ENTRADA', 'TRANSFERENCIA')",
       "me.estado<>'ANULADO'",
       accessFilter ? `me.id_bodega_destino IN (${accessFilter.sql})` : "1=1",
       ":id_bodega IS NULL OR me.id_bodega_destino=:id_bodega",
-      id_producto ? "md.id_producto=:id_producto" : qf.clause,
-      ":lote IS NULL OR md.lote LIKE :lote",
       ":documento IS NULL OR me.no_documento LIKE :documento",
-      ":from_date IS NULL OR DATE(me.creado_en) >= :from_date",
-      ":to_date IS NULL OR DATE(me.creado_en) <= :to_date",
-      ":id_categoria IS NULL OR p.id_categoria=:id_categoria",
-      ":id_subcategoria IS NULL OR p.id_subcategoria=:id_subcategoria",
+      ":from_dt IS NULL OR me.creado_en >= :from_dt",
+      ":to_dt IS NULL OR me.creado_en <= :to_dt",
       ":tipo_movimiento IS NULL OR me.tipo_movimiento=:tipo_movimiento",
       ":id_motivo IS NULL OR me.id_motivo=:id_motivo",
     ];
-    const whereSQL = whereClauses.join("\n         AND ");
+    const productClauses = [];
+    if (needsProductJoin) {
+      if (id_producto) productClauses.push("md.id_producto=:id_producto");
+      else if (qf.clause && qf.clause !== "1=1") productClauses.push(qf.clause);
+      if (lote) productClauses.push("md.lote LIKE :lote");
+      if (id_categoria) productClauses.push("p.id_categoria=:id_categoria");
+      if (id_subcategoria) productClauses.push("p.id_subcategoria=:id_subcategoria");
+    }
+    const whereSQL = [...headerClauses, ...productClauses].join("\n         AND ");
 
     const params = {
-      id_bodega, id_producto, lote, documento, from_date, to_date,
-      id_categoria, id_subcategoria, tipo_movimiento, id_motivo,
+      id_bodega, documento, from_dt, to_dt,
+      tipo_movimiento, id_motivo,
       ...(accessFilter?.params || {}),
-      ...(id_producto ? {} : qf.params),
+      ...(needsProductJoin
+        ? { id_producto, lote, id_categoria, id_subcategoria, ...(id_producto ? {} : qf.params) }
+        : {}),
     };
+
+    const productJoins = needsProductJoin
+      ? `JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
+         JOIN productos p ON p.id_producto=md.id_producto`
+      : "";
 
     // Count distinct movements
     const [[{ total }]] = await pool.query(
-      `SELECT COUNT(DISTINCT me.id_movimiento) AS total
-       FROM movimiento_encabezado me
-       JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
-       JOIN productos p ON p.id_producto=md.id_producto
-       LEFT JOIN categorias c ON c.id_categoria=p.id_categoria
-       LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
-       WHERE ${whereSQL}`,
+      needsProductJoin
+        ? `SELECT COUNT(DISTINCT me.id_movimiento) AS total
+           FROM movimiento_encabezado me
+           ${productJoins}
+           WHERE ${whereSQL}`
+        : `SELECT COUNT(*) AS total
+           FROM movimiento_encabezado me
+           WHERE ${whereSQL}`,
       params
     );
     const totalMovements = Number(total || 0);
 
-    // Get paginated movement headers
+    // Get paginated movement headers (sin GROUP BY si no hay joins)
     const [movements] = await pool.query(
-      `SELECT me.id_movimiento
-       FROM movimiento_encabezado me
-       JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
-       JOIN productos p ON p.id_producto=md.id_producto
-       LEFT JOIN categorias c ON c.id_categoria=p.id_categoria
-       LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
-       WHERE ${whereSQL}
-       GROUP BY me.id_movimiento
-       ORDER BY me.creado_en DESC, me.id_movimiento DESC
-       LIMIT ${limit} OFFSET ${offset}`,
+      needsProductJoin
+        ? `SELECT me.id_movimiento
+           FROM movimiento_encabezado me
+           ${productJoins}
+           WHERE ${whereSQL}
+           GROUP BY me.id_movimiento
+           ORDER BY me.creado_en DESC, me.id_movimiento DESC
+           LIMIT ${limit} OFFSET ${offset}`
+        : `SELECT me.id_movimiento
+           FROM movimiento_encabezado me
+           WHERE ${whereSQL}
+           ORDER BY me.creado_en DESC, me.id_movimiento DESC
+           LIMIT ${limit} OFFSET ${offset}`,
       params
     );
 
@@ -7738,6 +7921,9 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
     const documento = documentoRaw ? `%${documentoRaw}%` : null;
     const from_date = String(req.query.from || "").trim() || null;
     const to_date = String(req.query.to || "").trim() || null;
+    // Rango sargable sobre la columna DATETIME (NO DATE(col)) para usar el índice.
+    const from_dt = from_date ? `${from_date} 00:00:00` : null;
+    const to_dt = to_date ? `${to_date} 23:59:59` : null;
     const id_categoria = Number(req.query.categoria || 0) || null;
     const id_subcategoria = Number(req.query.subcategoria || 0) || null;
     const id_bodega_destino = Number(req.query.warehouse_destino || 0) || null;
@@ -7748,71 +7934,97 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
     const page = Math.max(1, Number(req.query.page || 1));
     const offset = (page - 1) * limit;
 
-    const whereClauses = [
+    // Solo se agregan los JOINs que el filtro realmente necesita:
+    //  - detalle/producto (md/p): solo si se filtra por producto/lote/categoría/subcategoría
+    //  - vínculo con pedido (pm/pe): solo si se filtra por bodega destino.
+    // El caso común (listado por fecha) se resuelve SOLO contra el encabezado,
+    // que está indexado por creado_en → milisegundos en vez de escanear todo.
+    const needsProductJoin = Boolean(
+      id_producto || qf.hasTokens || lote || id_categoria || id_subcategoria
+    );
+    const needsPedidoJoin = Boolean(id_bodega_destino);
+
+    const headerClauses = [
       "me.tipo_movimiento IN ('SALIDA', 'TRANSFERENCIA')",
       "me.estado<>'ANULADO'",
       accessFilter ? `me.id_bodega_origen IN (${accessFilter.sql})` : "1=1",
       ":id_bodega IS NULL OR me.id_bodega_origen=:id_bodega",
-      id_producto ? "md.id_producto=:id_producto" : qf.clause,
-      ":lote IS NULL OR md.lote LIKE :lote",
       ":documento IS NULL OR me.no_documento LIKE :documento",
-      ":from_date IS NULL OR DATE(me.creado_en) >= :from_date",
-      ":to_date IS NULL OR DATE(me.creado_en) <= :to_date",
-      ":id_categoria IS NULL OR p.id_categoria=:id_categoria",
-      ":id_subcategoria IS NULL OR p.id_subcategoria=:id_subcategoria",
-      ":id_bodega_destino IS NULL OR COALESCE(me.id_bodega_destino, pe.id_bodega_solicita)=:id_bodega_destino",
+      ":from_dt IS NULL OR me.creado_en >= :from_dt",
+      ":to_dt IS NULL OR me.creado_en <= :to_dt",
       ":tipo_movimiento IS NULL OR me.tipo_movimiento=:tipo_movimiento",
       ":id_motivo IS NULL OR me.id_motivo=:id_motivo",
     ];
-    const whereSQL = whereClauses.join("\n         AND ");
+    if (needsPedidoJoin) {
+      headerClauses.push(
+        ":id_bodega_destino IS NULL OR COALESCE(me.id_bodega_destino, pe.id_bodega_solicita)=:id_bodega_destino"
+      );
+    }
+    const productClauses = [];
+    if (needsProductJoin) {
+      if (id_producto) productClauses.push("md.id_producto=:id_producto");
+      else if (qf.clause && qf.clause !== "1=1") productClauses.push(qf.clause);
+      if (lote) productClauses.push("md.lote LIKE :lote");
+      if (id_categoria) productClauses.push("p.id_categoria=:id_categoria");
+      if (id_subcategoria) productClauses.push("p.id_subcategoria=:id_subcategoria");
+    }
+    const whereSQL = [...headerClauses, ...productClauses].join("\n         AND ");
 
     const params = {
-      id_bodega, id_producto, lote, documento, from_date, to_date,
-      id_categoria, id_subcategoria, id_bodega_destino,
+      id_bodega, documento, from_dt, to_dt,
       tipo_movimiento, id_motivo,
       ...(accessFilter?.params || {}),
-      ...(id_producto ? {} : qf.params),
+      ...(needsPedidoJoin ? { id_bodega_destino } : {}),
+      ...(needsProductJoin
+        ? { id_producto, lote, id_categoria, id_subcategoria, ...(id_producto ? {} : qf.params) }
+        : {}),
     };
+
+    const productJoins = needsProductJoin
+      ? `JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
+         JOIN productos p ON p.id_producto=md.id_producto`
+      : "";
+    const pedidoJoins = needsPedidoJoin
+      ? `LEFT JOIN (
+           SELECT pmv.id_movimiento, MIN(pd.id_pedido) AS id_pedido
+           FROM pedido_movimiento_vinculo pmv
+           JOIN pedido_detalle pd ON pd.id_pedido_detalle=pmv.id_pedido_detalle
+           GROUP BY pmv.id_movimiento
+         ) pm ON pm.id_movimiento=me.id_movimiento
+         LEFT JOIN pedido_encabezado pe ON pe.id_pedido=pm.id_pedido`
+      : "";
 
     // Count distinct movements
     const [[{ total }]] = await pool.query(
-      `SELECT COUNT(DISTINCT me.id_movimiento) AS total
-       FROM movimiento_encabezado me
-       JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
-       LEFT JOIN bodegas bo ON bo.id_bodega=me.id_bodega_origen
-       LEFT JOIN bodegas bd ON bd.id_bodega=me.id_bodega_destino
-       LEFT JOIN (
-         SELECT pmv.id_movimiento, MIN(pd.id_pedido) AS id_pedido
-         FROM pedido_movimiento_vinculo pmv
-         JOIN pedido_detalle pd ON pd.id_pedido_detalle=pmv.id_pedido_detalle
-         GROUP BY pmv.id_movimiento
-       ) pm ON pm.id_movimiento=me.id_movimiento
-       LEFT JOIN pedido_encabezado pe ON pe.id_pedido=pm.id_pedido
-       LEFT JOIN bodegas bped ON bped.id_bodega=pe.id_bodega_solicita
-       LEFT JOIN usuarios usol ON usol.id_usuario=pe.id_usuario_solicita
-       JOIN productos p ON p.id_producto=md.id_producto
-       LEFT JOIN categorias c ON c.id_categoria=p.id_categoria
-       LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
-       LEFT JOIN motivos_movimiento m ON m.id_motivo=me.id_motivo
-       LEFT JOIN usuarios u ON u.id_usuario=me.creado_por
-       WHERE ${whereSQL}`,
+      needsProductJoin || needsPedidoJoin
+        ? `SELECT COUNT(DISTINCT me.id_movimiento) AS total
+           FROM movimiento_encabezado me
+           ${productJoins}
+           ${pedidoJoins}
+           WHERE ${whereSQL}`
+        : `SELECT COUNT(*) AS total
+           FROM movimiento_encabezado me
+           WHERE ${whereSQL}`,
       params
     );
     const totalMovements = Number(total || 0);
 
-    // Get paginated distinct movement IDs
+    // Get paginated distinct movement IDs (sin GROUP BY si no hay joins)
     const [movements] = await pool.query(
-      `SELECT me.id_movimiento
-       FROM movimiento_encabezado me
-       JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
-       JOIN productos p ON p.id_producto=md.id_producto
-       LEFT JOIN (SELECT pmv.id_movimiento, MIN(pd.id_pedido) AS id_pedido FROM pedido_movimiento_vinculo pmv JOIN pedido_detalle pd ON pd.id_pedido_detalle=pmv.id_pedido_detalle GROUP BY pmv.id_movimiento) pm ON pm.id_movimiento=me.id_movimiento
-       LEFT JOIN pedido_encabezado pe ON pe.id_pedido=pm.id_pedido
-       LEFT JOIN bodegas bped ON bped.id_bodega=pe.id_bodega_solicita
-       WHERE ${whereSQL}
-       GROUP BY me.id_movimiento
-       ORDER BY me.creado_en DESC, me.id_movimiento DESC
-       LIMIT ${limit} OFFSET ${offset}`,
+      needsProductJoin || needsPedidoJoin
+        ? `SELECT me.id_movimiento
+           FROM movimiento_encabezado me
+           ${productJoins}
+           ${pedidoJoins}
+           WHERE ${whereSQL}
+           GROUP BY me.id_movimiento
+           ORDER BY me.creado_en DESC, me.id_movimiento DESC
+           LIMIT ${limit} OFFSET ${offset}`
+        : `SELECT me.id_movimiento
+           FROM movimiento_encabezado me
+           WHERE ${whereSQL}
+           ORDER BY me.creado_en DESC, me.id_movimiento DESC
+           LIMIT ${limit} OFFSET ${offset}`,
       params
     );
 
@@ -7889,7 +8101,7 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
          JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento
          LEFT JOIN bodegas bo ON bo.id_bodega=me.id_bodega_origen
          LEFT JOIN bodegas bd ON bd.id_bodega=me.id_bodega_destino
-         LEFT JOIN (SELECT pmv.id_movimiento, MIN(pd.id_pedido) AS id_pedido FROM pedido_movimiento_vinculo pmv JOIN pedido_detalle pd ON pd.id_pedido_detalle=pmv.id_pedido_detalle GROUP BY pmv.id_movimiento) pm ON pm.id_movimiento=me.id_movimiento
+         LEFT JOIN (SELECT pmv.id_movimiento, MIN(pd.id_pedido) AS id_pedido FROM pedido_movimiento_vinculo pmv JOIN pedido_detalle pd ON pd.id_pedido_detalle=pmv.id_pedido_detalle WHERE pmv.id_movimiento IN (${inClause.sql}) GROUP BY pmv.id_movimiento) pm ON pm.id_movimiento=me.id_movimiento
          LEFT JOIN pedido_encabezado pe ON pe.id_pedido=pm.id_pedido
          LEFT JOIN bodegas bped ON bped.id_bodega=pe.id_bodega_solicita
          LEFT JOIN usuarios usol ON usol.id_usuario=pe.id_usuario_solicita
@@ -8373,13 +8585,16 @@ app.get("/api/orders", auth, async (req, res) => {
     where.push("p.estado=:status");
     params.status = status;
   }
+  // Rango sargable sobre la columna DATETIME (NO DATE(col)) para que MySQL
+  // pueda usar el índice compuesto (id_bodega_surtidor, creado_en). DATE(col)
+  // impedía el rango por fecha sobre la segunda columna del índice.
   if (fromDate) {
-    where.push("DATE(p.creado_en) >= :from_date");
-    params.from_date = fromDate;
+    where.push("p.creado_en >= :from_dt");
+    params.from_dt = `${fromDate} 00:00:00`;
   }
   if (toDate) {
-    where.push("DATE(p.creado_en) <= :to_date");
-    params.to_date = toDate;
+    where.push("p.creado_en <= :to_dt");
+    params.to_dt = `${toDate} 23:59:59`;
   }
   if (scopeParam === "dispatch") {
     const warehouseScope = getScopedWarehouseFilter(stockScope, whParam);
@@ -8400,6 +8615,13 @@ app.get("/api/orders", auth, async (req, res) => {
     params.uid = req.user.id_user;
   }
   const whereSql = where.length ? "WHERE " + where.join(" AND ") : "";
+  // Límite de seguridad: evita respuestas gigantes cuando no hay filtros.
+  // El cliente puede pedir más con ?limit=N.
+  const limitParam = Math.max(1, Math.min(2000, Number(req.query.limit || 500)));
+  // NOTA de rendimiento: el stock (mi_stock_total / su_stock_total) se calcula
+  // DESPUÉS en una sola consulta agregada para los pedidos devueltos. Antes se
+  // usaban dos subconsultas escalares POR FILA que materializaban la vista
+  // v_stock_resumen (agrega TODO el kardex) N veces → ~1s con 500 pedidos.
   const [rows] = await pool.query(
     `
     SELECT p.*,
@@ -8408,25 +8630,9 @@ app.get("/api/orders", auth, async (req, res) => {
            bd.nombre_bodega AS from_warehouse,
            bd.nombre_bodega AS nombre_bodega_surtidor,
            u.nombre_completo AS requester_name,
-           -- Subqueries escalares: SÍ pueden referenciar p (el padre).
-           -- Cada una solo procesa las filas de ESTE pedido, no toda la tabla.
-           -- Mucho más rápido que los LEFT JOINs a subqueries con su propio
-           -- scan de pedido_encabezado + pedido_detalle.
            (SELECT COUNT(*) FROM pedido_detalle pd_tl WHERE pd_tl.id_pedido = p.id_pedido) AS total_lineas,
            (SELECT COALESCE(SUM(GREATEST(cantidad_solicitada - cantidad_surtida, 0)), 0)
             FROM pedido_detalle WHERE id_pedido = p.id_pedido) AS cantidad_pendiente_total,
-           (SELECT COALESCE(SUM(vs.stock), 0)
-            FROM pedido_detalle pd
-            JOIN v_stock_resumen vs
-              ON vs.id_producto = pd.id_producto
-             AND vs.id_bodega = p.id_bodega_surtidor
-            WHERE pd.id_pedido = p.id_pedido) AS mi_stock_total,
-           (SELECT COALESCE(SUM(vs.stock), 0)
-            FROM pedido_detalle pd
-            JOIN v_stock_resumen vs
-              ON vs.id_producto = pd.id_producto
-             AND vs.id_bodega = p.id_bodega_solicita
-            WHERE pd.id_pedido = p.id_pedido) AS su_stock_total,
            CASE
              WHEN bsol.tipo_bodega='RECEPTORA' OR cb.modo_despacho_auto='TRANSFERENCIA' THEN 'TRANSFERENCIA'
              ELSE 'SALIDA'
@@ -8439,9 +8645,42 @@ app.get("/api/orders", auth, async (req, res) => {
     JOIN usuarios u ON u.id_usuario=p.id_usuario_solicita
     ${whereSql}
     ORDER BY p.creado_en DESC
+    LIMIT ${limitParam}
     `,
     params
   );
+
+  // Stock por pedido en una sola pasada: suma el stock actual de v_stock_resumen
+  // para cada producto del pedido, agrupado por (pedido, bodega). Luego en JS se
+  // asigna mi_stock_total (bodega surtidora) y su_stock_total (bodega solicitante).
+  if (rows.length > 0) {
+    const ids = rows.map((r) => Number(r.id_pedido || 0));
+    const inClause = buildNamedInClause(ids, "ordstk");
+    const [stockRows] = await pool.query(
+      `SELECT pd.id_pedido,
+              vs.id_bodega,
+              SUM(vs.stock) AS stock
+       FROM pedido_detalle pd
+       JOIN v_stock_resumen vs
+         ON vs.id_producto = pd.id_producto
+       WHERE pd.id_pedido IN (${inClause.sql})
+       GROUP BY pd.id_pedido, vs.id_bodega`,
+      inClause.params
+    );
+    const stockByPedido = new Map(); // pedidoId -> Map(bodegaId -> stock)
+    for (const s of stockRows || []) {
+      const pid = Number(s.id_pedido || 0);
+      if (!stockByPedido.has(pid)) stockByPedido.set(pid, new Map());
+      stockByPedido.get(pid).set(Number(s.id_bodega || 0), Number(s.stock || 0));
+    }
+    for (const r of rows) {
+      const pid = Number(r.id_pedido || 0);
+      const stocks = stockByPedido.get(pid);
+      r.mi_stock_total = stocks ? (stocks.get(Number(r.id_bodega_surtidor || 0)) || 0) : 0;
+      r.su_stock_total = stocks ? (stocks.get(Number(r.id_bodega_solicita || 0)) || 0) : 0;
+    }
+  }
+
   res.json(rows);
 });
 

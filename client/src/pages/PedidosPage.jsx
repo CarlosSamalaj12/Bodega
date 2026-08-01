@@ -90,7 +90,7 @@ export default function PedidosPage() {
     setLoadingPedidos(true);
     const fetchId = ++fetchIdRef.current;
     try {
-      const data = await pedidosService.list({ from: dateFrom, to: dateTo });
+      const data = await pedidosService.list({ from: dateFrom, to: dateTo, limit: 500 });
       if (fetchId !== fetchIdRef.current) return; // descartamos respuesta de fetch anterior
       setPedidos(Array.isArray(data) ? data : []);
     } catch (e) {

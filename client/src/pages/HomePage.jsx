@@ -43,7 +43,7 @@ export default function HomePage() {
         // (necesario para mostrar el resumen en la Home).
         entradasService.listAgrupado({ limit: 100 }),
         salidasService.listAgrupado({ limit: 100 }),
-        pedidosService.list({ scope: 'dispatch' }),
+        pedidosService.list({ scope: 'dispatch', limit: 2000 }),
       ]);
 
       setResumen(dash);

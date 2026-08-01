@@ -74,31 +74,12 @@ export const salidasService = {
 
   /**
    * Obtener detalle completo de una salida (con líneas).
+   * Usa el endpoint dedicado /api/movimientos/:id en lugar de descargar
+   * la lista completa (antes era el cuello de botella al abrir un detalle).
    */
   async getDetail(id) {
-    const rows = await this.list({});
-    const lines = (rows || []).filter((r) => Number(r.id_movimiento) === Number(id));
-    if (!lines.length) {
-      const grouped = agruparMovimientos(rows);
-      return grouped.find((m) => m.id_movimiento === Number(id)) || null;
-    }
-    const first = lines[0];
-    return {
-      id_movimiento: Number(id),
-      fecha: first.creado_en || first.fecha,
-      tipo: first.tipo_salida || first.tipo_movimiento,
-      no_documento: first.no_documento,
-      observaciones: first.observaciones,
-      estado: first.estado || null,
-      anulado_por: first.anulado_por || null,
-      anulado_en: first.anulado_en || null,
-      anulado_por_usuario: first.anulado_por_usuario || null,
-      nombre_motivo: first.nombre_motivo,
-      id_motivo: first.id_motivo,
-      usuario_creador: first.usuario_creador,
-      bodega: first.nombre_bodega,
-      lines,
-    };
+    const { data } = await api.get(`/api/movimientos/${Number(id)}`);
+    return data;
   },
 
   /**
