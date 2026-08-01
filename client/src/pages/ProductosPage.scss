@@ -144,6 +144,11 @@
       color: $color-warning;
       background: $color-warning-soft;
     }
+
+    &--hidden {
+      color: $color-danger;
+      background: $color-danger-soft;
+    }
   }
 
   &__item-end {

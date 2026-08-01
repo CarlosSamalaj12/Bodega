@@ -3,7 +3,6 @@ import { Header } from '@/components/layout/Header';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { Spinner } from '@/components/ui/Spinner';
 import { Badge } from '@/components/ui/Badge';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { DataList } from '@/components/ui/DataList';
@@ -52,7 +51,6 @@ export default function PedidosPage() {
   const isMobile = !useMediaQuery('(min-width: 768px)');
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [createdPedido, setCreatedPedido] = useState(null);
   const [confirmPedido, setConfirmPedido] = useState(null);
 
@@ -412,36 +410,16 @@ export default function PedidosPage() {
         }}
       />
 
-      <Modal
+      <PedidoForm
         open={modalOpen}
-        onClose={() => !submitting && setModalOpen(false)}
-        title="Nuevo pedido"
-        size="xl"
-      >
-        {catalogError ? (
-          <div className="pedidos-page__catalog-error">
-            <p><strong>No se pudieron cargar las bodegas.</strong></p>
-            <p className="pedidos-page__catalog-error-detail">{catalogError}</p>
-            <Button variant="subtle" onClick={loadCatalogs}>Reintentar</Button>
-          </div>
-        ) : (
-          <>
-            {loadingCatalogs && (
-              <div className="pedidos-page__loading">
-                <Spinner size={18} label="Cargando bodegas…" />
-              </div>
-            )}
-            <PedidoForm
-              bodegas={bodegas}
-              user={user}
-              submitting={submitting}
-              onSubmittingChange={setSubmitting}
-              onCreated={handleCreated}
-              onCancel={() => setModalOpen(false)}
-            />
-          </>
-        )}
-      </Modal>
+        onClose={() => setModalOpen(false)}
+        user={user}
+        bodegas={bodegas}
+        loadingCatalogs={loadingCatalogs}
+        catalogError={catalogError}
+        onRetryCatalog={loadCatalogs}
+        onCreated={handleCreated}
+      />
 
       {/* Modal de éxito con opción de imprimir */}
       <Modal

@@ -11,6 +11,9 @@ export function ProductosFilters({
   categoriaId,
   onCategoriaChange,
   categorias = [],
+  subcategoriaId,
+  onSubcategoriaChange,
+  subcategorias = [],
   medidaId,
   onMedidaChange,
   medidas = [],
@@ -31,6 +34,19 @@ export function ProductosFilters({
           { value: '', label: 'Todas las categorías' },
           ...categorias.map((c) => ({ value: c.id_categoria, label: c.nombre_categoria })),
         ]}
+      />
+
+      <Select
+        value={subcategoriaId || ''}
+        onChange={(e) => onSubcategoriaChange(e.target.value ? Number(e.target.value) : null)}
+        options={[
+          { value: '', label: 'Todas las subcategorías' },
+          ...subcategorias.map((s) => ({
+            value: s.id_subcategoria,
+            label: s.nombre_subcategoria,
+          })),
+        ]}
+        disabled={subcategorias.length === 0}
       />
 
       <Select
@@ -62,6 +78,9 @@ ProductosFilters.propTypes = {
   categoriaId: PropTypes.number,
   onCategoriaChange: PropTypes.func,
   categorias: PropTypes.array,
+  subcategoriaId: PropTypes.number,
+  onSubcategoriaChange: PropTypes.func,
+  subcategorias: PropTypes.array,
   medidaId: PropTypes.number,
   onMedidaChange: PropTypes.func,
   medidas: PropTypes.array,

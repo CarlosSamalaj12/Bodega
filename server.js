@@ -1739,6 +1739,35 @@ async function setProductWarehouseVisibility(conn, idProducto, idBodega, visible
     { id_producto }
   );
 
+  // ── Guarda: nunca dejar el producto con 0 bodegas visibles=1 ──
+  // Si lo permitimos, queda en estado "Oculto en todas" y no se puede
+  // despachar desde ningún lado (rompe el "opt-out" sano del sistema).
+  if (!nextVisible) {
+    const visiblesActuales = currentRows.filter((r) => Number(r.visible) === 1);
+    const targetEsLaUnicaVisible =
+      visiblesActuales.length === 1 &&
+      Number(visiblesActuales[0].id_bodega) === id_bodega;
+    if (targetEsLaUnicaVisible) {
+      const err = new Error(
+        "No se puede dejar el producto sin bodegas visibles. Mantene al menos una con visible=1."
+      );
+      err.status = 400;
+      throw err;
+    }
+    // Sin reglas previas: si ocultamos y solo hay 1 bodega activa, el
+    // resultado seria 0 visibles. Tambien lo bloqueamos.
+    if (!currentRows.length) {
+      const activeWarehouseIds = await getActiveWarehouseIds(conn);
+      if (activeWarehouseIds.length <= 1) {
+        const err = new Error(
+          "No se puede ocultar el producto: el sistema solo tiene una bodega activa."
+        );
+        err.status = 400;
+        throw err;
+      }
+    }
+  }
+
   if (!currentRows.length) {
     if (nextVisible) return;
     const activeWarehouseIds = await getActiveWarehouseIds(conn);
@@ -4076,35 +4105,40 @@ app.get("/api/productos", auth, async (req, res) => {
   var page = Math.max(1, Number(req.query.page || 1));
   var offset = (page - 1) * limit;
   var id_categoria = Number(req.query.categoria || 0) || null;
+  var id_subcategoria = Number(req.query.subcategoria || 0) || null;
   var id_medida = Number(req.query.medida || 0) || null;
   var id_bodega_usuario = Number(req.user?.id_warehouse || 0) || null;
 
   var countSql =
     "SELECT COUNT(*) AS total FROM productos p JOIN medidas m ON m.id_medida=p.id_medida JOIN categorias c ON c.id_categoria=p.id_categoria WHERE (:all=1 OR p.activo=1) AND "
     + qf.clause
-    + " AND (:id_categoria IS NULL OR p.id_categoria=:id_categoria) AND (:id_medida IS NULL OR p.id_medida=:id_medida)";
+    + " AND (:id_categoria IS NULL OR p.id_categoria=:id_categoria)"
+    + " AND (:id_subcategoria IS NULL OR p.id_subcategoria=:id_subcategoria)"
+    + " AND (:id_medida IS NULL OR p.id_medida=:id_medida)";
 
   var sql = "SELECT p.id_producto,"
     + " p.nombre_producto, p.sku,"
     + " p.id_medida, p.id_categoria, p.id_subcategoria, p.activo,"
     + " m.nombre_medida, c.nombre_categoria, s.nombre_subcategoria,"
     + " COALESCE(pwv.total_bodegas_visibles, 0) AS total_bodegas_visibles,"
+    + " COALESCE(pwv.total_reglas, 0) AS total_reglas,"
     + " COALESCE(pwv.nombres_bodegas_visibles, '') AS nombres_bodegas_visibles,"
     + " CASE WHEN :id_bodega_usuario IS NULL THEN 1 WHEN NOT EXISTS (SELECT 1 FROM producto_bodegas_visibilidad pbv_all WHERE pbv_all.id_producto=p.id_producto) THEN 1 WHEN EXISTS (SELECT 1 FROM producto_bodegas_visibilidad pbv_me WHERE pbv_me.id_producto=p.id_producto AND pbv_me.id_bodega=:id_bodega_usuario AND pbv_me.visible=1) THEN 1 ELSE 0 END AS visible_en_bodega_usuario"
     + " FROM productos p";
   sql += " JOIN medidas m ON m.id_medida=p.id_medida";
   sql += " JOIN categorias c ON c.id_categoria=p.id_categoria";
   sql += " LEFT JOIN subcategorias s ON s.id_subcategoria=p.id_subcategoria";
-  sql += " LEFT JOIN (SELECT pbv.id_producto, COUNT(*) AS total_bodegas_visibles, GROUP_CONCAT(b.nombre_bodega ORDER BY b.nombre_bodega ASC SEPARATOR ', ') AS nombres_bodegas_visibles FROM producto_bodegas_visibilidad pbv JOIN bodegas b ON b.id_bodega=pbv.id_bodega WHERE pbv.visible=1 GROUP BY pbv.id_producto) pwv ON pwv.id_producto=p.id_producto";
+  sql += " LEFT JOIN (SELECT pbv.id_producto, SUM(pbv.visible=1) AS total_bodegas_visibles, COUNT(*) AS total_reglas, GROUP_CONCAT(b.nombre_bodega ORDER BY b.nombre_bodega ASC SEPARATOR ', ') AS nombres_bodegas_visibles FROM producto_bodegas_visibilidad pbv JOIN bodegas b ON b.id_bodega=pbv.id_bodega GROUP BY pbv.id_producto) pwv ON pwv.id_producto=p.id_producto";
   sql += " WHERE (:all=1 OR p.activo=1)";
   sql += " AND " + qf.clause;
   sql += " AND (:id_categoria IS NULL OR p.id_categoria=:id_categoria)";
+  sql += " AND (:id_subcategoria IS NULL OR p.id_subcategoria=:id_subcategoria)";
   sql += " AND (:id_medida IS NULL OR p.id_medida=:id_medida)";
   sql += " ORDER BY p.nombre_producto ASC";
   sql += " LIMIT " + limit + " OFFSET " + offset;
 
   // COUNT y SELECT en paralelo (antes secuenciales → el listado tardaba el doble).
-  var params = { all: all ? 1 : 0, id_bodega_usuario, id_categoria, id_medida, ...qf.params };
+  var params = { all: all ? 1 : 0, id_bodega_usuario, id_categoria, id_subcategoria, id_medida, ...qf.params };
   var [[countRows], [rows]] = await Promise.all([
     pool.query(countSql, params),
     pool.query(sql, params),

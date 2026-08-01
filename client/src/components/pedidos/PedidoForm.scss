@@ -13,6 +13,27 @@
     font-size: $font-size-sm;
   }
 
+  &__catalog-error {
+    padding: $space-4;
+    text-align: center;
+    background: $color-danger-soft;
+    color: $color-danger;
+    border-radius: $radius-md;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-2;
+
+    p { margin: 0; }
+  }
+
+  &__loading {
+    padding: $space-6;
+    display: grid;
+    place-items: center;
+    color: $color-text-muted;
+  }
+
   &__section {
     display: flex;
     flex-direction: column;
@@ -57,16 +78,77 @@
     font-size: $font-size-sm;
   }
 
+  // Contenedor scrolleable de líneas (4+ visibles sin scrollear)
+  &__lines {
+    // El LinesEditor ya tiene su propio padding; este wrapper permite
+    // auto-scroll cuando se agrega una línea y estamos lejos del final
+    min-height: 0;
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Footer sticky: vive en el slot .modal__footer del Modal
+  // (no scrollea con el body, siempre visible)
+  // ────────────────────────────────────────────────────────────
   &__footer {
     display: flex;
-    justify-content: flex-end;
+    align-items: center;
     gap: $space-3;
-    padding-top: $space-4;
-    border-top: 1px solid $color-stroke;
+    flex-wrap: wrap;
+    width: 100%;
 
-    @media (max-width: $bp-md) {
-      flex-direction: column-reverse;
+    // En desktop: info a la izquierda, acciones a la derecha
+    @media (min-width: $bp-md) {
+      flex-wrap: nowrap;
+      justify-content: space-between;
+    }
+
+    &--sticky {
+      // El footer vive en el slot .modal__footer (que ya provee padding
+      // y border-top). Solo necesitamos que ocupe el ancho completo.
+    }
+
+    &-info {
+      display: flex;
+      align-items: center;
       gap: $space-2;
+      color: $color-text-muted;
+      font-size: $font-size-sm;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+
+    &-count {
+      font-weight: $font-weight-medium;
+      color: $color-text-muted;
+      transition: color $transition-fast;
+
+      &--active {
+        color: $color-text;
+      }
+    }
+
+    &-units {
+      color: $color-text-muted;
+      font-variant-numeric: tabular-nums;
+    }
+
+    &-actions {
+      display: flex;
+      align-items: center;
+      gap: $space-2;
+      flex-shrink: 0;
+
+      // En móvil: cada botón ocupa su propio ancho para que sean fáciles
+      // de tocar con el pulgar
+      @media (max-width: $bp-md) {
+        width: 100%;
+        flex-wrap: wrap;
+
+        > * {
+          flex: 1 1 auto;
+          min-width: 110px;
+        }
+      }
     }
   }
 }

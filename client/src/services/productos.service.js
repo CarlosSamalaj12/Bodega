@@ -1,9 +1,9 @@
 import api from './api';
 
 export const productosService = {
-  async list({ q = '', all = false, limit = 50, page = 1, categoria, medida, signal } = {}) {
+  async list({ q = '', all = false, limit = 50, page = 1, categoria, subcategoria, medida, signal } = {}) {
     const { data } = await api.get('/api/productos', {
-      params: { q, all: all ? 1 : undefined, limit, page, categoria, medida },
+      params: { q, all: all ? 1 : undefined, limit, page, categoria, subcategoria, medida },
       signal,
     });
     return data;

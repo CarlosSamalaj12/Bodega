@@ -68,6 +68,7 @@ export default function ProductosPage() {
   const debouncedSearch = useDebounce(search, 350);
   const [showInactive, setShowInactive] = useState(false);
   const [categoriaId, setCategoriaId] = useState(null);
+  const [subcategoriaId, setSubcategoriaId] = useState(null);
   const [medidaId, setMedidaId] = useState(null);
 
   // Paginación
@@ -112,13 +113,32 @@ export default function ProductosPage() {
     return () => ctrl.abort();
   }, []);
 
+  // Subcategorías filtradas por la categoría seleccionada.
+  // Si no hay categoría, se muestran todas (filtradas a activas si el backend las marca).
+  const subcategoriasFiltradas = useMemo(() => {
+    if (!categoriaId) return subcategorias;
+    return subcategorias.filter(
+      (s) => Number(s.id_categoria) === Number(categoriaId)
+    );
+  }, [subcategorias, categoriaId]);
+
+  // Si cambia la categoría y la subcategoría seleccionada ya no pertenece,
+  // la limpiamos para evitar filtro vacío silencioso.
+  useEffect(() => {
+    if (!subcategoriaId) return;
+    const sigue = subcategoriasFiltradas.some(
+      (s) => Number(s.id_subcategoria) === Number(subcategoriaId)
+    );
+    if (!sigue) setSubcategoriaId(null);
+  }, [categoriaId, subcategoriasFiltradas, subcategoriaId]);
+
   // Ref con filtros actuales para evitar recrear fetchProductos.
   // Se actualiza en un efecto (declarado ANTES del efecto de fetch) y no
   // durante el render, que React puede descartar o repetir.
   const filtersRef = useRef({});
   useEffect(() => {
-    filtersRef.current = { debouncedSearch, showInactive, categoriaId, medidaId };
-  }, [debouncedSearch, showInactive, categoriaId, medidaId]);
+    filtersRef.current = { debouncedSearch, showInactive, categoriaId, subcategoriaId, medidaId };
+  }, [debouncedSearch, showInactive, categoriaId, subcategoriaId, medidaId]);
 
   // Carga productos cuando cambian filtros o página
   const fetchProductos = useCallback(async (silent = false) => {
@@ -132,6 +152,7 @@ export default function ProductosPage() {
         limit: 50,
         page,
         categoria: f.categoriaId || undefined,
+        subcategoria: f.subcategoriaId || undefined,
         medida: f.medidaId || undefined,
       });
       setProductos(result?.rows || []);
@@ -151,12 +172,13 @@ export default function ProductosPage() {
     debouncedSearch,
     showInactive,
     categoriaId,
+    subcategoriaId,
     medidaId,
   ]);
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, showInactive, categoriaId, medidaId]);
+  }, [debouncedSearch, showInactive, categoriaId, subcategoriaId, medidaId]);
 
   // ---- Orden ----
   const ordered = useMemo(() => {
@@ -240,11 +262,12 @@ export default function ProductosPage() {
   const handleClearFilters = () => {
     setSearch('');
     setCategoriaId(null);
+    setSubcategoriaId(null);
     setMedidaId(null);
     setShowInactive(false);
   };
 
-  const hasActiveFilters = search || categoriaId || medidaId || showInactive;
+  const hasActiveFilters = search || categoriaId || subcategoriaId || medidaId || showInactive;
 
   const exportColumns = [
     { key: 'id_producto', label: '#' },
@@ -289,6 +312,9 @@ export default function ProductosPage() {
             categoriaId={categoriaId}
             onCategoriaChange={setCategoriaId}
             categorias={categorias}
+            subcategoriaId={subcategoriaId}
+            onSubcategoriaChange={setSubcategoriaId}
+            subcategorias={subcategoriasFiltradas}
             medidaId={medidaId}
             onMedidaChange={setMedidaId}
             medidas={medidas}
@@ -327,9 +353,20 @@ export default function ProductosPage() {
                         {row.nombre_categoria && <span className="productos-page__item-tag">{row.nombre_categoria}</span>}
                         {row.nombre_subcategoria && <span className="productos-page__item-tag">{row.nombre_subcategoria}</span>}
                         {row.nombre_medida && <span className="productos-page__item-tag">{row.nombre_medida}</span>}
-                        <span className={`productos-page__vis-badge ${Number(row.total_bodegas_visibles) > 0 ? 'productos-page__vis-badge--limited' : ''}`}>
-                          {Number(row.total_bodegas_visibles) > 0 ? `${row.total_bodegas_visibles} bodega${Number(row.total_bodegas_visibles) === 1 ? '' : 's'}` : 'Todas'}
-                        </span>
+                        {(() => {
+                          const totalReglas = Number(row.total_reglas) || 0;
+                          const totalVisibles = Number(row.total_bodegas_visibles) || 0;
+                          // Sin reglas → visible en todas (opt-out)
+                          if (totalReglas === 0) {
+                            return <span className="productos-page__vis-badge" title="Sin reglas de visibilidad: visible en todas las bodegas">Todas</span>;
+                          }
+                          // Hay reglas pero todas con visible=0 → oculto en todas
+                          if (totalVisibles === 0) {
+                            return <span className="productos-page__vis-badge productos-page__vis-badge--hidden" title="Todas las reglas de visibilidad están en oculto=1">Oculto en todas</span>;
+                          }
+                          // Hay reglas con al menos una visible=1 → restringido
+                          return <span className="productos-page__vis-badge productos-page__vis-badge--limited" title={`Visible solo en ${totalVisibles} bodega${totalVisibles === 1 ? '' : 's'}`}>{totalVisibles} bodega{totalVisibles === 1 ? '' : 's'}</span>;
+                        })()}
                       </div>
                     </div>
                     <div className="productos-page__item-end">
@@ -345,8 +382,18 @@ export default function ProductosPage() {
                     {Boolean(user?.id_warehouse) && Number(row.visible_en_bodega_usuario) === 0 && (
                       <Button size="sm" variant="subtle" onClick={() => handleToggleVisibilidad(row, true)} title="Hacer visible en tu bodega">Mostrar</Button>
                     )}
-                    {Boolean(user?.id_warehouse) && Number(row.visible_en_bodega_usuario) === 1 && Number(row.total_bodegas_visibles) > 0 && (
+                    {Boolean(user?.id_warehouse) && Number(row.visible_en_bodega_usuario) === 1 && Number(row.total_bodegas_visibles) > 1 && (
                       <Button size="sm" variant="ghost" onClick={() => handleToggleVisibilidad(row, false)} title="Ocultar en tu bodega">Ocultar</Button>
+                    )}
+                    {Boolean(user?.id_warehouse) && Number(row.visible_en_bodega_usuario) === 1 && Number(row.total_bodegas_visibles) === 1 && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled
+                        title="No podés ocultar la única bodega visible. Editá el producto para asignarlo a otras bodegas."
+                      >
+                        Ocultar
+                      </Button>
                     )}
                   </div>
                 </DragItem>
