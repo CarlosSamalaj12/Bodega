@@ -20,6 +20,7 @@ const MedidasPage = lazy(() => import('@/pages/MedidasPage'));
 const MotivosPage = lazy(() => import('@/pages/MotivosPage'));
 const BodegasPage = lazy(() => import('@/pages/BodegasPage'));
 const KardexPage = lazy(() => import('@/pages/KardexPage'));
+const KardexGeneralPage = lazy(() => import('@/pages/KardexGeneralPage'));
 const ExistenciasPage = lazy(() => import('@/pages/ExistenciasPage'));
 const AlertasPage = lazy(() => import('@/pages/AlertasPage'));
 const UsuariosPage = lazy(() => import('@/pages/UsuariosPage'));
@@ -100,6 +101,7 @@ export const router = createBrowserRouter([
       { path: 'motivos', element: wrap(<MotivosPage />) },
       { path: 'bodegas', element: wrap(<BodegasPage />) },
       { path: 'kardex', element: wrap(<KardexPage />) },
+      { path: 'kardex-general', element: wrap(<KardexGeneralPage />) },
       { path: 'existencias', element: wrap(<ExistenciasPage />) },
       { path: 'alertas', element: wrap(<AlertasPage />) },
       { path: 'usuarios', element: wrap(<UsuariosPage />) },

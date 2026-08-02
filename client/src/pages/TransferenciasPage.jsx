@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
 import { Pagination } from '@/components/ui/Pagination';
-import { SearchInput } from '@/components/ui/SearchInput';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
@@ -13,7 +12,6 @@ import { Input } from '@/components/ui/Input';
 import { ProductPicker } from '@/components/ui/ProductPicker';
 import { LinesEditor } from '@/components/ui/LinesEditor';
 import { toast } from '@/components/ui/Toast';
-import { useDebounce } from '@/hooks/useDebounce';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
@@ -41,8 +39,7 @@ export default function TransferenciasPage() {
   const isMobile = !useMediaQuery('(min-width: 768px)');
 
   // Filtros
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebounce(search, 350);
+  const [selectedProduct, setSelectedProduct] = useState(null);
   const [rango, setRango] = useState(30);
   const hoy = new Date().toISOString().slice(0, 10);
   const hace30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -227,6 +224,7 @@ export default function TransferenciasPage() {
     const fetchId = ++fetchIdRef.current;
     try {
       const params = { from: dateFrom, to: dateTo, limit, page };
+      if (selectedProduct?.id_producto) params.id_producto = selectedProduct.id_producto;
       const { data } = await api.get('/api/reportes/transferencias', { params });
       if (fetchId !== fetchIdRef.current) return;
       if (data && Array.isArray(data.rows)) {
@@ -248,27 +246,15 @@ export default function TransferenciasPage() {
     } finally {
       if (fetchId === fetchIdRef.current) setLoading(false);
     }
-  }, [dateFrom, dateTo, page, limit]);
+  }, [dateFrom, dateTo, page, limit, selectedProduct]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  useEffect(() => { setPage(1); }, [dateFrom, dateTo]);
+  useEffect(() => { setPage(1); }, [dateFrom, dateTo, selectedProduct]);
 
-  // Filtro client-side sobre los datos de la página actual
-  const filtered = useMemo(() => {
-    if (!debouncedSearch) return rows;
-    const q = debouncedSearch.toLowerCase();
-    return rows.filter((g) =>
-      g.bodega_origen?.toLowerCase().includes(q) ||
-      g.bodega_destino?.toLowerCase().includes(q) ||
-      (g.lineas || []).some((l) =>
-        l.nombre_producto?.toLowerCase().includes(q) ||
-        l.sku?.toLowerCase().includes(q)
-      )
-    );
-  }, [rows, debouncedSearch]);
-
-  const displayRows = filtered;
+  // El filtrado por producto ahora es server-side (ProductPicker → id_producto),
+  // igual que en los reportes de entradas/salidas.
+  const displayRows = rows;
 
   const totales = useMemo(() => {
     let totalCantidad = 0, totalCosto = 0;
@@ -333,6 +319,21 @@ export default function TransferenciasPage() {
       else next.add(id);
       return next;
     });
+  };
+
+  // Helper para mostrar productos en la fila principal (misma lógica que
+  // Entradas/Salidas: resumen con los 2 primeros + "+N")
+  const renderProductos = (g) => {
+    const nombres = [...new Set(g.lineas.map((l) => l.nombre_producto).filter(Boolean))];
+    if (nombres.length === 0) return <span className="transferencias-page__muted">—</span>;
+    return (
+      <div className="transferencias-page__productos-list">
+        {nombres.slice(0, 2).map((n, i) => (
+          <span key={i} className="transferencias-page__productos-name">{n}{i === 0 && nombres.length > 2 ? ',' : ''}</span>
+        ))}
+        {nombres.length > 2 && <span className="transferencias-page__productos-more">+{nombres.length - 2}</span>}
+      </div>
+    );
   };
 
   // --- Navegación entre reversiones ---
@@ -437,7 +438,11 @@ export default function TransferenciasPage() {
       <div className="transferencias-page">
         <Card>
           <div className="transferencias-page__filters">
-            <SearchInput value={search} onChange={setSearch} placeholder="Buscar producto, SKU, origen o destino…" />
+            <ProductPicker
+              value={selectedProduct}
+              onChange={(p) => { setSelectedProduct(p); setPage(1); }}
+              placeholder="Buscar producto o SKU…"
+            />
             <div className="transferencias-page__fecha-group">
               <input type="date" className="input" value={dateFrom} max={dateTo}
                 onChange={(e) => { setDateFrom(e.target.value); setRango(null); }} />
@@ -469,6 +474,7 @@ export default function TransferenciasPage() {
                   <th>Fecha</th>
                   <th>Origen</th>
                   <th>Destino</th>
+                  <th>Productos</th>
                   {!isMobile && <th>Usuario</th>}
                   <th style={{ textAlign: 'right', width: 90 }}>Cant.</th>
                   <th style={{ textAlign: 'right', width: 110 }}>Total</th>
@@ -527,13 +533,14 @@ export default function TransferenciasPage() {
                       </td>
                       <td><Badge variant="info">{g.bodega_origen || '—'}</Badge></td>
                       <td><Badge variant="success">{g.bodega_destino || '—'}</Badge></td>
+                      <td>{renderProductos(g)}</td>
                       {!isMobile && <td className="transferencias-page__user">{g.usuario_creador || '—'}</td>}
                       <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{sumCant.toFixed(2)}</td>
                       <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>Q {sumTotal.toFixed(2)}</td>
                     </tr>,
                     isOpen && (
                       <tr key={`det-${g.id_movimiento}`} className="transferencias-page__det-row">
-                        <td colSpan={isMobile ? 6 : 8}>
+                        <td colSpan={isMobile ? 8 : 9}>
                           <div className="transferencias-page__detalle">
                             <table className="transferencias-page__det-table">
                               <thead>
@@ -582,7 +589,7 @@ export default function TransferenciasPage() {
               </tbody>
               <tfoot>
                 <tr className="transferencias-page__total-row">
-                  <td colSpan={isMobile ? 4 : 6} style={{ textAlign: 'right', fontWeight: 600 }}>Totales</td>
+                  <td colSpan={isMobile ? 6 : 7} style={{ textAlign: 'right', fontWeight: 600 }}>Totales</td>
                   <td style={{ textAlign: 'right', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{totales.totalCantidad.toFixed(2)}</td>
                   <td style={{ textAlign: 'right', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>Q {totales.totalCosto.toFixed(2)}</td>
                 </tr>

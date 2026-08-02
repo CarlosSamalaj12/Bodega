@@ -37,7 +37,8 @@ const NAV_ITEMS = [
   { to: '/conteo-ciclico', label: 'Conteo Cíclico', icon: '📋', section: 'conteo-ciclico', group: 'inventario' },
 
   // Reportes
-  { to: '/kardex', label: 'Kardex', icon: '📒', section: 'kardex', group: 'reportes' },
+  { to: '/kardex', label: 'Kardex por producto', icon: '📒', section: 'kardex', group: 'reportes' },
+  { to: '/kardex-general', label: 'Kardex general', icon: '📋', section: 'kardex-general', group: 'reportes' },
   { to: '/reporte-entradas', label: 'R. Entradas', icon: '📈', section: 'r-entradas', group: 'reportes' },
   { to: '/reporte-salidas', label: 'R. Salidas', icon: '📉', section: 'r-salidas', group: 'reportes' },
   { to: '/corte-diario', label: 'Corte Diario', icon: '📅', section: 'r-corte-diario', group: 'reportes' },

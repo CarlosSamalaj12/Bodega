@@ -1,10 +1,8 @@
-const STATIC_CACHE = "bodega-static-v9";
-const API_CACHE = "bodega-api-v9";
+const STATIC_CACHE = "bodega-static-v11";
+const API_CACHE = "bodega-api-v11";
 
 const STATIC_ASSETS = [
-  "./app.html",
-  "./app.js",
-  "./styles.css",
+  // Solo archivos que realmente existen en /public (servidos por Express).
   "./manifest.webmanifest",
   "./pw.ico",
   "./icon-192x192.png",
@@ -16,15 +14,28 @@ const STATIC_ASSETS = [
   "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200",
 ];
 
+// Precache resiliente: si algún recurso falla (offline, 404, CDN caída) el
+// install NO se rechaza — sin esto, cache.addAll() aborta TODO el install y
+// el SW nuevo nunca activa, dejando cachés viejas para siempre.
+async function precacheAll() {
+  const cache = await caches.open(STATIC_CACHE);
+  await Promise.allSettled(
+    STATIC_ASSETS.map(async (url) => {
+      try {
+        await cache.add(url);
+      } catch {
+        // ignorar: no bloquear el install por un recurso individual
+      }
+    })
+  );
+}
+
 // ─── Install: pre-cache app shell ───────────────────────────────────
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    (async () => {
-      const cache = await caches.open(STATIC_CACHE);
-      await cache.addAll(STATIC_ASSETS);
-    })()
-  );
-  // skipWaiting is handled via SKIP_WAITING message for user-initiated updates
+  // Activar de inmediato (sin esperar a que se cierren las pestañas): así el
+  // SW nuevo purga las cachés viejas y toma control en la primera recarga.
+  self.skipWaiting();
+  event.waitUntil(precacheAll());
 });
 
 // ─── Activate: prune old caches ─────────────────────────────────────

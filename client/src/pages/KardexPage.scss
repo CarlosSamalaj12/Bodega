@@ -6,18 +6,16 @@
   flex-direction: column;
   gap: $space-4;
 
-  // ---- Filtros ----
+  // ═══════════════════════════════════════════════════
+  // Estilos compartidos entre KardexPage y KardexGeneralPage
+  // ═══════════════════════════════════════════════════
+
+  // ---- Filtros (vista general) ----
   &__filters {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: $space-3;
-  }
-
-  &__header-actions {
-    display: flex;
-    align-items: center;
-    gap: $space-2;
   }
 
   &__search {
@@ -120,7 +118,7 @@
     @include truncate(1);
   }
 
-  // ---- Paginación ----
+  // ---- Paginación (vista general) ----
   &__pagination {
     display: flex;
     align-items: center;
@@ -286,10 +284,520 @@
     font-size: $font-size-xs;
   }
 
-  // ---- Responsive ----
-  @media (max-width: 639px) {
+  // ═══════════════════════════════════════════════════
+  // Header actions
+  // ═══════════════════════════════════════════════════
+  &__header-actions {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Selector de producto (top)
+  // ═══════════════════════════════════════════════════
+  &__selector {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+  }
+
+  &__producto-picker {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+  }
+
+  &__label {
+    font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: $color-text-muted;
+  }
+
+  &__subfiltros {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $space-2;
+    padding-top: $space-3;
+    border-top: 1px solid $color-stroke;
+
+    > .input,
+    > .select {
+      min-width: 140px;
+    }
+
+    > input[placeholder="Lote (opcional)"] {
+      min-width: 160px;
+    }
+  }
+
+  // Toggle "Todas las bodegas" (visible en el bloque de subfiltros)
+  &__scope-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-2 $space-3;
+    background: $color-surface;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-sm;
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+    cursor: pointer;
+    user-select: none;
+    transition: background $transition-fast, border-color $transition-fast, color $transition-fast;
+    margin-left: auto;
+
+    &:hover {
+      background: $color-surface-hover;
+      border-color: $color-stroke-strong;
+      color: $color-text;
+    }
+
+    input[type='checkbox'] {
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: $color-bg-2;
+      border: 1px solid $color-stroke;
+      border-radius: $radius-xs;
+      cursor: pointer;
+      position: relative;
+      flex-shrink: 0;
+      transition: background $transition-fast, border-color $transition-fast;
+
+      &:checked {
+        background: $color-accent;
+        border-color: $color-accent;
+
+        &::after {
+          content: '';
+          position: absolute;
+          left: 4px;
+          top: 1px;
+          width: 4px;
+          height: 8px;
+          border: solid $color-text-inverse;
+          border-width: 0 2px 2px 0;
+          transform: rotate(45deg);
+        }
+      }
+    }
+
+    // Si está checked, resaltamos todo el chip
+    &:has(input:checked) {
+      background: rgba($color-accent, 0.08);
+      border-color: rgba($color-accent, 0.3);
+      color: $color-text;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Header del producto (después de seleccionar)
+  // ═══════════════════════════════════════════════════
+  &__producto-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $space-5;
+    justify-content: space-between;
+  }
+
+  &__producto-info {
+    flex: 1 1 280px;
+    min-width: 0;
+  }
+
+  &__producto-nombre {
+    margin: 0 0 $space-2;
+    font-size: $font-size-lg;
+    font-weight: $font-weight-semibold;
+    color: $color-text;
+    @include truncate(2);
+  }
+
+  &__producto-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $space-3;
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+  }
+
+  &__producto-sku {
+    font-family: $font-mono;
+    font-size: $font-size-xs;
+    background: $color-bg-2;
+    padding: 2px $space-2;
+    border-radius: $radius-xs;
+    color: $color-text;
+  }
+
+  &__producto-cat {
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Stat cards: Entradas / Salidas / Stock
+  // ═══════════════════════════════════════════════════
+  &__stats {
+    display: flex;
+    gap: $space-3;
+    flex-wrap: wrap;
+  }
+
+  &__stat {
+    min-width: 120px;
+    padding: $space-3 $space-4;
+    border-radius: $radius-md;
+    border: 1px solid $color-stroke;
+    background: $color-surface;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    &--in {
+      border-color: rgba($color-success, 0.3);
+      background: rgba($color-success, 0.06);
+    }
+
+    &--out {
+      border-color: rgba($color-danger, 0.3);
+      background: rgba($color-danger, 0.06);
+    }
+
+    &--stock {
+      border-color: rgba($color-accent, 0.3);
+      background: rgba($color-accent, 0.06);
+    }
+  }
+
+  &__stat-label {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: $color-text-muted;
+  }
+
+  &__stat-valor {
+    font-family: $font-mono;
+    font-size: $font-size-xl;
+    font-weight: $font-weight-bold;
+    color: $color-text;
+    line-height: 1.1;
+
+    .kardex-page__stat--in & { color: $color-success; }
+    .kardex-page__stat--out & { color: $color-danger; }
+    .kardex-page__stat--stock & { color: $color-accent; }
+  }
+
+  &__stat-hint {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    font-weight: $font-weight-regular;
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Two columns: ENTRADAS (izq) | SALIDAS (der)
+  // ═══════════════════════════════════════════════════
+  &__columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-4;
+
+    @media (max-width: 768px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__column {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+    min-height: 0;
+
+    &--in {
+      border-top: 3px solid $color-success;
+    }
+
+    &--out {
+      border-top: 3px solid $color-danger;
+    }
+  }
+
+  &__column-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: $space-2;
+    border-bottom: 1px solid $color-stroke;
+  }
+
+  &__column-title {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    margin: 0;
+    font-size: $font-size-md;
+    font-weight: $font-weight-semibold;
+    color: $color-text;
+  }
+
+  &__column-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: $radius-pill;
+
+    &--in { background: $color-success; }
+    &--out { background: $color-danger; }
+  }
+
+  &__column-count {
+    font-family: $font-mono;
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+    background: $color-bg-2;
+    padding: 2px $space-2;
+    border-radius: $radius-xs;
+  }
+
+  &__column-empty {
+    padding: $space-4;
+    text-align: center;
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    background: $color-surface;
+    border: 1px dashed $color-stroke;
+    border-radius: $radius-md;
+  }
+
+  &__movs {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: $space-1;
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Movimiento individual (card dentro de la columna)
+  // ═══════════════════════════════════════════════════
+  &__mov {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    grid-template-rows: auto auto;
+    gap: $space-1 $space-3;
+    padding: $space-3;
+    background: $color-surface;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+    transition: background $transition-fast, border-color $transition-fast;
+
+    &:hover {
+      background: $color-surface-hover;
+      border-color: $color-stroke-strong;
+    }
+  }
+
+  &__mov-fecha {
+    grid-column: 1;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    min-width: 90px;
+  }
+
+  &__mov-fecha-date {
+    font-size: $font-size-sm;
+    color: $color-text;
+    font-weight: $font-weight-medium;
+    font-family: $font-mono;
+  }
+
+  &__mov-fecha-time {
+    font-size: $font-size-xs;
+    color: $color-text-subtle;
+    font-family: $font-mono;
+  }
+
+  &__mov-tipo {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+  }
+
+  &__mov-tipo-badge {
+    font-size: $font-size-xs;
+    font-weight: $font-weight-semibold;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 2px $space-2;
+    border-radius: $radius-xs;
+    color: $color-text-inverse;
+
+    &--entrada { background: $color-success; }
+    &--salida { background: $color-danger; }
+    &--transferencia { background: $color-info; }
+    &--ajuste { background: $color-warning; color: $color-text; }
+  }
+
+  &__mov-cantidad {
+    grid-column: 3;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  &__mov-cantidad-val {
+    font-family: $font-mono;
+    font-size: $font-size-md;
+    font-weight: $font-weight-bold;
+
+    &--in { color: $color-success; }
+    &--out { color: $color-danger; }
+  }
+
+  &__mov-meta {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $space-2;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+  }
+
+  &__mov-bodega,
+  &__mov-lote {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  &__mov-doc {
+    font-family: $font-mono;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    background: $color-bg-2;
+    padding: 0 $space-1;
+    border-radius: $radius-xs;
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Banner de "hay más"
+  // ═══════════════════════════════════════════════════
+  &__more-banner {
+    padding: $space-3 $space-4;
+    background: $color-warning-soft;
+    color: $color-text;
+    border: 1px solid rgba($color-warning, 0.3);
+    border-radius: $radius-md;
+    font-size: $font-size-sm;
+    text-align: center;
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Loading
+  // ═══════════════════════════════════════════════════
+  &__loading {
+    padding: $space-6;
+    display: grid;
+    place-items: center;
+    color: $color-text-muted;
+    gap: $space-2;
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Empty state (sin producto seleccionado)
+  // ═══════════════════════════════════════════════════
+  &__empty {
+    padding: $space-6 $space-5;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-2;
+  }
+
+  &__empty-icon {
+    font-size: 48px;
+    line-height: 1;
+    margin-bottom: $space-2;
+  }
+
+  &__empty-title {
+    margin: 0;
+    font-size: $font-size-md;
+    font-weight: $font-weight-semibold;
+    color: $color-text;
+  }
+
+  &__empty-msg {
+    margin: 0;
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    max-width: 480px;
+  }
+
+  &__empty-hint {
+    margin: $space-3 0 0;
+    padding: $space-3 $space-4;
+    background: rgba($color-info, 0.08);
+    border: 1px solid rgba($color-info, 0.3);
+    border-radius: $radius-md;
+    color: $color-text;
+    font-size: $font-size-sm;
+    max-width: 520px;
+    line-height: 1.5;
+
+    strong {
+      color: $color-info;
+      font-weight: $font-weight-semibold;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════
+  // Responsive
+  // ═══════════════════════════════════════════════════
+  @media (max-width: 768px) {
     padding: $space-4;
 
+    &__producto-header {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    &__stats {
+      justify-content: space-between;
+    }
+
+    &__stat {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+
+    &__subfiltros {
+      flex-direction: column;
+      align-items: stretch;
+
+      > .input,
+      > .select {
+        width: 100%;
+        min-width: 0;
+      }
+    }
+
+    // Estilos compartidos responsive
     &__filters {
       flex-direction: column;
       align-items: stretch;
@@ -302,6 +810,10 @@
 
     &__search {
       min-width: 0;
+    }
+
+    &__detail-grid {
+      grid-template-columns: 1fr;
     }
   }
 }

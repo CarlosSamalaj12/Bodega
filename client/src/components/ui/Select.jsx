@@ -30,10 +30,12 @@ export function Select({
         {options.map((opt) => {
           const v = typeof opt === 'object' ? opt.value : opt;
           const lbl = typeof opt === 'object' ? opt.label : opt;
-          // Primera opción vacía = placeholder automático
+          // Primera opción vacía = placeholder automático ("Seleccionar…",
+          // "Todas las categorías", etc.). DEBE quedar seleccionable para
+          // poder deseleccionar o volver a "Todas" cuando ya hay un valor.
           const isPlaceholder = String(v) === '' && options.indexOf(opt) === 0;
           return (
-            <option key={`${v}-${options.indexOf(opt)}`} value={v} disabled={isPlaceholder}>
+            <option key={`${v}-${options.indexOf(opt)}`} value={v}>
               {isPlaceholder ? (lbl || placeholder) : lbl}
             </option>
           );

@@ -1484,7 +1484,8 @@ const PERM_CATALOG = [
   { key: "section.view.conteo-ciclico", label: "Ver modulo Conteo Ciclico", group: "Inventario" },
 
   // ── Reportes ──
-  { key: "section.view.kardex", label: "Ver modulo Kardex", group: "Reportes", default_active: 0 },
+  { key: "section.view.kardex", label: "Ver modulo Kardex por producto", group: "Reportes", default_active: 0 },
+  { key: "section.view.kardex-general", label: "Ver modulo Kardex general", group: "Reportes", default_active: 0 },
   { key: "section.view.tendencia-producto", label: "Ver modulo Tendencia Producto", group: "Reportes", default_active: 0 },
   { key: "section.view.cuadre-caja", label: "Ver modulo Cuadre de Caja", group: "Reportes" },
   { key: "section.view.r-existencias", label: "Ver Reporte Existencias", group: "Reportes" },
@@ -8249,12 +8250,12 @@ app.get("/api/reportes/entradas", auth, async (req, res) => {
       "me.tipo_movimiento IN ('ENTRADA', 'TRANSFERENCIA')",
       "me.estado<>'ANULADO'",
       accessFilter ? `me.id_bodega_destino IN (${accessFilter.sql})` : "1=1",
-      ":id_bodega IS NULL OR me.id_bodega_destino=:id_bodega",
-      ":documento IS NULL OR me.no_documento LIKE :documento",
-      ":from_dt IS NULL OR me.creado_en >= :from_dt",
-      ":to_dt IS NULL OR me.creado_en <= :to_dt",
-      ":tipo_movimiento IS NULL OR me.tipo_movimiento=:tipo_movimiento",
-      ":id_motivo IS NULL OR me.id_motivo=:id_motivo",
+      "(:id_bodega IS NULL OR me.id_bodega_destino=:id_bodega)",
+      "(:documento IS NULL OR me.no_documento LIKE :documento)",
+      "(:from_dt IS NULL OR me.creado_en >= :from_dt)",
+      "(:to_dt IS NULL OR me.creado_en <= :to_dt)",
+      "(:tipo_movimiento IS NULL OR me.tipo_movimiento=:tipo_movimiento)",
+      "(:id_motivo IS NULL OR me.id_motivo=:id_motivo)",
     ];
     const productClauses = [];
     if (needsProductJoin) {
@@ -8507,16 +8508,16 @@ app.get("/api/reportes/salidas", auth, async (req, res) => {
       "me.tipo_movimiento IN ('SALIDA', 'TRANSFERENCIA')",
       "me.estado<>'ANULADO'",
       accessFilter ? `me.id_bodega_origen IN (${accessFilter.sql})` : "1=1",
-      ":id_bodega IS NULL OR me.id_bodega_origen=:id_bodega",
-      ":documento IS NULL OR me.no_documento LIKE :documento",
-      ":from_dt IS NULL OR me.creado_en >= :from_dt",
-      ":to_dt IS NULL OR me.creado_en <= :to_dt",
-      ":tipo_movimiento IS NULL OR me.tipo_movimiento=:tipo_movimiento",
-      ":id_motivo IS NULL OR me.id_motivo=:id_motivo",
+      "(:id_bodega IS NULL OR me.id_bodega_origen=:id_bodega)",
+      "(:documento IS NULL OR me.no_documento LIKE :documento)",
+      "(:from_dt IS NULL OR me.creado_en >= :from_dt)",
+      "(:to_dt IS NULL OR me.creado_en <= :to_dt)",
+      "(:tipo_movimiento IS NULL OR me.tipo_movimiento=:tipo_movimiento)",
+      "(:id_motivo IS NULL OR me.id_motivo=:id_motivo)",
     ];
     if (needsPedidoJoin) {
       headerClauses.push(
-        ":id_bodega_destino IS NULL OR COALESCE(me.id_bodega_destino, pe.id_bodega_solicita)=:id_bodega_destino"
+        "(:id_bodega_destino IS NULL OR COALESCE(me.id_bodega_destino, pe.id_bodega_solicita)=:id_bodega_destino)"
       );
     }
     const productClauses = [];
@@ -10450,10 +10451,23 @@ app.get("/api/reportes/kardex", auth, async (req, res) => {
 
     const warehouseScope = getScopedWarehouseFilter(scope, req.query.warehouse);
     if (warehouseScope.denied) return res.json(emptyPayload);
+    // Por defecto filtramos por la bodega del usuario (o la que pidió por
+    // query param). Si se pasa `all_bodegas=1`, NO filtramos por bodega —
+    // seguimos respetando `accessFilter` (bodegas permitidas) pero vemos
+    // movimientos de todas las bodegas a las que el usuario tiene acceso.
+    // Útil para la vista "Kardex por producto" donde el stock puede estar
+    // en una bodega distinta a la del usuario.
+    const allBodegasFlag = String(req.query.all_bodegas || "") === "1";
     let id_bodega = warehouseScope.selected;
-    if (!scope.can_all_bodegas) id_bodega = scope.id_bodega;
+    if (allBodegasFlag) id_bodega = null;
+    else if (!scope.can_all_bodegas) id_bodega = scope.id_bodega;
+    // Solo construimos accessFilter si hay bodegas permitidas (length > 0).
+    // Si el usuario no tiene restricciones (BODEGUERO típico), el filtro
+    // es null y se ve TODO. Si activó all_bodegas=1 pero no tiene
+    // restricciones, también debe ver todo (no aplicar un `IN (NULL)` que
+    // en MySQL no matchea ninguna fila).
     const accessFilter =
-      warehouseScope.restrictedIds.length && !id_bodega
+      warehouseScope.restrictedIds.length
         ? buildNamedInClause(warehouseScope.restrictedIds, "rkaw")
         : null;
 
@@ -10629,31 +10643,53 @@ app.get("/api/reportes/transferencias", auth, async (req, res) => {
 
     const from_date = String(req.query.from || "").trim() || null;
     const to_date = String(req.query.to || "").trim() || null;
+    const id_producto = Number(req.query.id_producto || 0) || null;
     const limit = Math.max(1, Math.min(200, Number(req.query.limit || 50)));
     const page = Math.max(1, Number(req.query.page || 1));
     const offset = (page - 1) * limit;
 
-    const params = { from_date, to_date };
+    // Si se filtra por producto, se une detalle para poder filtrar por línea
+    // (misma lógica que los reportes de entradas/salidas).
+    const needsProductJoin = Boolean(id_producto);
+    const productJoins = needsProductJoin
+      ? `JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento`
+      : "";
+
+    const params = { from_date, to_date, ...(needsProductJoin ? { id_producto } : {}) };
     const whereSQL = `me.tipo_movimiento='TRANSFERENCIA'
          AND me.estado<>'ANULADO'
          AND (:from_date IS NULL OR DATE(me.creado_en) >= :from_date)
-         AND (:to_date IS NULL OR DATE(me.creado_en) <= :to_date)`;
+         AND (:to_date IS NULL OR DATE(me.creado_en) <= :to_date)
+         ${needsProductJoin ? "AND md.id_producto=:id_producto" : ""}`;
 
     // Paginado por MOVIMIENTO (no por línea)
     const [[{ total }]] = await pool.query(
-      `SELECT COUNT(*) AS total
-       FROM movimiento_encabezado me
-       WHERE ${whereSQL}`,
+      needsProductJoin
+        ? `SELECT COUNT(DISTINCT me.id_movimiento) AS total
+           FROM movimiento_encabezado me
+           ${productJoins}
+           WHERE ${whereSQL}`
+        : `SELECT COUNT(*) AS total
+           FROM movimiento_encabezado me
+           WHERE ${whereSQL}`,
       params
     );
     const totalMovements = Number(total || 0);
 
     const [movements] = await pool.query(
-      `SELECT me.id_movimiento
-       FROM movimiento_encabezado me
-       WHERE ${whereSQL}
-       ORDER BY me.creado_en DESC, me.id_movimiento DESC
-       LIMIT ${limit} OFFSET ${offset}`,
+      needsProductJoin
+        ? `SELECT me.id_movimiento
+           FROM movimiento_encabezado me
+           ${productJoins}
+           WHERE ${whereSQL}
+           GROUP BY me.id_movimiento
+           ORDER BY me.creado_en DESC, me.id_movimiento DESC
+           LIMIT ${limit} OFFSET ${offset}`
+        : `SELECT me.id_movimiento
+           FROM movimiento_encabezado me
+           WHERE ${whereSQL}
+           ORDER BY me.creado_en DESC, me.id_movimiento DESC
+           LIMIT ${limit} OFFSET ${offset}`,
       params
     );
 
@@ -10686,6 +10722,13 @@ app.get("/api/reportes/transferencias", auth, async (req, res) => {
 
       // Líneas de los movimientos de la página
       const lineClause = buildNamedInClause(ids, "trand");
+      const lineParams = {
+        ...lineClause.params,
+        ...(needsProductJoin ? { id_producto } : {}),
+      };
+      const lineWhere = `md.id_movimiento IN (${lineClause.sql})${
+        needsProductJoin ? " AND md.id_producto=:id_producto" : ""
+      }`;
       const [lineRows] = await pool.query(
         `SELECT md.id_movimiento,
                 md.id_detalle,
@@ -10699,9 +10742,9 @@ app.get("/api/reportes/transferencias", auth, async (req, res) => {
                 (md.cantidad * md.costo_unitario) AS total_linea
          FROM movimiento_detalle md
          JOIN productos p ON p.id_producto=md.id_producto
-         WHERE md.id_movimiento IN (${lineClause.sql})
+         WHERE ${lineWhere}
          ORDER BY md.id_detalle ASC`,
-        lineClause.params
+        lineParams
       );
       for (const l of lineRows) {
         const g = movMap.get(l.id_movimiento);
