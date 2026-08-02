@@ -15,6 +15,7 @@ import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import { formatDate } from '@/utils/format';
 import { existenciasService } from '@/services/existencias.service';
 import { catalogosService } from '@/services/catalogos.service';
+import { getSocket } from '@/services/socket';
 import './ExistenciasPage.scss';
 
 function getAlertBadge(item) {
@@ -145,6 +146,22 @@ export default function ExistenciasPage() {
     bodegaId,
     showZeroStock,
   ]);
+
+  useEffect(() => {
+    let socket;
+    try {
+      socket = getSocket();
+    } catch { return; }
+
+    const onStockChanged = () => {
+      fetchExistencias();
+    };
+    socket.on('stock:changed', onStockChanged);
+
+    return () => {
+      socket.off('stock:changed', onStockChanged);
+    };
+  }, [fetchExistencias]);
 
   // Agrupar filas por producto+bodega
   const grupos = useMemo(() => {

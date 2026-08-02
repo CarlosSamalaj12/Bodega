@@ -3198,13 +3198,16 @@ async function applyConteoFinalLines(conn, { id_bodega, lines, motivo, user, app
   for (const ln of lines) {
     const id_producto = Number(ln?.id_producto || 0);
     if (!id_producto) continue;
+    const [[prodInfo]] = await conn.query('SELECT nombre_producto, sku FROM productos WHERE id_producto = ?', [id_producto]);
+    const pName = prodInfo ? `"${prodInfo.nombre_producto}" (SKU: ${prodInfo.sku})` : `producto #${id_producto}`;
+
     if (!(await isProductVisibleInWarehouse(conn, id_producto, id_bodega))) {
-      throw new Error(`El producto #${id_producto} no esta habilitado para la bodega seleccionada`);
+      throw new Error(`El producto ${pName} no esta habilitado para la bodega seleccionada`);
     }
 
     const existenciaFinal = Number(ln?.existencia_final);
     if (!Number.isFinite(existenciaFinal) || existenciaFinal < 0) {
-      throw new Error(`Existencia final invalida para producto #${id_producto}`);
+      throw new Error(`Existencia final invalida para producto ${pName}`);
     }
 
     const [[stockRow]] = await conn.query(
@@ -3218,7 +3221,7 @@ async function applyConteoFinalLines(conn, { id_bodega, lines, motivo, user, app
     const existenciaActual = Number(stockRow?.stock || 0);
     if (existenciaFinal > existenciaActual) {
       throw new Error(
-        `La existencia final no puede ser mayor a la existencia actual para producto #${id_producto}`
+        `La existencia final no puede ser mayor a la existencia actual para producto ${pName}`
       );
     }
 
@@ -3227,7 +3230,7 @@ async function applyConteoFinalLines(conn, { id_bodega, lines, motivo, user, app
 
     const { picks, remaining } = await pickLotsFEFO(conn, id_bodega, id_producto, qtyRequested);
     if (!picks.length || remaining > 0) {
-      throw new Error(`Stock insuficiente para producto #${id_producto}`);
+      throw new Error(`Stock insuficiente para producto ${pName}`);
     }
 
     const notePrefix = `Conteo final. Sistema: ${existenciaActual}. Final: ${existenciaFinal}. Salida: ${qtyRequested}.`;
@@ -5230,8 +5233,10 @@ app.post("/api/entradas", auth, requirePermission("action.create_update", "regis
     for (const ln of lines) {
       if (!ln.id_producto) throw new Error("Linea sin producto");
       if (!(await isProductVisibleInWarehouse(conn, ln.id_producto, id_bodega_destino))) {
+        const [[p]] = await conn.query('SELECT nombre_producto, sku FROM productos WHERE id_producto = ?', [ln.id_producto]);
+        const pName = p ? `"${p.nombre_producto}" (SKU: ${p.sku})` : `producto #${ln.id_producto}`;
         await conn.rollback();
-        return res.status(400).json({ error: `El producto #${ln.id_producto} no esta habilitado para la bodega destino` });
+        return res.status(400).json({ error: `El producto ${pName} no esta habilitado para la bodega destino` });
       }
       const cantidad = Number(ln.cantidad || ln.qty || ln.qty_requested || 0);
       if (!cantidad || cantidad <= 0) continue;
@@ -5393,9 +5398,12 @@ app.post("/api/ajustes", auth, requirePermission("action.create_update", "regist
       const id_producto = Number(ln?.id_producto || 0);
       const qtyRequested = Number(ln?.cantidad || 0);
       if (!id_producto || qtyRequested <= 0) continue;
+      const [[p]] = await conn.query('SELECT nombre_producto, sku FROM productos WHERE id_producto = ?', [id_producto]);
+      const pName = p ? `"${p.nombre_producto}" (SKU: ${p.sku})` : `producto #${id_producto}`;
+
       if (!(await isProductVisibleInWarehouse(conn, id_producto, id_bodega))) {
         await conn.rollback();
-        return res.status(400).json({ error: `El producto #${id_producto} no esta habilitado para la bodega seleccionada` });
+        return res.status(400).json({ error: `El producto ${pName} no esta habilitado para la bodega seleccionada` });
       }
 
       if (dir === "ENTRADA") {
@@ -5438,7 +5446,7 @@ app.post("/api/ajustes", auth, requirePermission("action.create_update", "regist
       const { picks, remaining } = await pickLotsFEFO(conn, id_bodega, id_producto, qtyRequested);
       if (!picks.length || remaining > 0) {
         await conn.rollback();
-        return res.status(400).json({ error: `Stock insuficiente para producto #${id_producto}` });
+        return res.status(400).json({ error: `Stock insuficiente para producto ${pName}` });
       }
 
       for (const p of picks) {
@@ -5482,6 +5490,10 @@ app.post("/api/ajustes", auth, requirePermission("action.create_update", "regist
     }
 
     await conn.commit();
+    emitStockChanged(id_bodega, {
+      action: "ajuste",
+      id_movimiento,
+    });
     await writeSensitiveActionAudit({
       req,
       action_key: dir === "ENTRADA" ? "ENTRADA_AJUSTE_MANUAL" : "SALIDA_AJUSTE_MANUAL",
@@ -5647,21 +5659,22 @@ app.post("/api/salidas", auth, requirePermission("action.create_update", "regist
     for (const ln of lines) {
       const id_producto = Number(ln.id_producto || 0);
       const qtyRequested = Number(ln.cantidad || ln.qty || 0);
-      // Aceptar tanto `precio_salida` (forma correcta) como `precio` (legacy)
-      // para mantener compatibilidad con clientes que aún mandan el nombre viejo.
-      const precioSalida = Number(ln.precio_salida || ln.precio || 0);
       if (!id_producto || qtyRequested <= 0) continue;
+      const [[prod]] = await conn.query('SELECT nombre_producto, sku FROM productos WHERE id_producto = ?', [id_producto]);
+      const pName = prod ? `"${prod.nombre_producto}" (SKU: ${prod.sku})` : `producto #${id_producto}`;
+
+      const precioSalida = Number(ln.precio_salida || ln.precio || 0);
       if (requierePrecioSalida && precioSalida <= 0) {
         await conn.rollback();
-        return res.status(400).json({ error: `El precio de salida es obligatorio para producto #${id_producto}` });
+        return res.status(400).json({ error: `El precio de salida es obligatorio para producto ${pName}` });
       }
       if (!(await isProductVisibleInWarehouse(conn, id_producto, id_bodega_origen))) {
         await conn.rollback();
-        return res.status(400).json({ error: `El producto #${id_producto} no esta habilitado para la bodega origen` });
+        return res.status(400).json({ error: `El producto ${pName} no esta habilitado para la bodega origen` });
       }
       if (useTransfer && !(await isProductVisibleInWarehouse(conn, id_producto, idDestino))) {
         await conn.rollback();
-        return res.status(400).json({ error: `El producto #${id_producto} no esta habilitado para la bodega destino` });
+        return res.status(400).json({ error: `El producto ${pName} no esta habilitado para la bodega destino` });
       }
 
       // Si el motivo NO es merma/descomposicion, FEFO excluye lotes vencidos.
@@ -5672,8 +5685,8 @@ app.post("/api/salidas", auth, requirePermission("action.create_update", "regist
         await conn.rollback();
         return res.status(400).json({
           error: allowExpiredWriteoff
-            ? `Stock insuficiente para producto #${id_producto}`
-            : `Stock insuficiente (vigente) para producto #${id_producto}. Si es merma usa un motivo de Merma o Descomposicion.`,
+            ? `Stock insuficiente para producto ${pName}`
+            : `Stock insuficiente (vigente) para producto ${pName}. Si es merma usa un motivo de Merma o Descomposicion.`,
         });
       }
 
@@ -5747,6 +5760,16 @@ app.post("/api/salidas", auth, requirePermission("action.create_update", "regist
     }
 
     await conn.commit();
+    emitStockChanged(id_bodega_origen, {
+      action: "salida",
+      id_movimiento,
+    });
+    if (useTransfer) {
+      emitStockChanged(idDestino, {
+        action: "entrada",
+        id_movimiento,
+      });
+    }
     await writeSensitiveActionAudit({
       req,
       action_key: "SALIDA_AJUSTE_MANUAL",
@@ -9169,8 +9192,10 @@ app.post("/api/orders", auth, requirePermission("action.create_update", "crear p
 
     for (const ln of lines) {
       if (ln?.id_product && !(await isProductVisibleInWarehouse(conn, ln.id_product, requestedFromWarehouseId))) {
+        const [[p]] = await conn.query('SELECT nombre_producto, sku FROM productos WHERE id_producto = ?', [ln.id_product]);
+        const pName = p ? `"${p.nombre_producto}" (SKU: ${p.sku})` : `producto #${ln.id_product}`;
         await conn.rollback();
-        return res.status(400).json({ error: `El producto #${ln.id_product} no esta habilitado para la bodega que despacha` });
+        return res.status(400).json({ error: `El producto ${pName} no esta habilitado para la bodega que despacha` });
       }
       if (!ln.id_product || !ln.qty_requested || ln.qty_requested <= 0) continue;
       await conn.query(
@@ -9703,6 +9728,16 @@ app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "
     }
 
     await conn.commit();
+    emitStockChanged(pe.id_bodega_surtidor, {
+      action: "salida",
+      id_movimiento,
+    });
+    if (useTransfer && cfg?.maneja_stock === 1) {
+      emitStockChanged(pe.id_bodega_solicita, {
+        action: "entrada",
+        id_movimiento,
+      });
+    }
     emitPedidoChanged({
       id_pedido,
       requester_warehouse_id: pe.id_bodega_solicita,
@@ -11716,20 +11751,21 @@ app.post("/api/transferencias", auth, requirePermission("action.create_update", 
 
       // Validar producto y visibilidad en ambas bodegas
       const [[prod]] = await conn.query(
-        `SELECT id_producto FROM productos WHERE id_producto=:id_producto LIMIT 1`,
+        `SELECT id_producto, nombre_producto, sku FROM productos WHERE id_producto=:id_producto LIMIT 1`,
         { id_producto }
       );
       if (!prod) {
         await conn.rollback();
         return res.status(400).json({ error: `Producto #${id_producto} no existe` });
       }
+      const pName = `"${prod.nombre_producto}" (SKU: ${prod.sku})`;
       if (!(await isProductVisibleInWarehouse(conn, id_producto, id_origen))) {
         await conn.rollback();
-        return res.status(400).json({ error: `El producto #${id_producto} no esta habilitado para la bodega origen` });
+        return res.status(400).json({ error: `El producto ${pName} no esta habilitado para la bodega origen` });
       }
       if (!(await isProductVisibleInWarehouse(conn, id_producto, id_destino))) {
         await conn.rollback();
-        return res.status(400).json({ error: `El producto #${id_producto} no esta habilitado para la bodega destino` });
+        return res.status(400).json({ error: `El producto ${pName} no esta habilitado para la bodega destino` });
       }
 
       // Seleccionar lotes: FEFO si no se especifica lote; validar el lote pedido si viene.
@@ -11747,7 +11783,7 @@ app.post("/api/transferencias", auth, requirePermission("action.create_update", 
         if (!lotRow || stockLote < cantidad) {
           await conn.rollback();
           return res.status(400).json({
-            error: `Stock insuficiente del lote "${loteSolicitado}" para producto #${id_producto}: disponible ${stockLote}, solicitado ${cantidad}`,
+            error: `Stock insuficiente del lote "${loteSolicitado}" para producto ${pName}: disponible ${stockLote}, solicitado ${cantidad}`,
           });
         }
         picks = [{ lote: loteSolicitado, fecha_vencimiento: lotRow.fecha_vencimiento, qty: cantidad }];
@@ -11756,7 +11792,7 @@ app.post("/api/transferencias", auth, requirePermission("action.create_update", 
         if (!r.picks.length || r.remaining > 0) {
           await conn.rollback();
           return res.status(400).json({
-            error: `Stock insuficiente (vigente) en origen para producto #${id_producto}: solicitado ${cantidad}`,
+            error: `Stock insuficiente (vigente) en origen para producto ${pName}: solicitado ${cantidad}`,
           });
         }
         picks = r.picks;
@@ -11823,6 +11859,14 @@ app.post("/api/transferencias", auth, requirePermission("action.create_update", 
     }
 
     await conn.commit();
+    emitStockChanged(id_origen, {
+      action: "salida",
+      id_movimiento,
+    });
+    emitStockChanged(id_destino, {
+      action: "entrada",
+      id_movimiento,
+    });
     res.json({ ok: true, id_movimiento, total_lineas: totalLineas });
   } catch (e) {
     await conn.rollback().catch(() => {});
@@ -11980,9 +12024,11 @@ app.post("/api/movimientos/:id/revert", auth, requirePermission("action.create_u
             [row.id_bodega, ln.id_producto, row.lote]
           );
           if (Number(st?.stock || 0) < Math.abs(deltaInv) - 1e-9) {
+            const [[p]] = await conn.query('SELECT nombre_producto, sku FROM productos WHERE id_producto = ?', [ln.id_producto]);
+            const pName = p ? `"${p.nombre_producto}" (SKU: ${p.sku})` : `producto #${ln.id_producto}`;
             await conn.rollback();
             return res.status(400).json({
-              error: `No se puede revertir: stock insuficiente del producto #${ln.id_producto} (lote ${row.lote ?? "sin lote"}) en bodega #${row.id_bodega}. Ya fue consumido.`,
+              error: `No se puede revertir: stock insuficiente del producto ${pName} (lote ${row.lote ?? "sin lote"}) en bodega #${row.id_bodega}. Ya fue consumido.`,
             });
           }
         }
@@ -12177,9 +12223,11 @@ app.post("/api/transferencias/:id/revert", auth, requirePermission("action.creat
       );
       const disponible = Number(stockRow?.disponible || 0);
       if (disponible < cantidad) {
+        const [[p]] = await conn.query('SELECT nombre_producto, sku FROM productos WHERE id_producto = ?', [id_producto]);
+        const pName = p ? `"${p.nombre_producto}" (SKU: ${p.sku})` : `producto #${id_producto}`;
         await conn.rollback();
         return res.status(400).json({
-          error: `Stock insuficiente en bodega destino para revertir producto #${id_producto} (lote ${lote ?? "sin lote"}): disponible ${disponible}, requerido ${cantidad}`,
+          error: `Stock insuficiente en bodega destino para revertir producto ${pName} (lote ${lote ?? "sin lote"}): disponible ${disponible}, requerido ${cantidad}`,
         });
       }
 
