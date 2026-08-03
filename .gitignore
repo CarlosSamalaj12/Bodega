@@ -79,3 +79,7 @@ backups/
 
 # Script temporal de generación de cierres
 generar_cierres.js
+
+bdbodega1.sql
+reporte_duplicados.doc
+reporte_duplicados_limpio.doc

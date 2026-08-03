@@ -9164,11 +9164,17 @@ app.post("/api/orders", auth, requirePermission("action.create_update", "crear p
     }
     
     let finalRequesterUserId = requester_user_id;
+    let actualRequesterUser = requesterUser;
     
     if (!requesterUser.pin_hash) {
       const matchedUser = await findOrderPinCollision(requester_pin, 0, conn, true);
       if (matchedUser) {
         finalRequesterUserId = matchedUser.id_usuario;
+        const [[dbUser]] = await conn.query(
+          `SELECT id_usuario, id_bodega, activo FROM usuarios WHERE id_usuario = ? LIMIT 1`,
+          [matchedUser.id_usuario]
+        );
+        if (dbUser) actualRequesterUser = dbUser;
       } else {
         await conn.rollback();
         return res.status(400).json({ error: "El usuario solicitante no tiene PIN de pedidos configurado" });
@@ -9179,6 +9185,11 @@ app.post("/api/orders", auth, requirePermission("action.create_update", "crear p
         const matchedUser = await findOrderPinCollision(requester_pin, 0, conn, true);
         if (matchedUser) {
           finalRequesterUserId = matchedUser.id_usuario;
+          const [[dbUser]] = await conn.query(
+            `SELECT id_usuario, id_bodega, activo FROM usuarios WHERE id_usuario = ? LIMIT 1`,
+            [matchedUser.id_usuario]
+          );
+          if (dbUser) actualRequesterUser = dbUser;
         } else {
           trackPinFailure("order", { requester_user_id, actor_user_id: Number(req.user?.id_user || 0) });
           await conn.rollback();
@@ -9187,7 +9198,7 @@ app.post("/api/orders", auth, requirePermission("action.create_update", "crear p
       }
     }
     
-    const requester_warehouse_id = Number(requesterUser.id_bodega || 0);
+    const requester_warehouse_id = Number(actualRequesterUser.id_bodega || 0);
     if (!requester_warehouse_id) {
       await conn.rollback();
       return res.status(400).json({ error: "Usuario solicitante sin bodega asignada" });
