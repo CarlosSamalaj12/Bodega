@@ -67,9 +67,10 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
   []);
 
   const setCantidad = useCallback((idx, value) => {
-    const v = String(value).replace(/[^\d]/g, '');
-    const num = v === '' ? 0 : (parseInt(v, 10) || 0);
-    setLine(idx, { cantidad: num });
+    // Guardamos la cadena cruda para preservar lo que el usuario tipea
+    // (ej. "1.", "1.5"). El navegador ya bloquea caracteres no numéricos
+    // con type="number" + step="0.001", así que no hace falta sanear.
+    setLine(idx, { cantidad: value });
   }, [setLine]);
 
   const anularLinea = useCallback((idx) => {
@@ -124,9 +125,27 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
   // Despacho rápido: envía al servidor SOLO las líneas indicadas (por producto
   // o todas). El backend valida stock vigente y vencimiento (FEFO). Tras
   // despachar refresca el detalle; si ya no queda pendiente, cierra el modal.
+  //
+  // Importante: la cantidad a despachar es la que el usuario tipeó en el
+  // input (`l.cantidad`), NO el pendiente. Esto permite hacer un despacho
+  // parcial desde el botón ⚡ sin tener que usar el submit principal.
+  // Antes se mandaba siempre el pendiente completo, lo que confundía al
+  // operador (veía "1" en el input pero el sistema despachaba 50).
+  //
+  // Opciones:
+  //   - usePendingQty=true  → usa SIEMPRE el pendiente (caso "Despachar todo")
+  //   - usePendingQty=false → usa la cantidad tipeada (caso botón ⚡ por línea)
   const quickDispatch = useCallback(
-    async (targetLines) => {
-      const linesAFulfill = targetLines.filter((l) => Number(l.pendiente || 0) > 0 && !l.anulada);
+    async (targetLines, { usePendingQty = false } = {}) => {
+      const linesAFulfill = targetLines.filter((l) => !l.anulada).map((l) => {
+        if (usePendingQty) {
+          return { ...l, _qty: Number(l.pendiente || 0) };
+        }
+        const typed = Number(l.cantidad);
+        const hasTyped = Number.isFinite(typed) && typed > 0;
+        const qty = hasTyped ? typed : Number(l.pendiente || 0);
+        return { ...l, _qty: qty };
+      }).filter((l) => l._qty > 0 && Number(l.pendiente || 0) > 0);
       if (!linesAFulfill.length) return;
       onSubmittingChange?.(true);
       setSubmitError(null);
@@ -135,7 +154,7 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
           justificacion: justificacion.trim() || null,
           lines: linesAFulfill.map((l) => ({
             id_pedido_detalle: l.id_pedido_detalle,
-            qty: Number(l.pendiente || 0),
+            qty: l._qty,
           })),
         });
         const skipped = Array.isArray(res?.skipped) ? res.skipped : [];
@@ -176,7 +195,17 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
 
   const dispatchLine = useCallback(
     (l) => {
-      if (Number(l.pendiente || 0) <= 0 || l.anulada) return;
+      if (l.anulada) return;
+      const cant = Number(l.cantidad);
+      const pend = Number(l.pendiente || 0);
+      const stock = Number(l.stock || 0);
+      // Bloqueos:
+      //  - línea sin pendiente
+      //  - cantidad tipeada vacía o 0
+      //  - cantidad tipeada mayor al stock disponible
+      if (pend <= 0) return;
+      if (!Number.isFinite(cant) || cant <= 0) return;
+      if (cant > stock) return;
       quickDispatch([l]);
     },
     [quickDispatch]
@@ -184,7 +213,9 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
 
   const dispatchAll = useCallback(() => {
     if (!canDispatchAll) return;
-    quickDispatch(pendingLines);
+    // "Despachar todo" siempre despacha el pendiente completo de cada
+    // línea, sin importar lo que el usuario haya tipeado individualmente.
+    quickDispatch(pendingLines, { usePendingQty: true });
   }, [canDispatchAll, pendingLines, quickDispatch]);
 
   const handleSubmit = async (e) => {
@@ -333,12 +364,12 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
               type="number"
               className={`input despacho-form__input ${overStock ? 'despacho-form__input--warn' : ''} ${sobreDespacho ? 'despacho-form__input--info' : ''}`}
               min="0"
-              step="1"
-              pattern="[0-9]*"
+              step="0.001"
+              inputMode="decimal"
               value={l.cantidad}
               onChange={(e) => setCantidad(idx, e.target.value)}
               disabled={l.pendiente === 0 || l.anulada}
-              title={sobreDespacho ? `Estás despachando ${cant - pend} unidad(es) de más sobre lo solicitado` : ''}
+              title={sobreDespacho ? `Estás despachando ${(cant - pend).toFixed(3)} sobre lo solicitado` : ''}
             />
             {overStock && (
               <div className="despacho-form__warn">Sin stock suficiente — disp. {l.stock}</div>
@@ -367,19 +398,34 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
       label: '',
       width: 76,
       hideOnMobile: true,
-      render: (l, idx) => (
+      render: (l, idx) => {
+        const cant = Number(l.cantidad);
+        const pend = Number(l.pendiente || 0);
+        const stock = Number(l.stock || 0);
+        const cantValida = Number.isFinite(cant) && cant > 0;
+        const sobreStock = cantValida && cant > stock;
+        const quickDisabled =
+          submitting ||
+          l.anulada ||
+          pend <= 0 ||
+          !cantValida ||
+          sobreStock;
+        const quickTitle = (() => {
+          if (l.anulada) return 'Línea anulada';
+          if (pend <= 0) return 'Línea ya despachada';
+          if (!cantValida) return 'Escribe una cantidad mayor a 0';
+          if (sobreStock) return `Sin stock suficiente (disp. ${stock})`;
+          return `Despachar ${cant} u. de ${l.nombre_producto}`;
+        })();
+        return (
         <div className="despacho-form__row-actions">
           {l.pendiente > 0 && !l.anulada && (
             <button
               type="button"
               className="despacho-form__quick"
               onClick={() => dispatchLine(l)}
-              disabled={submitting || Number(l.stock || 0) < Number(l.pendiente || 0)}
-              title={
-                Number(l.stock || 0) < Number(l.pendiente || 0)
-                  ? `Sin stock suficiente (disp. ${l.stock})`
-                  : `Despachar solo ${l.nombre_producto} (${l.pendiente} u.)`
-              }
+              disabled={quickDisabled}
+              title={quickTitle}
               aria-label={`Despachar ${l.nombre_producto}`}
             >
               ⚡
@@ -407,7 +453,8 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
             </button>
           ) : null}
         </div>
-      ),
+        );
+      },
     },
   ];
 
@@ -453,16 +500,35 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
 
       {/* En móvil, acciones rápidas por línea (despachar / anular / rehabilitar) */}
       <div className="despacho-form__anular-mobile">
-        {lines.map((l, idx) => (
+        {lines.map((l, idx) => {
+          const cant = Number(l.cantidad);
+          const pend = Number(l.pendiente || 0);
+          const stock = Number(l.stock || 0);
+          const cantValida = Number.isFinite(cant) && cant > 0;
+          const sobreStock = cantValida && cant > stock;
+          const quickDisabled =
+            submitting ||
+            l.anulada ||
+            pend <= 0 ||
+            !cantValida ||
+            sobreStock;
+          return (
           <div key={l.id_pedido_detalle} className="despacho-form__mobile-row">
             {l.pendiente > 0 && !l.anulada && (
               <button
                 type="button"
                 className="despacho-form__quick-mobile-btn"
                 onClick={() => dispatchLine(l)}
-                disabled={submitting || Number(l.stock || 0) < Number(l.pendiente || 0)}
+                disabled={quickDisabled}
+                title={
+                  sobreStock
+                    ? `Sin stock suficiente (disp. ${stock})`
+                    : !cantValida
+                    ? 'Escribe una cantidad mayor a 0'
+                    : `Despachar ${cant} u.`
+                }
               >
-                ⚡ Despachar: {l.nombre_producto} ({l.pendiente} u.)
+                ⚡ Despachar: {l.nombre_producto} ({cantValida ? cant : pend} u.)
               </button>
             )}
             {l.pendiente > 0 && !l.anulada ? (
@@ -483,7 +549,8 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
               </button>
             ) : null}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {totales.esParcial && (

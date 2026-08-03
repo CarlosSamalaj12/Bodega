@@ -166,6 +166,23 @@ export function printPedidoPos80mm(pedido, opts = {}) {
       text-overflow: ellipsis;
     }
 
+    .line-note {
+      display: block;
+      margin-top: 2px;
+      font-size: 11px;
+      font-style: italic;
+      font-weight: normal;
+      color: #444;
+      line-height: 1.15;
+      white-space: normal;
+      word-break: break-word;
+    }
+    .line-note::before {
+      content: "Nota: ";
+      font-style: normal;
+      font-weight: bold;
+    }
+
     .lines-table td.right {
       text-align: right;
       white-space: nowrap;
@@ -280,7 +297,7 @@ export function printPedidoPos80mm(pedido, opts = {}) {
       <tbody>
         ${lines.map(l => `
         <tr>
-          <td class="product-name">${esc(l.nombre_producto) || '—'}</td>
+          <td class="product-name">${esc(l.nombre_producto) || '—'}${l.observacion_producto ? `<span class="line-note">${esc(l.observacion_producto)}</span>` : ''}</td>
           <td class="right">${Number(l.cantidad_solicitada || 0)}</td>
           <td class="right">${Number(l.cantidad_surtida || 0) || ''}</td>
           <td class="right">${Number(l.pendiente || 0)}</td>
@@ -578,6 +595,22 @@ export function printPedidoLetterSize(pedido, opts = {}) {
       border-radius: 2pt;
     }
 
+    /* Observacion por linea de pedido (debajo del nombre del producto) */
+    .line-note {
+      display: block;
+      margin-top: 2pt;
+      font-size: 7.5pt;
+      font-style: italic;
+      color: #555;
+      line-height: 1.2;
+    }
+    .line-note::before {
+      content: "Nota: ";
+      font-style: normal;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+
     /* ===== Firmas ===== */
     .signatures {
       margin-top: 10pt;
@@ -738,7 +771,7 @@ export function printPedidoLetterSize(pedido, opts = {}) {
           ${lines.map((l, i) => `
           <tr>
             <td>${i + 1}</td>
-            <td>${esc(l.nombre_producto) || '—'}</td>
+            <td>${esc(l.nombre_producto) || '—'}${l.observacion_producto ? `<span class="line-note">${esc(l.observacion_producto)}</span>` : ''}</td>
             <td class="r">${Number(l.cantidad_solicitada || 0)}</td>
             <td class="r">${Number(l.cantidad_surtida || 0) || ''}</td>
             <td class="r">${Number(l.pendiente || 0) || ''}</td>

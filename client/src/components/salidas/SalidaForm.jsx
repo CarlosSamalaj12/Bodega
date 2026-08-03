@@ -254,7 +254,8 @@ export function SalidaForm({
               type="number"
               className={`input salida-form__num ${err ? 'input--error' : ''}`}
               min="0"
-              step="1"
+              step="0.001"
+              inputMode="decimal"
               value={l.cantidad}
               onChange={(e) => setLine(idx, { cantidad: e.target.value })}
               placeholder="0"

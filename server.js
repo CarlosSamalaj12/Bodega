@@ -9464,6 +9464,7 @@ app.get("/api/orders/:id/details", auth, async (req, res) => {
             d.cantidad_solicitada, d.cantidad_surtida,
             COALESCE(d.estado_linea, 'PENDIENTE') AS estado_linea,
             d.justificacion_linea,
+            d.observacion_producto,
             CASE
               WHEN COALESCE(d.estado_linea, 'PENDIENTE')='ANULADO' THEN 0
               ELSE GREATEST(d.cantidad_solicitada - d.cantidad_surtida, 0)
