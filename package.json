@@ -11,7 +11,8 @@
     "build:client": "cd client && npm run build",
     "test:stock": "node test_reconcile_stock.cjs && node test_kardex_triggers.cjs && node test_reversa_e2e.cjs && node test_despacho_rapido.cjs && node test_bench_reportes.cjs && node test_stock_history.cjs",
     "test:stock:fix": "node test_reconcile_stock.cjs --fix && node test_kardex_triggers.cjs && node test_reversa_e2e.cjs && node test_despacho_rapido.cjs && node test_bench_reportes.cjs && node test_stock_history.cjs",
-    "deploy:stock": "npm run test:stock:fix",        "doctor": "cd client && npx react-doctor@latest"
+    "deploy:stock": "npm run test:stock:fix",
+    "doctor": "cd client && npx react-doctor@latest"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -22,6 +23,7 @@
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.16.3",
     "socket.io": "^4.8.3",
+    "ssh2": "^1.17.0",
     "web-push": "^3.6.7"
   },
   "description": "",

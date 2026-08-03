@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
 import { formatDate } from '@/utils/format';
+import { getSocket } from '@/services/socket';
 import './MovimientosListTable.scss';
 
 /**
@@ -128,6 +129,22 @@ export function MovimientosListTable({
       loadData({ background: true });
     }
   }, [reloadKey, loadData]);
+
+  useEffect(() => {
+    let socket;
+    try {
+      socket = getSocket();
+    } catch { return; }
+
+    const onStockChanged = () => {
+      loadData({ background: true });
+    };
+    socket.on('stock:changed', onStockChanged);
+
+    return () => {
+      socket.off('stock:changed', onStockChanged);
+    };
+  }, [loadData]);
 
   // Recargar cuando cambia el rango de fechas (sin afectar reloadKey)
   useEffect(() => {

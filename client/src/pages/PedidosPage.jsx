@@ -18,6 +18,7 @@ import { catalogosService } from '@/services/catalogos.service';
 import { pedidosService } from '@/services/pedidos.service';
 import { printPedidoPos80mm } from '@/utils/print';
 import { PedidoForm } from '@/components/pedidos/PedidoForm';
+import { getSocket } from '@/services/socket';
 import { ConfirmarRecepcionModal } from '@/components/pedidos/ConfirmarRecepcionModal';
 import './PedidosPage.scss';
 
@@ -104,6 +105,24 @@ export default function PedidosPage() {
     loadCatalogs();
     loadPedidos();
   }, [loadCatalogs, loadPedidos]);
+
+  useEffect(() => {
+    let socket;
+    try {
+      socket = getSocket();
+    } catch { return; }
+
+    const onPedidosChanged = () => {
+      loadPedidos();
+    };
+    socket.on('pedido:changed', onPedidosChanged);
+    socket.on('stock:changed', onPedidosChanged);
+
+    return () => {
+      socket.off('pedido:changed', onPedidosChanged);
+      socket.off('stock:changed', onPedidosChanged);
+    };
+  }, [loadPedidos]);
 
   const handleCreated = async (data) => {
     setModalOpen(false);

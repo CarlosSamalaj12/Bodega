@@ -17,6 +17,7 @@ import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import { formatDate } from '@/utils/format';
 import api from '@/services/api';
+import { getSocket } from '@/services/socket';
 import './TransferenciasPage.scss';
 
 const RANGE_PRESETS = [
@@ -249,6 +250,22 @@ export default function TransferenciasPage() {
   }, [dateFrom, dateTo, page, limit, selectedProduct]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    let socket;
+    try {
+      socket = getSocket();
+    } catch { return; }
+
+    const onStockChanged = () => {
+      fetchData();
+    };
+    socket.on('stock:changed', onStockChanged);
+
+    return () => {
+      socket.off('stock:changed', onStockChanged);
+    };
+  }, [fetchData]);
 
   useEffect(() => { setPage(1); }, [dateFrom, dateTo, selectedProduct]);
 

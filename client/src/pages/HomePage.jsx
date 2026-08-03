@@ -13,6 +13,7 @@ import { dashboardService } from '@/services/dashboard.service';
 import { entradasService } from '@/services/entradas.service';
 import { salidasService } from '@/services/salidas.service';
 import { pedidosService } from '@/services/pedidos.service';
+import { getSocket } from '@/services/socket';
 import './HomePage.scss';
 
 const DashboardCharts = lazy(() => import('@/components/dashboard/DashboardCharts'));
@@ -73,6 +74,24 @@ export default function HomePage() {
 
   useEffect(() => {
     loadDashboard();
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    let socket;
+    try {
+      socket = getSocket();
+    } catch { return; }
+
+    const onDashboardChanged = () => {
+      loadDashboard();
+    };
+    socket.on('stock:changed', onDashboardChanged);
+    socket.on('pedido:changed', onDashboardChanged);
+
+    return () => {
+      socket.off('stock:changed', onDashboardChanged);
+      socket.off('pedido:changed', onDashboardChanged);
+    };
   }, [loadDashboard]);
 
   // Normalizar los valores del resumen a números

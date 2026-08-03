@@ -9,6 +9,7 @@ import { toast } from '@/components/ui/Toast';
 import { kardexService } from '@/services/kardex.service';
 import { productosService } from '@/services/productos.service';
 import { catalogosService } from '@/services/catalogos.service';
+import { getSocket } from '@/services/socket';
 import './KardexPage.scss';
 
 const TIPO_FILTRO = [
@@ -131,6 +132,22 @@ export default function KardexPage() {
   useEffect(() => {
     fetchKardexProducto();
   }, [fetchKardexProducto, tipoFiltro, fromDate, toDate, loteFiltro, todasLasBodegas]);
+
+  useEffect(() => {
+    let socket;
+    try {
+      socket = getSocket();
+    } catch { return; }
+
+    const onStockChanged = () => {
+      fetchKardexProducto();
+    };
+    socket.on('stock:changed', onStockChanged);
+
+    return () => {
+      socket.off('stock:changed', onStockChanged);
+    };
+  }, [fetchKardexProducto]);
 
   // ─── Derivados: separar entradas y salidas, calcular totales ───
   const { entradas, salidas, totales } = useMemo(() => {

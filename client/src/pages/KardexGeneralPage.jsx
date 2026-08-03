@@ -14,6 +14,7 @@ import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import { formatDate } from '@/utils/format';
 import { kardexService } from '@/services/kardex.service';
 import { catalogosService } from '@/services/catalogos.service';
+import { getSocket } from '@/services/socket';
 import './KardexPage.scss';
 
 const TIPO_MOVIMIENTO = [
@@ -114,6 +115,22 @@ export default function KardexGeneralPage() {
     fromDate,
     toDate,
   ]);
+
+  useEffect(() => {
+    let socket;
+    try {
+      socket = getSocket();
+    } catch { return; }
+
+    const onStockChanged = () => {
+      fetchKardex();
+    };
+    socket.on('stock:changed', onStockChanged);
+
+    return () => {
+      socket.off('stock:changed', onStockChanged);
+    };
+  }, [fetchKardex]);
 
   useEffect(() => { setPage(1); }, [committedSearch, tipo, categoriaId, fromDate, toDate, pageSize]);
 

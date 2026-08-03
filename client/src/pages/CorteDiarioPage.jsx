@@ -18,6 +18,7 @@ import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import { formatDate } from '@/utils/format';
 import { catalogosService } from '@/services/catalogos.service';
 import api from '@/services/api';
+import { getSocket } from '@/services/socket';
 import './CorteDiarioPage.scss';
 
 export default function CorteDiarioPage() {
@@ -126,6 +127,23 @@ export default function CorteDiarioPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
   useEffect(() => { fetchCierreStatus(); }, [fetchCierreStatus]);
+
+  useEffect(() => {
+    let socket;
+    try {
+      socket = getSocket();
+    } catch { return; }
+
+    const onStockChanged = () => {
+      fetchData();
+      fetchCierreStatus();
+    };
+    socket.on('stock:changed', onStockChanged);
+
+    return () => {
+      socket.off('stock:changed', onStockChanged);
+    };
+  }, [fetchData, fetchCierreStatus]);
 
   // Limpiar conteos finales cuando cambian los datos (nueva bodega o refrescar)
   useEffect(() => {
