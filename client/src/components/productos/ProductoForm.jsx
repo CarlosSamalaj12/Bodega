@@ -16,12 +16,26 @@ const EMPTY = {
   id_bodegas_visibles: [],
 };
 
+/**
+ * Construye el valor inicial de `id_bodegas_visibles` para un producto nuevo.
+ * - Si el usuario tiene una bodega por defecto y esa bodega está activa
+ *   → preselecciona SOLO esa bodega (comportamiento "Mi bodega" al crear).
+ * - Si no hay default o la bodega no está activa → array vacío = "Todas".
+ */
+function buildInitialVisibilidad(defaultBodegaId, bodegas) {
+  const def = Number(defaultBodegaId || 0);
+  if (!def) return [];
+  const existe = (bodegas || []).some((b) => Number(b.id_bodega) === def && Number(b.activo) === 1);
+  return existe ? [def] : [];
+}
+
 export function ProductoForm({
   initial = null,
   categorias = [],
   subcategorias = [],
   medidas = [],
   bodegas = [],
+  defaultBodegaId = null,
   onSubmit,
   onCancel,
   submitting = false,
@@ -42,9 +56,12 @@ export function ProductoForm({
         id_bodegas_visibles: initial.id_bodegas_visibles || [],
       });
     } else {
-      setValues(EMPTY);
+      setValues({
+        ...EMPTY,
+        id_bodegas_visibles: buildInitialVisibilidad(defaultBodegaId, bodegas),
+      });
     }
-  }, [initial]);
+  }, [initial, defaultBodegaId, bodegas]);
 
   // Subcategorías filtradas por categoría
   const subcategoriasFiltradas = values.id_categoria
@@ -61,6 +78,27 @@ export function ProductoForm({
       return { ...prev, id_bodegas_visibles: [...list] };
     });
   };
+
+  // ── Acciones masivas sobre bodegas visibles ──
+  const selectAllBodegas = () => {
+    set('id_bodegas_visibles', bodegas.map((b) => Number(b.id_bodega)).filter(Boolean));
+  };
+  const clearAllBodegas = () => set('id_bodegas_visibles', []);
+  const selectOnlyDefaultBodega = () => {
+    const def = Number(defaultBodegaId || 0);
+    if (!def) return;
+    set('id_bodegas_visibles', [def]);
+  };
+
+  // ── Estado derivado para los botones bulk ──
+  const allSelected =
+    bodegas.length > 0 &&
+    bodegas.every((b) => values.id_bodegas_visibles.includes(Number(b.id_bodega)));
+  const noneSelected = values.id_bodegas_visibles.length === 0;
+  const hasDefaultBodega = Number(defaultBodegaId || 0) > 0;
+  const defaultBodegaNombre = hasDefaultBodega
+    ? bodegas.find((b) => Number(b.id_bodega) === Number(defaultBodegaId))?.nombre_bodega
+    : null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -132,8 +170,50 @@ export function ProductoForm({
       <div className="producto-form__field">
         <label className="producto-form__label">Visibilidad por bodega</label>
         <p className="producto-form__hint">
-          Si no seleccionas ninguna, el producto será visible en todas las bodegas activas.
+          {hasDefaultBodega && !isEdit
+            ? `Por defecto, al crear un producto se asigna a tu bodega${defaultBodegaNombre ? ` (${defaultBodegaNombre})` : ''}. Si deseleccionas todas, el producto será visible en todas las bodegas activas.`
+            : 'Si no seleccionas ninguna, el producto será visible en todas las bodegas activas.'}
         </p>
+
+        <div className="producto-form__bulk">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={selectAllBodegas}
+            disabled={allSelected || bodegas.length === 0}
+            title="Marcar todas las bodegas como visibles"
+          >
+            Todas
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={clearAllBodegas}
+            disabled={noneSelected}
+            title="Deseleccionar todas las bodegas (visible en todas)"
+          >
+            Ninguna
+          </Button>
+          {hasDefaultBodega && (
+            <Button
+              type="button"
+              size="sm"
+              variant="subtle"
+              onClick={selectOnlyDefaultBodega}
+              title={`Dejar visible solo en tu bodega${defaultBodegaNombre ? ` (${defaultBodegaNombre})` : ''}`}
+            >
+              Mi bodega{defaultBodegaNombre ? `: ${defaultBodegaNombre}` : ''}
+            </Button>
+          )}
+          <span className="producto-form__bulk-count">
+            {values.id_bodegas_visibles.length === 0
+              ? 'Todas las bodegas'
+              : `${values.id_bodegas_visibles.length} de ${bodegas.length}`}
+          </span>
+        </div>
+
         <div className="producto-form__bodegas">
           {bodegas.length === 0 && (
             <span className="producto-form__muted">No hay bodegas activas.</span>
@@ -183,6 +263,7 @@ ProductoForm.propTypes = {
   subcategorias: PropTypes.array,
   medidas: PropTypes.array,
   bodegas: PropTypes.array,
+  defaultBodegaId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   onSubmit: PropTypes.func,
   onCancel: PropTypes.func,
   submitting: PropTypes.bool,
