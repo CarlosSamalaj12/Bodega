@@ -2635,6 +2635,50 @@ async function findOrderPinCollision(pin, excludeUserId = 0, conn = pool, onlyAc
   return null;
 }
 
+/**
+ * Busca si la `password` (en claro) coincide con la `contrasena_hash`
+ * de algún otro usuario. Las contraseñas están hasheadas con bcrypt,
+ * por lo que NO se puede indexar: hay que iterar y comparar una por una.
+ *
+ * Costo: O(n) por intento, ~100ms por comparación bcrypt a cost 10.
+ * Para este sistema (decenas de usuarios) es aceptable. Si el sistema
+ * crece a cientos de usuarios, conviene agregar un campo
+ * `password_fingerprint` (SHA-256) con UNIQUE para convertir el lookup
+ * en O(log n) y mantener la verificación de seguridad con bcrypt.
+ *
+ * @param {string} password - Contraseña en claro a verificar.
+ * @param {number} excludeUserId - ID del usuario a excluir de la búsqueda
+ *   (útil al resetear para que el usuario pueda "mantener" su misma pass).
+ * @param {object} conn - Conexión al pool (default: pool).
+ * @param {boolean} onlyActive - Si true, solo busca entre usuarios activos.
+ * @returns {Promise<{id_usuario, usuario, nombre_completo}|null>}
+ */
+async function findPasswordCollision(password, excludeUserId = 0, conn = pool, onlyActive = false) {
+  const safePass = String(password || "");
+  if (!safePass) return null;
+  const excluded = Number(excludeUserId || 0);
+  const [rows] = await conn.query(
+    `SELECT id_usuario, usuario, nombre_completo, activo, contrasena_hash
+     FROM usuarios
+     WHERE contrasena_hash IS NOT NULL
+       AND contrasena_hash <> ''
+       AND (:exclude_id<=0 OR id_usuario<>:exclude_id)
+       AND (:only_active=0 OR activo=1)`,
+    { exclude_id: excluded, only_active: onlyActive ? 1 : 0 }
+  );
+  for (const row of rows || []) {
+    const ok = await bcrypt.compare(safePass, String(row?.contrasena_hash || ""));
+    if (ok) {
+      return {
+        id_usuario: Number(row.id_usuario || 0),
+        usuario: String(row.usuario || ""),
+        nombre_completo: String(row.nombre_completo || ""),
+      };
+    }
+  }
+  return null;
+}
+
 async function verifySensitiveApproval(req, conn, actionLabel) {
   const actorUserId = Number(req.user?.id_user || 0);
   if (!actorUserId) {
@@ -10878,6 +10922,15 @@ app.post("/api/usuarios", auth, requirePermission("action.manage_permissions", "
         return res.status(409).json({ error: "Ese PIN de pedidos ya esta en uso por otro usuario" });
       }
     }
+    // ── Unica: la password no puede coincidir con la de otro usuario ──
+    // (el mismo usuario sí puede tener password == order_pin propio,
+    // eso es libre por diseño)
+    const duplicatedPassOwner = await findPasswordCollision(pass, 0, pool, false);
+    if (duplicatedPassOwner) {
+      return res.status(409).json({
+        error: "Esa contrasena ya esta en uso por otro usuario",
+      });
+    }
 
     const passHash = await bcrypt.hash(pass, 10);
     const [r] = await pool.query(
@@ -11058,6 +11111,17 @@ app.post("/api/usuarios/:id/reset-password", auth, requirePermission("action.man
     const pass = String(req.body?.password || "");
     if (!id_user) return res.status(400).json({ error: "Falta usuario" });
     if (!pass || pass.length < 6) return res.status(400).json({ error: "Contrasena invalida" });
+
+    // ── Unica: la nueva password no puede coincidir con la de otro
+    // usuario. Excluimos al propio id_user para permitir "resetear a la
+    // misma clave" (operación válida). El mismo usuario sí puede tener
+    // password == order_pin propio, eso es libre por diseño. ──
+    const duplicatedPassOwner = await findPasswordCollision(pass, id_user, pool, false);
+    if (duplicatedPassOwner) {
+      return res.status(409).json({
+        error: "Esa contrasena ya esta en uso por otro usuario",
+      });
+    }
 
     const passHash = await bcrypt.hash(pass, 10);
     const [r] = await pool.query(

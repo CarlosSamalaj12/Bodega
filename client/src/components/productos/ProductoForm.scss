@@ -28,6 +28,24 @@
     color: $color-text-subtle;
   }
 
+  &__bulk {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-2 $space-3;
+    background: $color-surface;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-sm;
+  }
+
+  &__bulk-count {
+    margin-left: auto;
+    font-size: $font-size-xs;
+    color: $color-text-subtle;
+    font-variant-numeric: tabular-nums;
+  }
+
   &__muted {
     color: $color-text-subtle;
     font-size: $font-size-sm;

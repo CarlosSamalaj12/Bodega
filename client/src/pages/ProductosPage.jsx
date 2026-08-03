@@ -441,6 +441,7 @@ export default function ProductosPage() {
           subcategorias={subcategorias}
           medidas={medidas}
           bodegas={bodegas}
+          defaultBodegaId={user?.id_warehouse ?? null}
           onSubmit={handleSubmit}
           onCancel={() => setModalOpen(false)}
           submitting={submitting}
