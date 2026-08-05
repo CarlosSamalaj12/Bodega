@@ -10,6 +10,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { toast } from '@/components/ui/Toast';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useStockScope } from '@/hooks/useStockScope';
+import { useWarehouseLogo } from '@/hooks/useWarehouseLogo';
+import { useAuthStore } from '@/stores/auth.store';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import { formatDate } from '@/utils/format';
@@ -52,6 +54,27 @@ export default function ReportePedidosPage() {
     const hit = list.find((b) => Number(b.id_bodega) === fixedBodegaId);
     return hit?.nombre_bodega || '';
   }, [stockScope, scopeBodegas, fixedBodegaId]);
+
+  // Logo y nombre de bodega para el PDF exportado.
+  const user = useAuthStore((s) => s.user);
+  const userBodegaId = Number(user?.id_warehouse || 0);
+  const userBodegaName = useMemo(() => {
+    if (!user || !Array.isArray(scopeBodegas)) return '';
+    const hit = scopeBodegas.find((b) => Number(b.id_bodega) === userBodegaId);
+    return hit?.nombre_bodega || '';
+  }, [user, scopeBodegas, userBodegaId]);
+  const { logoDataUri } = useWarehouseLogo(userBodegaId);
+  // Para pedidos, el nombre de bodega del PDF es la fija del bodeguero.
+  // Si el admin filtró por una específica (solicita o despacho), usamos esa.
+  const exportBodegaName = useMemo(() => {
+    const filtered = bodegaSolicitaId || bodegaDespachoId;
+    if (filtered) {
+      const list = Array.isArray(bodegas) ? bodegas : [];
+      const hit = list.find((b) => Number(b.id_bodega) === Number(filtered));
+      if (hit?.nombre_bodega) return hit.nombre_bodega;
+    }
+    return fixedBodegaName || userBodegaName || '';
+  }, [bodegaSolicitaId, bodegaDespachoId, bodegas, fixedBodegaName, userBodegaName]);
 
   // Filtros — búsqueda diferida (Enter o botón Buscar)
   const [search, setSearch] = useState('');
@@ -269,6 +292,8 @@ export default function ReportePedidosPage() {
           return Number(row[col.key] || 0).toFixed(2);
         return row[col.key];
       },
+      logoDataUri: format === 'pdf' ? logoDataUri : undefined,
+      warehouseName: format === 'pdf' ? exportBodegaName : undefined,
     });
     setShowColumnSelector(false);
   };

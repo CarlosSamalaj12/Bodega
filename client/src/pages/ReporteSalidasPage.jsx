@@ -9,6 +9,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { toast } from '@/components/ui/Toast';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useStockScope } from '@/hooks/useStockScope';
+import { useWarehouseLogo } from '@/hooks/useWarehouseLogo';
+import { useAuthStore } from '@/stores/auth.store';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import { formatDate } from '@/utils/format';
@@ -39,6 +41,24 @@ export default function ReporteSalidasPage() {
     const hit = list.find((b) => Number(b.id_bodega) === fixedBodegaId);
     return hit?.nombre_bodega || '';
   }, [stockScope, scopeBodegas, fixedBodegaId]);
+
+  // Logo y nombre de bodega para el PDF exportado.
+  const user = useAuthStore((s) => s.user);
+  const userBodegaId = Number(user?.id_warehouse || 0);
+  const userBodegaName = useMemo(() => {
+    if (!user || !Array.isArray(scopeBodegas)) return '';
+    const hit = scopeBodegas.find((b) => Number(b.id_bodega) === userBodegaId);
+    return hit?.nombre_bodega || '';
+  }, [user, scopeBodegas, userBodegaId]);
+  const { logoDataUri } = useWarehouseLogo(userBodegaId);
+  const exportBodegaName = useMemo(() => {
+    if (warehouseId) {
+      const list = Array.isArray(bodegas) ? bodegas : [];
+      const hit = list.find((b) => Number(b.id_bodega) === Number(warehouseId));
+      if (hit?.nombre_bodega) return hit.nombre_bodega;
+    }
+    return fixedBodegaName || userBodegaName || '';
+  }, [warehouseId, bodegas, fixedBodegaName, userBodegaName]);
 
   // Filtros
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -288,6 +308,8 @@ export default function ReporteSalidasPage() {
         }
         return row[col.key];
       },
+      logoDataUri: format === 'pdf' ? logoDataUri : undefined,
+      warehouseName: format === 'pdf' ? exportBodegaName : undefined,
     });
     setShowColumnSelector(false);
   };

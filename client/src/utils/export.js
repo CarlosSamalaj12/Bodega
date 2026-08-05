@@ -100,9 +100,13 @@ export function downloadXLSX(rows, opts = {}) {
  * @param {string} options.filename
  * @param {object[]} options.columns - { key, label }
  * @param {function} [options.format] - (row, col) => valor formateado
+ * @param {string} [options.logoDataUri] - Logo en data URI (image/png o image/jpeg)
+ *   para mostrar arriba a la izquierda del PDF.
+ * @param {string} [options.warehouseName] - Nombre de la bodega, se muestra al
+ *   lado del logo como subtítulo.
  */
 export function downloadPDF(rows, opts = {}) {
-  const { filename = 'export', columns, format } = opts;
+  const { filename = 'export', columns, format, logoDataUri, warehouseName } = opts;
   if (!rows?.length || !columns?.length) return;
   const { header, data } = prepareData(rows, { columns, format });
 
@@ -125,19 +129,50 @@ export function downloadPDF(rows, opts = {}) {
 
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
 
+    // Layout: si hay logo, ocupa la izquierda (max 30mm de ancho × 14mm de alto)
+    // y el título + bodega se corren a la derecha. Si no hay logo, queda como
+    // antes (título pegado al margen izquierdo).
+    const LOGO_MAX_W = 30;
+    const LOGO_MAX_H = 14;
+    const hasLogo = Boolean(logoDataUri) && /^data:image\/(png|jpe?g);base64,/i.test(logoDataUri);
+    const textX = hasLogo ? LOGO_MAX_W + 6 : 14;
+    const titleY = 18;
+
+    if (hasLogo) {
+      try {
+        // Detectar formato por el data URI. jsPDF soporta PNG y JPEG nativos.
+        const fmt = /\/png/i.test(logoDataUri) ? 'PNG' : 'JPEG';
+        doc.addImage(logoDataUri, fmt, 14, 6, LOGO_MAX_W, LOGO_MAX_H, undefined, 'FAST');
+      } catch (imgErr) {
+        // Si addImage falla (formato no soportado, base64 corrupto, etc.),
+        // seguimos sin logo en vez de romper la exportación.
+        console.warn('No se pudo incrustar el logo en el PDF:', imgErr);
+      }
+    }
+
     // Título
     const title = filename.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
     doc.setFontSize(14);
-    doc.text(title, 14, 18);
+    doc.setTextColor(0);
+    doc.text(title, textX, titleY);
 
-    // Subtítulo con fecha y total de filas
+    // Subtítulo: nombre de bodega (si viene) arriba, y fecha/registros abajo
+    let subY = 24;
+    if (warehouseName) {
+      doc.setFontSize(10);
+      doc.setTextColor(80);
+      doc.text(warehouseName, textX, subY);
+      subY += 5;
+    }
     doc.setFontSize(8);
     doc.setTextColor(100);
-    doc.text(`${rows.length} registros · ${new Date().toLocaleDateString()}`, 14, 24);
+    doc.text(`${rows.length} registros · ${new Date().toLocaleDateString()}`, textX, subY);
 
-    // Tabla (nueva API: autoTable como función, no como método del doc)
+    // Tabla (nueva API: autoTable como función, no como método del doc).
+    // Si hay logo, bajamos el startY para que la tabla no se solape con él.
+    const startY = hasLogo ? Math.max(subY + 4, 24) : 28;
     autoTable(doc, {
-      startY: 28,
+      startY,
       head: [header],
       body: data,
       styles: {

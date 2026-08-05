@@ -9,6 +9,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { toast } from '@/components/ui/Toast';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useStockScope } from '@/hooks/useStockScope';
+import { useWarehouseLogo } from '@/hooks/useWarehouseLogo';
+import { useAuthStore } from '@/stores/auth.store';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import { formatDate } from '@/utils/format';
@@ -38,6 +40,29 @@ export default function ReporteEntradasPage() {
     const hit = list.find((b) => Number(b.id_bodega) === fixedBodegaId);
     return hit?.nombre_bodega || '';
   }, [stockScope, scopeBodegas, fixedBodegaId]);
+
+  // Logo para el PDF: usamos el de la bodega del usuario. Si el reporte está
+  // filtrado por una bodega distinta (admin que puede ver varias), el subtítulo
+  // muestra esa, pero el logo es siempre el de la marca del usuario.
+  const user = useAuthStore((s) => s.user);
+  const userBodegaId = Number(user?.id_warehouse || 0);
+  const userBodegaName = useMemo(() => {
+    if (!user || !Array.isArray(scopeBodegas)) return '';
+    const hit = scopeBodegas.find((b) => Number(b.id_bodega) === userBodegaId);
+    return hit?.nombre_bodega || '';
+  }, [user, scopeBodegas, userBodegaId]);
+  const { logoDataUri } = useWarehouseLogo(userBodegaId);
+  // Bodega que se muestra como subtítulo del PDF: la filtrada (si el user
+  // eligió una específica) o la fija del bodeguero. Si el admin no filtró,
+  // queda el nombre de su propia bodega.
+  const exportBodegaName = useMemo(() => {
+    if (warehouseId) {
+      const list = Array.isArray(bodegas) ? bodegas : [];
+      const hit = list.find((b) => Number(b.id_bodega) === Number(warehouseId));
+      if (hit?.nombre_bodega) return hit.nombre_bodega;
+    }
+    return fixedBodegaName || userBodegaName || '';
+  }, [warehouseId, bodegas, fixedBodegaName, userBodegaName]);
 
   // Filtros — búsqueda de producto seleccionado
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -300,6 +325,8 @@ export default function ReporteEntradasPage() {
         }
         return row[col.key];
       },
+      logoDataUri: format === 'pdf' ? logoDataUri : undefined,
+      warehouseName: format === 'pdf' ? exportBodegaName : undefined,
     });
     setShowColumnSelector(false);
   };

@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { toast } from '@/components/ui/Toast';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useForm } from '@/hooks/useForm';
+import { usePermission } from '@/components/shared/PermissionGuard';
 import api from '@/services/api';
 import { catalogosService } from '@/services/catalogos.service';
 import './BodegasPage.scss';
@@ -158,6 +159,175 @@ function BodegaForm({ open, onClose, editingId, editValues, onSaved }) {
   );
 }
 
+// ================== Logo Bodega Modal ==================
+// Modal para subir/editar el logo de UNA bodega. Lo usa el admin desde la
+// lista de bodegas; el bodeguero sigue editando el suyo desde Ajustes.
+function LogoBodegaModal({ open, onClose, bodega, onSaved }) {
+  const [logoApp, setLogoApp] = useState('');
+  const [logoPrint, setLogoPrint] = useState('');
+  const [logoAppPreview, setLogoAppPreview] = useState('');
+  const [logoPrintPreview, setLogoPrintPreview] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Cargar logo actual al abrir
+  useEffect(() => {
+    if (!open || !bodega) return;
+    setError(null);
+    setLoading(true);
+    api.get(`/api/bodegas/${bodega.id_bodega}/logo`)
+      .then(({ data }) => {
+        setLogoApp(data?.logo_app_data || '');
+        setLogoPrint(data?.logo_print_data || '');
+        setLogoAppPreview(data?.logo_app_data || '');
+        setLogoPrintPreview(data?.logo_print_data || '');
+      })
+      .catch(() => {
+        // Si falla, asumimos que no hay logo. El usuario puede subir uno nuevo.
+        setLogoApp('');
+        setLogoPrint('');
+        setLogoAppPreview('');
+        setLogoPrintPreview('');
+      })
+      .finally(() => setLoading(false));
+  }, [open, bodega?.id_bodega]);
+
+  const toBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const handleLogoFile = async (e, setter) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!/^image\/(png|jpe?g|webp|gif)$/i.test(file.type)) {
+      toast.error('Formato no soportado (usa PNG, JPG, WEBP o GIF)');
+      return;
+    }
+    if (file.size > 1_400_000) {
+      toast.error('La imagen es muy pesada (máx ~1.4MB)');
+      return;
+    }
+    const b64 = await toBase64(file);
+    setter(b64);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await api.put(`/api/bodegas/${bodega.id_bodega}/logo`, {
+        logo_app_data: logoAppPreview || null,
+        logo_print_data: logoPrintPreview || null,
+      });
+      setLogoApp(logoAppPreview);
+      setLogoPrint(logoPrintPreview);
+      toast.success(`Logo de ${bodega.nombre_bodega} actualizado`);
+      onSaved?.();
+      onClose();
+    } catch (e) {
+      setError(e?.response?.data?.error || 'Error al guardar logo');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!window.confirm(`¿Quitar el logo de ${bodega.nombre_bodega}?`)) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await api.put(`/api/bodegas/${bodega.id_bodega}/logo`, {
+        logo_app_data: null,
+        logo_print_data: null,
+      });
+      setLogoApp('');
+      setLogoPrint('');
+      setLogoAppPreview('');
+      setLogoPrintPreview('');
+      toast.success(`Logo de ${bodega.nombre_bodega} eliminado`);
+      onSaved?.();
+      onClose();
+    } catch (e) {
+      setError(e?.response?.data?.error || 'Error al quitar logo');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const hasChanges = logoApp !== logoAppPreview || logoPrint !== logoPrintPreview;
+  const hasAnyLogo = !!(logoAppPreview || logoPrintPreview);
+
+  return (
+    <Modal
+      open={open}
+      onClose={() => !saving && onClose()}
+      title={bodega ? `Logo de ${bodega.nombre_bodega}` : 'Logo de bodega'}
+      size="md"
+    >
+      {error && <div className="bodegas-page__form-error">{error}</div>}
+      {loading ? (
+        <div className="bodegas-page__state"><Spinner size={20} label="Cargando logo…" /></div>
+      ) : (
+        <div className="bodegas-page__logo-modal">
+          <div className="bodegas-page__logo-field">
+            <label className="bodegas-page__label">Logo para la app (web/móvil)</label>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              onChange={(e) => handleLogoFile(e, setLogoAppPreview)}
+            />
+            {logoAppPreview ? (
+              <div className="bodegas-page__logo-preview">
+                <img src={logoAppPreview} alt="Logo app" />
+              </div>
+            ) : (
+              <p className="bodegas-page__hint">Sin logo configurado. Sube una imagen.</p>
+            )}
+          </div>
+          <div className="bodegas-page__logo-field">
+            <label className="bodegas-page__label">Logo para impresión (PDF)</label>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              onChange={(e) => handleLogoFile(e, setLogoPrintPreview)}
+            />
+            {logoPrintPreview ? (
+              <div className="bodegas-page__logo-preview">
+                <img src={logoPrintPreview} alt="Logo impresión" />
+              </div>
+            ) : (
+              <p className="bodegas-page__hint">Si no subes uno, se usa el de la app.</p>
+            )}
+          </div>
+        </div>
+      )}
+      <div className="bodegas-page__form-footer">
+        {hasAnyLogo && !loading && (
+          <Button type="button" variant="ghost" onClick={handleRemove} disabled={saving}>
+            Quitar logo
+          </Button>
+        )}
+        <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
+          Cancelar
+        </Button>
+        <Button
+          type="button"
+          variant="primary"
+          onClick={handleSave}
+          disabled={saving || !hasChanges || loading}
+        >
+          {saving ? <Spinner size={14} /> : 'Guardar logo'}
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
 // ================== PAGE ==================
 export default function BodegasPage() {
   const [items, setItems] = useState([]);
@@ -167,6 +337,18 @@ export default function BodegasPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editingValues, setEditingValues] = useState(null);
+
+  // Estado del modal de logo (admin/reporte edita el logo de CUALQUIER bodega).
+  // El botón en cada fila solo se muestra si el usuario tiene el permiso
+  // `action.manage_warehouse_logo`. Los bodegueros siguen editando SU logo
+  // desde la página Ajustes.
+  const [logoModalOpen, setLogoModalOpen] = useState(false);
+  const [logoBodega, setLogoBodega] = useState(null);
+  const { has: canView, hasPermsLoaded } = usePermission();
+  // Mientras los permisos no estén cargados (hasPermsLoaded=false), dejamos
+  // visible el botón para no romper el flujo de admins/roles sin permisos
+  // granulares; el backend vuelve a validar.
+  const canManageLogo = !hasPermsLoaded || canView('action.manage_warehouse_logo');
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -178,6 +360,15 @@ export default function BodegasPage() {
   }, []);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
+
+  const openLogoModal = (row) => {
+    setLogoBodega({ id_bodega: row.id_bodega, nombre_bodega: row.nombre_bodega });
+    setLogoModalOpen(true);
+  };
+  const closeLogoModal = () => {
+    setLogoModalOpen(false);
+    setLogoBodega(null);
+  };
 
   // ---- Orden ----
   const ordered = useMemo(() => {
@@ -309,6 +500,16 @@ export default function BodegasPage() {
                       {Number(row.requiere_confirmacion_recepcion) === 1 ? '🔒 PIN recepción: ON' : '🔓 PIN recepción: OFF'}
                     </Button>
                   )}
+                  {canManageLogo && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => openLogoModal(row)}
+                      title={`Editar logo de ${row.nombre_bodega}`}
+                    >
+                      🖼️ Logo
+                    </Button>
+                  )}
                   <Button size="sm" variant={Number(row.activo) === 1 ? 'subtle' : 'ghost'} onClick={() => handleToggle(row)} title={Number(row.activo) === 1 ? 'Desactivar' : 'Activar'}>
                     {Number(row.activo) === 1 ? 'Desactivar' : 'Activar'}
                   </Button>
@@ -325,6 +526,13 @@ export default function BodegasPage() {
         onClose={() => setModalOpen(false)}
         editingId={editingId}
         editValues={editingValues}
+        onSaved={fetchItems}
+      />
+
+      <LogoBodegaModal
+        open={logoModalOpen}
+        onClose={closeLogoModal}
+        bodega={logoBodega}
         onSaved={fetchItems}
       />
     </>
