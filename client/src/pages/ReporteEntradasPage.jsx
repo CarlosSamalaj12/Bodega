@@ -8,6 +8,7 @@ import { ProductPicker } from '@/components/ui/ProductPicker';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { toast } from '@/components/ui/Toast';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useStockScope } from '@/hooks/useStockScope';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import { formatDate } from '@/utils/format';
@@ -26,6 +27,18 @@ const RANGE_PRESETS = [
 export default function ReporteEntradasPage() {
   const isMobile = !useMediaQuery('(min-width: 768px)');
 
+  // Scope de bodega del usuario: si NO tiene acceso a todas las bodegas,
+  // ocultamos el selector y forzamos la bodega del usuario.
+  const { scope: stockScope, bodegas: scopeBodegas } = useStockScope();
+  const canPickWarehouse = Boolean(stockScope?.can_all_bodegas);
+  const fixedBodegaId = Number(stockScope?.id_bodega_default || 0);
+  const fixedBodegaName = useMemo(() => {
+    if (!stockScope) return '';
+    const list = Array.isArray(scopeBodegas) ? scopeBodegas : stockScope.bodegas || [];
+    const hit = list.find((b) => Number(b.id_bodega) === fixedBodegaId);
+    return hit?.nombre_bodega || '';
+  }, [stockScope, scopeBodegas, fixedBodegaId]);
+
   // Filtros — búsqueda de producto seleccionado
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [documento, setDocumento] = useState('');
@@ -40,7 +53,10 @@ export default function ReporteEntradasPage() {
   const [categoriaId, setCategoriaId] = useState(null);
   const [subcategoriaId, setSubcategoriaId] = useState(null);
   const [motivoId, setMotivoId] = useState(null);
-  const [warehouseId, setWarehouseId] = useState(null);
+  // Si el usuario solo puede ver su propia bodega, forzamos warehouseId a esa
+  // bodega y bloqueamos el selector; si tiene acceso a varias, parte en null
+  // (= "Todas las bodegas" cuando can_all_bodegas).
+  const [warehouseId, setWarehouseId] = useState(() => null);
 
   // Catálogos
   const [categorias, setCategorias] = useState([]);
@@ -64,6 +80,15 @@ export default function ReporteEntradasPage() {
 
   // Export column selector
   const [showColumnSelector, setShowColumnSelector] = useState(false);
+
+  // Si el scope ya cargó y el usuario NO puede elegir bodega, fijamos su
+  // bodega en el filtro. Esto garantiza que la query siempre lleve el
+  // id_bodega correcto aunque el dropdown quede oculto.
+  useEffect(() => {
+    if (stockScope && !canPickWarehouse && fixedBodegaId > 0) {
+      setWarehouseId((prev) => (prev === fixedBodegaId ? prev : fixedBodegaId));
+    }
+  }, [stockScope, canPickWarehouse, fixedBodegaId]);
 
   // Cargar catálogos
   useEffect(() => {
@@ -393,10 +418,17 @@ export default function ReporteEntradasPage() {
             </div>
 
             <div className="reporte-entradas__filter-item">
-              <select className="select" value={warehouseId ?? ''} onChange={(e) => setWarehouseId(e.target.value ? Number(e.target.value) : null)}>
-                <option value="">Todas las bodegas</option>
-                {bodegas.map((b) => <option key={`ent-bod-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>)}
-              </select>
+              {canPickWarehouse ? (
+                <select className="select" value={warehouseId ?? ''} onChange={(e) => setWarehouseId(e.target.value ? Number(e.target.value) : null)}>
+                  <option value="">Todas las bodegas</option>
+                  {bodegas.map((b) => <option key={`ent-bod-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>)}
+                </select>
+              ) : (
+                <div className="reporte-entradas__bodega-fija" title="Solo puedes ver entradas de tu bodega">
+                  <span className="reporte-entradas__bodega-fija-label">Bodega</span>
+                  <span className="reporte-entradas__bodega-fija-value">{fixedBodegaName || `#${fixedBodegaId}`}</span>
+                </div>
+              )}
             </div>
           </div>
         </Card>

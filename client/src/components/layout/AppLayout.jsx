@@ -18,8 +18,10 @@ export function AppLayout() {
   const navigate = useNavigate();
 
   const user = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const notifyNew = useDispatchStore((s) => s.notifyNew);
   const pushInitRef = useRef(false);
+  const permsBootstrappedRef = useRef(false);
 
   // Notificaciones de alertas (stock mínimo, vencimientos, etc.)
   useAlertNotifications();
@@ -35,6 +37,22 @@ export function AppLayout() {
       }
     });
   }, [user?.id_warehouse]);
+
+  // Sincronizar permisos con el server al montar. El store se hidrata desde
+  // localStorage (snapshot del último login), que puede quedar desfasado si
+  // el server agregó permisos nuevos al catálogo o si el usuario actual fue
+  // editado por otro admin. Refrescar en mount garantiza que la UI
+  // (sidebar, Ajustes, etc.) siempre refleje la DB. Si el JWT expiró, el
+  // interceptor de axios manda a /login. Si hay error de red, simplemente
+  // seguimos con el snapshot local; el próximo mount lo reintenta.
+  useEffect(() => {
+    if (!isAuthenticated || permsBootstrappedRef.current) return;
+    permsBootstrappedRef.current = true;
+    useAuthStore.getState().refreshPermisos().catch(() => {
+      // Silenciar: el interceptor ya manejó 401, los errores de red
+      // se toleran y el próximo mount vuelve a intentar.
+    });
+  }, [isAuthenticated]);
 
   // Cierra el drawer en móvil al cambiar de ruta
   useEffect(() => {

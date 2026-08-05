@@ -81,6 +81,8 @@ export default function UsuariosPage() {
     can_supervisor: false,
     no_auto_logout: false,
     order_pin: '',
+    avatar_data: '',      // base64 data URL o vacío
+    avatar_removed: false, // true si el admin marcó "Quitar avatar"
   };
   const [form, setForm] = useState({ ...emptyForm });
   const [formError, setFormError] = useState(null);
@@ -202,6 +204,8 @@ export default function UsuariosPage() {
       can_supervisor: Number(user.can_supervisor) === 1,
       no_auto_logout: Number(user.no_auto_logout) === 1,
       order_pin: '',
+      avatar_data: user.avatar_url || '',
+      avatar_removed: false,
     });
     setFormError(null);
     setPermisosOpen(false);
@@ -214,6 +218,34 @@ export default function UsuariosPage() {
 
     loadPermisos(user.id_user);
     loadBodegasAcceso(user.id_user);
+  };
+
+  // ---- Helpers de avatar ----
+  const toBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const handleAvatarFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!/^image\/(png|jpe?g|webp|gif)$/i.test(file.type)) {
+      toast.error('Formato no soportado (usa PNG, JPG, WEBP o GIF)');
+      return;
+    }
+    if (file.size > 1_400_000) {
+      toast.error('La imagen es muy pesada (máx ~1.4MB)');
+      return;
+    }
+    const b64 = await toBase64(file);
+    setForm((f) => ({ ...f, avatar_data: b64, avatar_removed: false }));
+  };
+
+  const removeAvatar = () => {
+    setForm((f) => ({ ...f, avatar_data: '', avatar_removed: true }));
   };
 
   // ---- Cargar permisos del usuario ----
@@ -301,6 +333,12 @@ export default function UsuariosPage() {
     setSubmitting(true);
     try {
       if (editingId) {
+        // En update SIEMPRE mandamos avatar_data (aunque sea null) para que
+        // el server distinga "no tocar" vs "borrar". En el form actual, si
+        // hay avatar_data nuevo, lo mandamos; si lo quitaron, mandamos null.
+        const avatarPayload = form.avatar_removed || !form.avatar_data
+          ? null
+          : form.avatar_data;
         await usuariosService.update(editingId, {
           username: form.username.trim(),
           full_name: form.full_name.trim(),
@@ -309,10 +347,11 @@ export default function UsuariosPage() {
           active: form.active ? 1 : 0,
           can_supervisor: form.can_supervisor ? 1 : 0,
           no_auto_logout: form.no_auto_logout ? 1 : 0,
+          avatar_data: avatarPayload,
         });
         toast.success('Usuario actualizado');
       } else {
-        await usuariosService.create({
+        const payload = {
           username: form.username.trim(),
           full_name: form.full_name.trim(),
           password: form.password,
@@ -322,7 +361,10 @@ export default function UsuariosPage() {
           can_supervisor: form.can_supervisor ? 1 : 0,
           no_auto_logout: form.no_auto_logout ? 1 : 0,
           order_pin: form.order_pin || null,
-        });
+        };
+        // En create, solo mandamos avatar_data si hay uno cargado.
+        if (form.avatar_data) payload.avatar_data = form.avatar_data;
+        await usuariosService.create(payload);
         toast.success('Usuario creado');
       }
       setModalOpen(false);
@@ -643,6 +685,36 @@ export default function UsuariosPage() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Avatar (solo admin lo gestiona) */}
+            <div className="usuarios-page__field usuarios-page__field--full">
+              <label className="usuarios-page__label" htmlFor="u-avatar">
+                Avatar
+              </label>
+              <div className="usuarios-page__avatar-row">
+                <div className="usuarios-page__avatar-preview" aria-hidden={!form.avatar_data}>
+                  {form.avatar_data ? (
+                    <img src={form.avatar_data} alt="Avatar del usuario" />
+                  ) : (
+                    <span className="usuarios-page__avatar-placeholder">{(form.username || '?').charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+                <div className="usuarios-page__avatar-controls">
+                  <input
+                    id="u-avatar"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    onChange={handleAvatarFile}
+                  />
+                  <p className="usuarios-page__avatar-hint">PNG, JPG, WEBP o GIF · máx 1.4MB</p>
+                  {form.avatar_data && (
+                    <Button type="button" variant="ghost" size="sm" onClick={removeAvatar}>
+                      Quitar avatar
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* PIN de pedidos (solo crear) */}
