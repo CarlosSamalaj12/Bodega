@@ -23,9 +23,7 @@ export function Modal({ open, onClose, title, size = 'md', footer, children }) {
       document.body.style.overflow = 'hidden';
     }
 
-    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
-    document.addEventListener('keydown', onKey);
-
+    // No escuchar la tecla Escape para evitar cierres accidentales en formularios
     return () => {
       document.body.style.overflow = prevOverflow;
       document.body.style.position = prevPosition;
@@ -34,7 +32,6 @@ export function Modal({ open, onClose, title, size = 'md', footer, children }) {
       if (isSmallScreen) {
         window.scrollTo(0, scrollY);
       }
-      document.removeEventListener('keydown', onKey);
     };
   }, [open, onClose]);
 
@@ -44,7 +41,8 @@ export function Modal({ open, onClose, title, size = 'md', footer, children }) {
 
   return createPortal(
     <>
-      <div className="modal-backdrop" onClick={onClose} aria-hidden="true" />
+      {/* Se quita el onClick={onClose} para evitar que el modal se cierre al hacer clic fuera por accidente */}
+      <div className="modal-backdrop" aria-hidden="true" />
       <div
         className={`modal ${sizeClass}`}
         role="dialog"

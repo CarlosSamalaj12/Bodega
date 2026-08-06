@@ -59,6 +59,9 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(request.url);
 
+  // Evitar esquemas no soportados como chrome-extension:// que causan fallos en Cache.put
+  if (url.protocol !== "http:" && url.protocol !== "https:") return;
+
   // Never cache print endpoints or session-policy
   if (url.pathname.includes("/api/print/")) return;
   if (url.pathname.includes("/api/session-policy")) return;

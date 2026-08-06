@@ -24,7 +24,7 @@ export function PinModal({ open, title, description, submitting, onConfirm, onCa
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Escape' && !submitting) onCancel?.();
+    // No cerrar al presionar Escape para evitar cierres accidentales
     if (e.key === 'Enter' && !submitting) handleConfirm();
   };
 
@@ -32,7 +32,8 @@ export function PinModal({ open, title, description, submitting, onConfirm, onCa
 
   return createPortal(
     <div className="pin-modal-overlay" onKeyDown={handleKeyDown}>
-      <div className="modal-backdrop" onClick={submitting ? undefined : onCancel} aria-hidden="true" />
+      {/* Se quita el onClick para evitar cierres accidentales al hacer clic fuera */}
+      <div className="modal-backdrop" aria-hidden="true" />
       <div
         className="modal pin-modal"
         role="dialog"

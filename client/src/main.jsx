@@ -59,6 +59,25 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   });
 }
 
+// Capturar errores de importación de módulos dinámicos (Vite)
+window.addEventListener('vite:preloadError', (event) => {
+  console.warn('[vite] Preload error detected, forcing page reload...', event);
+  window.location.reload();
+});
+
+// Capturar errores de importación dinámica globales sin capturar
+window.addEventListener('error', (event) => {
+  const msg = (event.message || '').toLowerCase();
+  if (
+    msg.includes('failed to fetch dynamically imported module') ||
+    msg.includes('expected a javascript-or-wasm module script') ||
+    msg.includes('error loading dynamically imported module')
+  ) {
+    console.warn('[window.error] Falla de importación dinámica detectada. Recargando...', event);
+    window.location.reload();
+  }
+}, true); // Usar fase de captura para interceptar errores de carga de script
+
 // Aplica el tema antes de montar React para evitar parpadeo
 useThemeStore.getState().init();
 

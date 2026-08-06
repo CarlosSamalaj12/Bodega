@@ -20,6 +20,21 @@ export class ErrorBoundary extends Component {
   componentDidCatch(error, info) {
     // Registrar el error real en console sin depender del formateo de DevTools
     console.error('[ErrorBoundary]', error?.message || error, error?.stack || '');
+
+    // Si es un error de importación dinámica (por ejemplo, porque cambió el hash en un deploy),
+    // recargar la página limpia automáticamente para obtener la nueva versión de los assets.
+    const errorMsg = (error?.message || '').toLowerCase();
+    if (
+      errorMsg.includes('failed to fetch') ||
+      errorMsg.includes('dynamically imported module') ||
+      errorMsg.includes('expected a javascript-or-wasm') ||
+      errorMsg.includes('dynamic import') ||
+      errorMsg.includes('load module script') ||
+      errorMsg.includes('mime type')
+    ) {
+      console.warn('[ErrorBoundary] Falla de carga dinámica detectada. Forzando recarga de página...');
+      window.location.reload();
+    }
   }
 
   handleReset = () => {
