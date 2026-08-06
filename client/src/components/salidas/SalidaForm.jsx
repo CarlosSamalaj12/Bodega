@@ -121,6 +121,7 @@ export function SalidaForm({
 
   const canSubmit =
     cabecera.id_motivo &&
+    cabecera.no_documento.trim() &&
     lines.every((l) => l.id_producto && Number(l.cantidad) > 0) &&
     lines.every((l) => l.precio !== '' && Number(l.precio) >= 0) &&
     !submitting;
@@ -254,7 +255,8 @@ export function SalidaForm({
               type="number"
               className={`input salida-form__num ${err ? 'input--error' : ''}`}
               min="0"
-              step="1"
+              step="0.001"
+              inputMode="decimal"
               value={l.cantidad}
               onChange={(e) => setLine(idx, { cantidad: e.target.value })}
               placeholder="0"
@@ -311,7 +313,7 @@ export function SalidaForm({
 
         <div className="salida-form__row">
           <Select
-            label="Motivo"
+            label={requiredLabel('Motivo')}
             value={cabecera.id_motivo}
             onChange={(e) => setCab('id_motivo', e.target.value)}
             options={[
@@ -321,10 +323,11 @@ export function SalidaForm({
             required
           />
           <Input
-            label="No. documento"
+            label={requiredLabel('No. documento')}
             value={cabecera.no_documento}
             onChange={(e) => setCab('no_documento', e.target.value)}
-            placeholder="Opcional"
+            placeholder="Ej. S-12345"
+            required
           />
         </div>
 

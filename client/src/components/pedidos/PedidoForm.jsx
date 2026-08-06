@@ -169,12 +169,14 @@ export function PedidoForm({
           type="number"
           className="input pedido-form__num"
           min="0"
-          step="1"
-          pattern="[0-9]*"
+          step="0.001"
+          inputMode="decimal"
           value={l.cantidad}
           onChange={(e) => {
-            const v = e.target.value.replace(/[^\d]/g, '');
-            setLine(idx, { cantidad: v });
+            // Permitimos números decimales (ej. 1.5, 1.25). El navegador
+            // ya bloquea caracteres no numéricos con type="number" +
+            // step="0.001", así que no hace falta sanear la cadena.
+            setLine(idx, { cantidad: e.target.value });
           }}
           placeholder="0"
         />

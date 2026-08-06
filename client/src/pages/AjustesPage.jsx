@@ -18,7 +18,12 @@ export default function AjustesPage() {
   // lo sacamos al inicio aunque el guard de ruta no se haya aplicado.
   // Importante: este hook debe ir antes de cualquier return condicional para
   // cumplir con las reglas de los hooks de React.
-  const { has: canView } = usePermission();
+  const { has: canView, hasPermsLoaded } = usePermission();
+  // Permiso granular para subir/editar el logo de la propia bodega.
+  // Mientras los permisos no estén cargados (hasPermsLoaded=false), dejamos
+  // visible el botón para no romper el flujo de admins/roles sin permisos
+  // granulares; el backend vuelve a validar.
+  const canManageLogo = !hasPermsLoaded || canView('action.manage_warehouse_logo');
 
   // Estado general
   const [loading, setLoading] = useState(true);
@@ -257,10 +262,17 @@ export default function AjustesPage() {
 
             {/* === Logo de Bodega === */}
             <Card header={<h3 className="ajustes-page__section-title">🖼️ Logo de la Bodega</h3>}>
+              {!canManageLogo && (
+                <p className="ajustes-page__hint" style={{ marginBottom: '0.75rem' }}>
+                  Solo lectura: no tienes permiso para modificar el logo. Pide a un administrador que active el permiso <code>action.manage_warehouse_logo</code>.
+                </p>
+              )}
               <div className="ajustes-page__logo-section">
                 <div className="ajustes-page__logo-field">
                   <label className="ajustes-page__label">Logo para la app (web/móvil)</label>
-                  <input type="file" accept="image/*" onChange={(e) => handleLogoFile(e, setLogoAppPreview)} />
+                  {canManageLogo ? (
+                    <input type="file" accept="image/*" onChange={(e) => handleLogoFile(e, setLogoAppPreview)} />
+                  ) : null}
                   {logoAppPreview && (
                     <div className="ajustes-page__logo-preview">
                       <img src={logoAppPreview} alt="Logo app" />
@@ -269,7 +281,9 @@ export default function AjustesPage() {
                 </div>
                 <div className="ajustes-page__logo-field">
                   <label className="ajustes-page__label">Logo para impresión (PDF)</label>
-                  <input type="file" accept="image/*" onChange={(e) => handleLogoFile(e, setLogoPrintPreview)} />
+                  {canManageLogo ? (
+                    <input type="file" accept="image/*" onChange={(e) => handleLogoFile(e, setLogoPrintPreview)} />
+                  ) : null}
                   {logoPrintPreview && (
                     <div className="ajustes-page__logo-preview">
                       <img src={logoPrintPreview} alt="Logo impresión" />
@@ -277,7 +291,7 @@ export default function AjustesPage() {
                   )}
                 </div>
               </div>
-              {hasLogoChanges && (
+              {canManageLogo && hasLogoChanges && (
                 <div className="ajustes-page__actions" style={{ marginTop: '1rem' }}>
                   <Button variant="primary" onClick={handleSaveLogo} disabled={savingLogo}>
                     {savingLogo ? 'Guardando…' : 'Guardar logo'}

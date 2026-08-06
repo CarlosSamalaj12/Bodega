@@ -1516,6 +1516,7 @@ const PERM_CATALOG = [
   { key: "action.dispatch", label: "Despachar pedidos", group: "Acciones" },
   { key: "action.sensitive_approve", label: "Aprobar acciones sensibles", group: "Acciones", default_active: 0 },
   { key: "action.manage_permissions", label: "Administrar permisos de usuarios", group: "Acciones" },
+  { key: "action.manage_warehouse_logo", label: "Administrar logo de bodega", group: "Acciones" },
 ];
 
 async function ensureUserPermissionsTable() {
@@ -5165,10 +5166,24 @@ app.get("/api/bodegas/:id/logo", auth, requirePermission("section.view.ajustes",
   }
 });
 
-app.put("/api/bodegas/:id/logo", auth, requirePermission("action.create_update", "actualizar logo de bodega"), async (req, res) => {
+app.put("/api/bodegas/:id/logo", auth, requirePermission("action.manage_warehouse_logo", "actualizar logo de bodega"), async (req, res) => {
   try {
     const id_bodega = Number(req.params.id || 0);
     if (!id_bodega) return res.status(400).json({ error: "Bodega invalida" });
+    // Guard: un bodeguero solo puede tocar el logo de SU propia bodega. Admin
+    // y rol REPORTE (con bodegas permitidas) pueden tocar cualquiera de su lista.
+    const scope = await resolveStockScope(req.user);
+    if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
+    if (!scope.can_all_bodegas) {
+      if (id_bodega !== Number(scope.id_bodega)) {
+        return res.status(403).json({ error: "Solo puedes modificar el logo de tu propia bodega" });
+      }
+    } else if (scope.has_warehouse_restrictions) {
+      const allowed = (scope.allowed_warehouse_ids || []).map(Number);
+      if (allowed.length && !allowed.includes(id_bodega)) {
+        return res.status(403).json({ error: "No tienes acceso a esta bodega" });
+      }
+    }
     await ensureWarehouseLogoTable();
 
     const legacyLogo = normalizeLogoData(req.body?.logo_data);
@@ -9475,6 +9490,7 @@ app.get("/api/orders/:id/details", auth, async (req, res) => {
             d.cantidad_solicitada, d.cantidad_surtida,
             COALESCE(d.estado_linea, 'PENDIENTE') AS estado_linea,
             d.justificacion_linea,
+            d.observacion_producto,
             CASE
               WHEN COALESCE(d.estado_linea, 'PENDIENTE')='ANULADO' THEN 0
               ELSE GREATEST(d.cantidad_solicitada - d.cantidad_surtida, 0)
@@ -10731,6 +10747,23 @@ app.get("/api/reportes/transferencias", auth, async (req, res) => {
     if (!scope.id_bodega) return res.status(400).json({ error: "Usuario sin bodega" });
     if (!scope.can_view_existencias) return res.json({ rows: [], total: 0, page: 1, limit: 50, totalPages: 1 });
 
+    // Scope de bodegas: una transferencia involucra al usuario cuando su bodega
+    // aparece como ORIGEN o DESTINO. Mismas reglas que entradas/salidas:
+    //  - admin/report sin restricciones: ve todo (puede pasar ?warehouse=N para acotar)
+    //  - report con allowed_warehouse_ids: limita a esa lista
+    //  - bodeguero: limita a su bodega
+    const warehouseScope = getScopedWarehouseFilter(scope, req.query.warehouse, { fallbackToDefault: true });
+    if (warehouseScope.denied) return res.json({ rows: [], total: 0, page: 1, limit: 50, totalPages: 1 });
+    const restrictedIds = warehouseScope.restrictedIds;
+    // Lista efectiva de bodegas a considerar como "visibles" para el usuario.
+    // Prioridad: bodega seleccionada > restricciones explícitas > bodega del usuario.
+    const effectiveWarehouseIds = (() => {
+      if (warehouseScope.selected) return [Number(warehouseScope.selected)];
+      if (restrictedIds.length) return restrictedIds.map(Number);
+      if (!scope.can_all_bodegas && scope.id_bodega) return [Number(scope.id_bodega)];
+      return null; // sin filtro (admin sin selección)
+    })();
+
     const from_date = String(req.query.from || "").trim() || null;
     const to_date = String(req.query.to || "").trim() || null;
     const id_producto = Number(req.query.id_producto || 0) || null;
@@ -10745,12 +10778,21 @@ app.get("/api/reportes/transferencias", auth, async (req, res) => {
       ? `JOIN movimiento_detalle md ON md.id_movimiento=me.id_movimiento`
       : "";
 
+    // Filtro de bodega: la transferencia es visible si la bodega del usuario
+    // está en su lista efectiva Y esa bodega aparece como origen o destino.
+    let warehouseFilterSQL = "";
     const params = { from_date, to_date, ...(needsProductJoin ? { id_producto } : {}) };
+    if (effectiveWarehouseIds) {
+      const inClause = buildNamedInClause(effectiveWarehouseIds, "trnw");
+      warehouseFilterSQL = ` AND (me.id_bodega_origen IN (${inClause.sql}) OR me.id_bodega_destino IN (${inClause.sql}))`;
+      Object.assign(params, inClause.params);
+    }
+
     const whereSQL = `me.tipo_movimiento='TRANSFERENCIA'
          AND me.estado<>'ANULADO'
          AND (:from_date IS NULL OR DATE(me.creado_en) >= :from_date)
          AND (:to_date IS NULL OR DATE(me.creado_en) <= :to_date)
-         ${needsProductJoin ? "AND md.id_producto=:id_producto" : ""}`;
+         ${needsProductJoin ? "AND md.id_producto=:id_producto" : ""}${warehouseFilterSQL}`;
 
     // Paginado por MOVIMIENTO (no por línea)
     const [[{ total }]] = await pool.query(

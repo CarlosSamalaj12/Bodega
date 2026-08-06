@@ -183,6 +183,43 @@
     border-top: 1px solid $color-stroke;
   }
 
+  // ---- Logo modal ----
+  &__logo-modal {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+  }
+
+  &__logo-field {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+  }
+
+  &__logo-preview {
+    margin-top: $space-2;
+    padding: $space-3;
+    background: $color-bg-2;
+    border: 1px solid $color-stroke;
+    border-radius: $radius-md;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 80px;
+
+    img {
+      max-width: 220px;
+      max-height: 100px;
+      object-fit: contain;
+    }
+  }
+
+  &__hint {
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    margin: 0;
+  }
+
   // ---- Responsive ----
   @media (max-width: 639px) {
     padding: $space-4;

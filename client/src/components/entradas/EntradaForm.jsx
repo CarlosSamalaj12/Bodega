@@ -130,6 +130,8 @@ export function EntradaForm({
 
   const canSubmit =
     cabecera.id_motivo &&
+    cabecera.id_proveedor &&
+    cabecera.no_documento.trim() &&
     lines.every((l) => l.id_producto && Number(l.cantidad) > 0) &&
     lines.every((l) => l.precio !== '' && Number(l.precio) >= 0) &&
     lines.every((l) => String(l.lote || '').trim()) &&
@@ -285,7 +287,8 @@ export function EntradaForm({
               type="number"
               className={`input entrada-form__num ${err ? 'input--error' : ''}`}
               min="0"
-              step="1"
+              step="0.001"
+              inputMode="decimal"
               value={l.cantidad}
               onChange={(e) => setLine(idx, { cantidad: e.target.value })}
               placeholder="0"
@@ -385,7 +388,7 @@ export function EntradaForm({
 
         <div className="entrada-form__row">
           <Select
-            label="Motivo"
+            label={requiredLabel('Motivo')}
             value={cabecera.id_motivo}
             onChange={(e) => setCab('id_motivo', e.target.value)}
             options={[
@@ -395,24 +398,26 @@ export function EntradaForm({
             required
           />
           <Select
-            label="Proveedor"
+            label={requiredLabel('Proveedor')}
             value={cabecera.id_proveedor}
             onChange={(e) => setCab('id_proveedor', e.target.value)}
             options={[
               { value: '', label: 'Sin proveedor' },
               ...proveedores.map((p) => ({ value: p.id_proveedor, label: p.nombre_proveedor })),
             ]}
+            required
           />
         </div>
 
         <div className="entrada-form__row">
           <Input
-            label="No. documento"
+            label={requiredLabel('No. documento')}
             value={cabecera.no_documento}
             onChange={(e) => setCab('no_documento', e.target.value)}
             onBlur={handleNoDocumentoBlur}
             placeholder="Ej. F-12345"
             hint="Para detectar duplicados"
+            required
             error={duplicateWarn?.exists ? 'Documento ya registrado hoy' : null}
           />
           <Input

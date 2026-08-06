@@ -9,6 +9,9 @@ import { SearchInput } from '@/components/ui/SearchInput';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { toast } from '@/components/ui/Toast';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useStockScope } from '@/hooks/useStockScope';
+import { useWarehouseLogo } from '@/hooks/useWarehouseLogo';
+import { useAuthStore } from '@/stores/auth.store';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import { formatDate } from '@/utils/format';
@@ -39,6 +42,40 @@ const ESTADO_BADGE = {
 export default function ReportePedidosPage() {
   const isMobile = !useMediaQuery('(min-width: 768px)');
 
+  // Scope de bodega. Para pedidos, el bodeguero solo ve movimientos donde
+  // su bodega es solicitante o surtidora, así que ambos filtros se bloquean
+  // a su bodega cuando no tiene acceso a todas.
+  const { scope: stockScope, bodegas: scopeBodegas } = useStockScope();
+  const canPickWarehouse = Boolean(stockScope?.can_all_bodegas);
+  const fixedBodegaId = Number(stockScope?.id_bodega_default || 0);
+  const fixedBodegaName = useMemo(() => {
+    if (!stockScope) return '';
+    const list = Array.isArray(scopeBodegas) ? scopeBodegas : stockScope.bodegas || [];
+    const hit = list.find((b) => Number(b.id_bodega) === fixedBodegaId);
+    return hit?.nombre_bodega || '';
+  }, [stockScope, scopeBodegas, fixedBodegaId]);
+
+  // Logo y nombre de bodega para el PDF exportado.
+  const user = useAuthStore((s) => s.user);
+  const userBodegaId = Number(user?.id_warehouse || 0);
+  const userBodegaName = useMemo(() => {
+    if (!user || !Array.isArray(scopeBodegas)) return '';
+    const hit = scopeBodegas.find((b) => Number(b.id_bodega) === userBodegaId);
+    return hit?.nombre_bodega || '';
+  }, [user, scopeBodegas, userBodegaId]);
+  const { logoDataUri } = useWarehouseLogo(userBodegaId);
+  // Para pedidos, el nombre de bodega del PDF es la fija del bodeguero.
+  // Si el admin filtró por una específica (solicita o despacho), usamos esa.
+  const exportBodegaName = useMemo(() => {
+    const filtered = bodegaSolicitaId || bodegaDespachoId;
+    if (filtered) {
+      const list = Array.isArray(bodegas) ? bodegas : [];
+      const hit = list.find((b) => Number(b.id_bodega) === Number(filtered));
+      if (hit?.nombre_bodega) return hit.nombre_bodega;
+    }
+    return fixedBodegaName || userBodegaName || '';
+  }, [bodegaSolicitaId, bodegaDespachoId, bodegas, fixedBodegaName, userBodegaName]);
+
   // Filtros — búsqueda diferida (Enter o botón Buscar)
   const [search, setSearch] = useState('');
   const [committedSearch, setCommittedSearch] = useState('');
@@ -52,6 +89,14 @@ export default function ReportePedidosPage() {
   const [subcategoriaId, setSubcategoriaId] = useState(null);
   const [bodegaSolicitaId, setBodegaSolicitaId] = useState(null);
   const [bodegaDespachoId, setBodegaDespachoId] = useState(null);
+
+  // Si el usuario no puede elegir bodega, fijamos ambos filtros a su bodega.
+  useEffect(() => {
+    if (stockScope && !canPickWarehouse && fixedBodegaId > 0) {
+      setBodegaSolicitaId((prev) => (prev === fixedBodegaId ? prev : fixedBodegaId));
+      setBodegaDespachoId((prev) => (prev === fixedBodegaId ? prev : fixedBodegaId));
+    }
+  }, [stockScope, canPickWarehouse, fixedBodegaId]);
   const [dateMode, setDateMode] = useState('PEDIDO');
 
   // Catálogos
@@ -247,6 +292,8 @@ export default function ReportePedidosPage() {
           return Number(row[col.key] || 0).toFixed(2);
         return row[col.key];
       },
+      logoDataUri: format === 'pdf' ? logoDataUri : undefined,
+      warehouseName: format === 'pdf' ? exportBodegaName : undefined,
     });
     setShowColumnSelector(false);
   };
@@ -332,15 +379,29 @@ export default function ReportePedidosPage() {
               {subcategoriasFiltradas.map((s) => <option key={`rep-sub-${s.id_subcategoria}`} value={s.id_subcategoria}>{s.nombre_subcategoria}</option>)}
             </select>
 
-            <select className="select" value={bodegaSolicitaId ?? ''} onChange={(e) => setBodegaSolicitaId(e.target.value ? Number(e.target.value) : null)}>
-              <option value="">Bodega solicitante (todas)</option>
-              {bodegas.map((b) => <option key={`rep-bodsol-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>)}
-            </select>
+            {canPickWarehouse ? (
+              <select className="select" value={bodegaSolicitaId ?? ''} onChange={(e) => setBodegaSolicitaId(e.target.value ? Number(e.target.value) : null)}>
+                <option value="">Bodega solicitante (todas)</option>
+                {bodegas.map((b) => <option key={`rep-bodsol-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>)}
+              </select>
+            ) : (
+              <div className="reporte-pedidos__bodega-fija" title="Solo puedes ver pedidos donde tu bodega es solicitante o surtidora">
+                <span className="reporte-pedidos__bodega-fija-label">Bodega solicitante</span>
+                <span className="reporte-pedidos__bodega-fija-value">{fixedBodegaName || `#${fixedBodegaId}`}</span>
+              </div>
+            )}
 
-            <select className="select" value={bodegaDespachoId ?? ''} onChange={(e) => setBodegaDespachoId(e.target.value ? Number(e.target.value) : null)}>
-              <option value="">Bodega despacho (todas)</option>
-              {bodegas.map((b) => <option key={`rep-boddes-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>)}
-            </select>
+            {canPickWarehouse ? (
+              <select className="select" value={bodegaDespachoId ?? ''} onChange={(e) => setBodegaDespachoId(e.target.value ? Number(e.target.value) : null)}>
+                <option value="">Bodega despacho (todas)</option>
+                {bodegas.map((b) => <option key={`rep-boddes-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>)}
+              </select>
+            ) : (
+              <div className="reporte-pedidos__bodega-fija" title="Solo puedes ver pedidos donde tu bodega es solicitante o surtidora">
+                <span className="reporte-pedidos__bodega-fija-label">Bodega despacho</span>
+                <span className="reporte-pedidos__bodega-fija-value">{fixedBodegaName || `#${fixedBodegaId}`}</span>
+              </div>
+            )}
           </div>
         </Card>
 

@@ -8,6 +8,9 @@ import { ProductPicker } from '@/components/ui/ProductPicker';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { toast } from '@/components/ui/Toast';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useStockScope } from '@/hooks/useStockScope';
+import { useWarehouseLogo } from '@/hooks/useWarehouseLogo';
+import { useAuthStore } from '@/stores/auth.store';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import { formatDate } from '@/utils/format';
@@ -26,6 +29,37 @@ const RANGE_PRESETS = [
 export default function ReporteSalidasPage() {
   const isMobile = !useMediaQuery('(min-width: 768px)');
 
+  // Scope de bodega del usuario. Para salidas, el "origen" se bloquea a la
+  // bodega del usuario si no tiene acceso a todas; el "destino" sigue siendo
+  // un filtro libre (puede querer acotar "qué mandé a Cocina").
+  const { scope: stockScope, bodegas: scopeBodegas } = useStockScope();
+  const canPickWarehouse = Boolean(stockScope?.can_all_bodegas);
+  const fixedBodegaId = Number(stockScope?.id_bodega_default || 0);
+  const fixedBodegaName = useMemo(() => {
+    if (!stockScope) return '';
+    const list = Array.isArray(scopeBodegas) ? scopeBodegas : stockScope.bodegas || [];
+    const hit = list.find((b) => Number(b.id_bodega) === fixedBodegaId);
+    return hit?.nombre_bodega || '';
+  }, [stockScope, scopeBodegas, fixedBodegaId]);
+
+  // Logo y nombre de bodega para el PDF exportado.
+  const user = useAuthStore((s) => s.user);
+  const userBodegaId = Number(user?.id_warehouse || 0);
+  const userBodegaName = useMemo(() => {
+    if (!user || !Array.isArray(scopeBodegas)) return '';
+    const hit = scopeBodegas.find((b) => Number(b.id_bodega) === userBodegaId);
+    return hit?.nombre_bodega || '';
+  }, [user, scopeBodegas, userBodegaId]);
+  const { logoDataUri } = useWarehouseLogo(userBodegaId);
+  const exportBodegaName = useMemo(() => {
+    if (warehouseId) {
+      const list = Array.isArray(bodegas) ? bodegas : [];
+      const hit = list.find((b) => Number(b.id_bodega) === Number(warehouseId));
+      if (hit?.nombre_bodega) return hit.nombre_bodega;
+    }
+    return fixedBodegaName || userBodegaName || '';
+  }, [warehouseId, bodegas, fixedBodegaName, userBodegaName]);
+
   // Filtros
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [documento, setDocumento] = useState('');
@@ -42,6 +76,13 @@ export default function ReporteSalidasPage() {
   const [motivoId, setMotivoId] = useState(null);
   const [warehouseId, setWarehouseId] = useState(null);
   const [bodegaDestinoId, setBodegaDestinoId] = useState(null);
+
+  // Fijar la bodega de origen a la del usuario si no puede elegir.
+  useEffect(() => {
+    if (stockScope && !canPickWarehouse && fixedBodegaId > 0) {
+      setWarehouseId((prev) => (prev === fixedBodegaId ? prev : fixedBodegaId));
+    }
+  }, [stockScope, canPickWarehouse, fixedBodegaId]);
 
   const [categorias, setCategorias] = useState([]);
   const [subcategorias, setSubcategorias] = useState([]);
@@ -267,6 +308,8 @@ export default function ReporteSalidasPage() {
         }
         return row[col.key];
       },
+      logoDataUri: format === 'pdf' ? logoDataUri : undefined,
+      warehouseName: format === 'pdf' ? exportBodegaName : undefined,
     });
     setShowColumnSelector(false);
   };
@@ -369,10 +412,17 @@ export default function ReporteSalidasPage() {
             <input type="text" className="input" placeholder="Lote…"
               value={lote} onChange={(e) => setLote(e.target.value)} onKeyDown={handleKeyDown} />
 
-            <select className="select" value={warehouseId ?? ''} onChange={(e) => setWarehouseId(e.target.value ? Number(e.target.value) : null)}>
-              <option value="">Bodega origen</option>
-              {bodegas.map((b) => <option key={`sal-bodor-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>)}
-            </select>
+            {canPickWarehouse ? (
+              <select className="select" value={warehouseId ?? ''} onChange={(e) => setWarehouseId(e.target.value ? Number(e.target.value) : null)}>
+                <option value="">Bodega origen</option>
+                {bodegas.map((b) => <option key={`sal-bodor-${b.id_bodega}`} value={b.id_bodega}>{b.nombre_bodega}</option>)}
+              </select>
+            ) : (
+              <div className="reporte-salidas__bodega-fija" title="Solo puedes ver salidas desde tu bodega">
+                <span className="reporte-salidas__bodega-fija-label">Bodega origen</span>
+                <span className="reporte-salidas__bodega-fija-value">{fixedBodegaName || `#${fixedBodegaId}`}</span>
+              </div>
+            )}
 
             <select className="select" value={bodegaDestinoId ?? ''} onChange={(e) => setBodegaDestinoId(e.target.value ? Number(e.target.value) : null)}>
               <option value="">Bodega destino</option>
