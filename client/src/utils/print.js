@@ -223,12 +223,16 @@ export function printPedidoPos80mm(pedido, opts = {}) {
         margin: 0 !important;
         padding: 0 !important;
         left: 0 !important;
+        height: auto !important;
+        min-height: auto !important;
+        max-height: max-content !important;
+        overflow: visible !important;
       }
       body {
         width: 80mm !important;
         max-width: 80mm !important;
         min-width: 80mm !important;
-        padding: 5mm 0 10mm 0 !important;
+        padding: 2mm 0 !important; /* Reducido de 10mm a 2mm para cortar justo al finalizar el texto */
         font-size: 16px !important;
         text-align: left !important;
       }
@@ -865,12 +869,27 @@ export function printOrderListPos80mm(pedidos = [], opts = {}) {
   <meta charset="UTF-8" />
   <title>${esc(title)}</title>
   <style>
-    @page { size: 80mm auto; margin: 0; }
+    @page { size: 80mm auto; margin: 0 !important; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      height: auto !important;
+      min-height: auto !important;
+      max-height: max-content !important;
+      overflow: visible !important;
+    }
     body {
-      width: 80mm; max-width: 80mm;
-      padding: 4mm; font-family: 'Courier New', monospace;
-      font-size: 10px; font-weight: bold; line-height: 1.4; color: #000; background: #fff;
+      width: 80mm !important;
+      max-width: 80mm !important;
+      min-width: 80mm !important;
+      padding: 3mm !important;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      font-weight: bold;
+      line-height: 1.4;
+      color: #000;
+      background: #fff;
     }
     h1 { text-align: center; font-size: 14px; margin-bottom: 3mm; text-transform: uppercase; }
     .sep { border-top: 1px dashed #000; margin: 2mm 0; }
