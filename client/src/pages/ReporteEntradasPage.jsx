@@ -52,18 +52,6 @@ export default function ReporteEntradasPage() {
     return hit?.nombre_bodega || '';
   }, [user, scopeBodegas, userBodegaId]);
   const { logoDataUri } = useWarehouseLogo(userBodegaId);
-  // Bodega que se muestra como subtítulo del PDF: la filtrada (si el user
-  // eligió una específica) o la fija del bodeguero. Si el admin no filtró,
-  // queda el nombre de su propia bodega.
-  const exportBodegaName = useMemo(() => {
-    if (warehouseId) {
-      const list = Array.isArray(bodegas) ? bodegas : [];
-      const hit = list.find((b) => Number(b.id_bodega) === Number(warehouseId));
-      if (hit?.nombre_bodega) return hit.nombre_bodega;
-    }
-    return fixedBodegaName || userBodegaName || '';
-  }, [warehouseId, bodegas, fixedBodegaName, userBodegaName]);
-
   // Filtros — búsqueda de producto seleccionado
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [documento, setDocumento] = useState('');
@@ -80,7 +68,7 @@ export default function ReporteEntradasPage() {
   const [motivoId, setMotivoId] = useState(null);
   // Si el usuario solo puede ver su propia bodega, forzamos warehouseId a esa
   // bodega y bloqueamos el selector; si tiene acceso a varias, parte en null
-  // (= "Todas las bodegas" cuando can_all_bodegas).
+  // (= "Todas las bodegas" when can_all_bodegas).
   const [warehouseId, setWarehouseId] = useState(() => null);
 
   // Catálogos
@@ -88,6 +76,18 @@ export default function ReporteEntradasPage() {
   const [subcategorias, setSubcategorias] = useState([]);
   const [motivos, setMotivos] = useState([]);
   const [bodegas, setBodegas] = useState([]);
+
+  // Bodega que se muestra como subtítulo del PDF: la filtrada (si el user
+  // eligió una específica) o la fija del bodeguero. Si el admin no filtró,
+  // queda el nombre de su propia bodega.
+  const exportBodegaName = useMemo(() => {
+    if (warehouseId) {
+      const list = Array.isArray(bodegas) ? bodegas : [];
+      const hit = list.find((b) => Number(b.id_bodega) === Number(warehouseId));
+      if (hit?.nombre_bodega) return hit.nombre_bodega;
+    }
+    return fixedBodegaName || userBodegaName || '';
+  }, [warehouseId, bodegas, fixedBodegaName, userBodegaName]);
 
   // Datos
   const [rows, setRows] = useState([]);

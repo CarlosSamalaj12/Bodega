@@ -51,15 +51,6 @@ export default function ReporteSalidasPage() {
     return hit?.nombre_bodega || '';
   }, [user, scopeBodegas, userBodegaId]);
   const { logoDataUri } = useWarehouseLogo(userBodegaId);
-  const exportBodegaName = useMemo(() => {
-    if (warehouseId) {
-      const list = Array.isArray(bodegas) ? bodegas : [];
-      const hit = list.find((b) => Number(b.id_bodega) === Number(warehouseId));
-      if (hit?.nombre_bodega) return hit.nombre_bodega;
-    }
-    return fixedBodegaName || userBodegaName || '';
-  }, [warehouseId, bodegas, fixedBodegaName, userBodegaName]);
-
   // Filtros
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [documento, setDocumento] = useState('');
@@ -88,6 +79,15 @@ export default function ReporteSalidasPage() {
   const [subcategorias, setSubcategorias] = useState([]);
   const [motivos, setMotivos] = useState([]);
   const [bodegas, setBodegas] = useState([]);
+
+  const exportBodegaName = useMemo(() => {
+    if (warehouseId) {
+      const list = Array.isArray(bodegas) ? bodegas : [];
+      const hit = list.find((b) => Number(b.id_bodega) === Number(warehouseId));
+      if (hit?.nombre_bodega) return hit.nombre_bodega;
+    }
+    return fixedBodegaName || userBodegaName || '';
+  }, [warehouseId, bodegas, fixedBodegaName, userBodegaName]);
 
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);

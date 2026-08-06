@@ -64,18 +64,6 @@ export default function ReportePedidosPage() {
     return hit?.nombre_bodega || '';
   }, [user, scopeBodegas, userBodegaId]);
   const { logoDataUri } = useWarehouseLogo(userBodegaId);
-  // Para pedidos, el nombre de bodega del PDF es la fija del bodeguero.
-  // Si el admin filtró por una específica (solicita o despacho), usamos esa.
-  const exportBodegaName = useMemo(() => {
-    const filtered = bodegaSolicitaId || bodegaDespachoId;
-    if (filtered) {
-      const list = Array.isArray(bodegas) ? bodegas : [];
-      const hit = list.find((b) => Number(b.id_bodega) === Number(filtered));
-      if (hit?.nombre_bodega) return hit.nombre_bodega;
-    }
-    return fixedBodegaName || userBodegaName || '';
-  }, [bodegaSolicitaId, bodegaDespachoId, bodegas, fixedBodegaName, userBodegaName]);
-
   // Filtros — búsqueda diferida (Enter o botón Buscar)
   const [search, setSearch] = useState('');
   const [committedSearch, setCommittedSearch] = useState('');
@@ -103,6 +91,18 @@ export default function ReportePedidosPage() {
   const [categorias, setCategorias] = useState([]);
   const [subcategorias, setSubcategorias] = useState([]);
   const [bodegas, setBodegas] = useState([]);
+
+  // Para pedidos, el nombre de bodega del PDF es la fija del bodeguero.
+  // Si el admin filtró por una específica (solicita o despacho), usamos esa.
+  const exportBodegaName = useMemo(() => {
+    const filtered = bodegaSolicitaId || bodegaDespachoId;
+    if (filtered) {
+      const list = Array.isArray(bodegas) ? bodegas : [];
+      const hit = list.find((b) => Number(b.id_bodega) === Number(filtered));
+      if (hit?.nombre_bodega) return hit.nombre_bodega;
+    }
+    return fixedBodegaName || userBodegaName || '';
+  }, [bodegaSolicitaId, bodegaDespachoId, bodegas, fixedBodegaName, userBodegaName]);
 
   // Datos
   const [rows, setRows] = useState([]);
