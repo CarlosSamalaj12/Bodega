@@ -191,12 +191,9 @@ export function AppLayout() {
         onClose={() => setSidebarOpen(false)}
         onToggle={() => setSidebarOpen((v) => !v)}
       />
-      {isDesktop && <div className="app-layout__main"><Outlet /></div>}
-      {!isDesktop && (
-        <main className="app-layout__main app-layout__main--mobile">
-          <Outlet />
-        </main>
-      )}
+      <main className={`app-layout__main ${!isDesktop ? 'app-layout__main--mobile' : ''}`}>
+        <Outlet />
+      </main>
 
       {/* Backdrop en móvil cuando el drawer está abierto */}
       {!isDesktop && sidebarOpen && (
