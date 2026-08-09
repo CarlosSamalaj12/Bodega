@@ -63,6 +63,11 @@ export function AppLayout() {
   useEffect(() => {
     const socket = getSocket();
 
+    // Asegurar reconexión del socket tras el inicio de sesión para que tome las cookies HttpOnly
+    if (!socket.connected) {
+      socket.connect();
+    }
+
     // Mapa para evitar duplicados rápidos
     const recent = new Map();
 

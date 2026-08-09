@@ -5,37 +5,62 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { ErrorBoundary, RouteErrorFallback } from '@/components/shared/ErrorBoundary';
 import { PermissionGuard } from '@/components/shared/PermissionGuard';
 
-// Carga diferida de todas las páginas
-const LoginPage = lazy(() => import('@/pages/LoginPage'));
-const HomePage = lazy(() => import('@/pages/HomePage'));
-const ProductosPage = lazy(() => import('@/pages/ProductosPage'));
-const EntradasPage = lazy(() => import('@/pages/EntradasPage'));
-const SalidasPage = lazy(() => import('@/pages/SalidasPage'));
-const PedidosPage = lazy(() => import('@/pages/PedidosPage'));
-const DespacharPage = lazy(() => import('@/pages/DespacharPage'));
-const CategoriasPage = lazy(() => import('@/pages/CategoriasPage'));
+// Envoltorio de lazy que intenta recargar la página limpia si falla la carga del chunk dinámico.
+// Evita pantallas rotas persistentes al cambiar de versión o por micro-cortes de red.
+function lazyWithRetry(componentImport) {
+  return lazy(async () => {
+    try {
+      return await componentImport();
+    } catch (error) {
+      console.error('[lazyWithRetry] Error cargando componente dinámico:', error);
+      const errorMsg = (error?.message || '').toLowerCase();
+      if (
+        errorMsg.includes('failed to fetch') ||
+        errorMsg.includes('dynamically imported') ||
+        errorMsg.includes('expected a javascript-or-wasm') ||
+        errorMsg.includes('dynamic import') ||
+        errorMsg.includes('load module script') ||
+        errorMsg.includes('mime type')
+      ) {
+        console.warn('[lazyWithRetry] Falla de carga dinámica detectada. Forzando recarga de página...');
+        window.location.reload();
+      }
+      throw error;
+    }
+  });
+}
+
+// Carga diferida de todas las páginas con reintento automático
+const LoginPage = lazyWithRetry(() => import('@/pages/LoginPage'));
+const HomePage = lazyWithRetry(() => import('@/pages/HomePage'));
+const ProductosPage = lazyWithRetry(() => import('@/pages/ProductosPage'));
+const EntradasPage = lazyWithRetry(() => import('@/pages/EntradasPage'));
+const SalidasPage = lazyWithRetry(() => import('@/pages/SalidasPage'));
+const PedidosPage = lazyWithRetry(() => import('@/pages/PedidosPage'));
+const DespacharPage = lazyWithRetry(() => import('@/pages/DespacharPage'));
+const CategoriasPage = lazyWithRetry(() => import('@/pages/CategoriasPage'));
 // Subcategorias ahora está integrada en CategoriasPage
-const ProveedoresPage = lazy(() => import('@/pages/ProveedoresPage'));
-const MedidasPage = lazy(() => import('@/pages/MedidasPage'));
-const MotivosPage = lazy(() => import('@/pages/MotivosPage'));
-const BodegasPage = lazy(() => import('@/pages/BodegasPage'));
-const KardexPage = lazy(() => import('@/pages/KardexPage'));
-const KardexGeneralPage = lazy(() => import('@/pages/KardexGeneralPage'));
-const ExistenciasPage = lazy(() => import('@/pages/ExistenciasPage'));
-const AlertasPage = lazy(() => import('@/pages/AlertasPage'));
-const UsuariosPage = lazy(() => import('@/pages/UsuariosPage'));
-const ReglasSubcategoriasPage = lazy(() => import('@/pages/ReglasSubcategoriasPage'));
-const LimitesPage = lazy(() => import('@/pages/LimitesPage'));
-const ReporteEntradasPage = lazy(() => import('@/pages/ReporteEntradasPage'));
-const ReporteSalidasPage = lazy(() => import('@/pages/ReporteSalidasPage'));
-const CorteDiarioPage = lazy(() => import('@/pages/CorteDiarioPage'));
-const ReportePedidosPage = lazy(() => import('@/pages/ReportePedidosPage'));
-const AjustesPage = lazy(() => import('@/pages/AjustesPage'));
-const TransferenciasPage = lazy(() => import('@/pages/TransferenciasPage'));
-const ConteoCiclicoPage = lazy(() => import('@/pages/ConteoCiclicoPage'));
-const CuadreCajaPage = lazy(() => import('@/pages/CuadreCajaPage'));
-const TendenciaProductoPage = lazy(() => import('@/pages/TendenciaProductoPage'));
-const AuditoriaSensiblesPage = lazy(() => import('@/pages/AuditoriaSensiblesPage'));
+const ProveedoresPage = lazyWithRetry(() => import('@/pages/ProveedoresPage'));
+const MedidasPage = lazyWithRetry(() => import('@/pages/MedidasPage'));
+const MotivosPage = lazyWithRetry(() => import('@/pages/MotivosPage'));
+const BodegasPage = lazyWithRetry(() => import('@/pages/BodegasPage'));
+const KardexPage = lazyWithRetry(() => import('@/pages/KardexPage'));
+const KardexGeneralPage = lazyWithRetry(() => import('@/pages/KardexGeneralPage'));
+const ExistenciasPage = lazyWithRetry(() => import('@/pages/ExistenciasPage'));
+const AlertasPage = lazyWithRetry(() => import('@/pages/AlertasPage'));
+const UsuariosPage = lazyWithRetry(() => import('@/pages/UsuariosPage'));
+const ReglasSubcategoriasPage = lazyWithRetry(() => import('@/pages/ReglasSubcategoriasPage'));
+const LimitesPage = lazyWithRetry(() => import('@/pages/LimitesPage'));
+const ReporteEntradasPage = lazyWithRetry(() => import('@/pages/ReporteEntradasPage'));
+const ReporteSalidasPage = lazyWithRetry(() => import('@/pages/ReporteSalidasPage'));
+const CorteDiarioPage = lazyWithRetry(() => import('@/pages/CorteDiarioPage'));
+const ReportePedidosPage = lazyWithRetry(() => import('@/pages/ReportePedidosPage'));
+const AjustesPage = lazyWithRetry(() => import('@/pages/AjustesPage'));
+const TransferenciasPage = lazyWithRetry(() => import('@/pages/TransferenciasPage'));
+const ConteoCiclicoPage = lazyWithRetry(() => import('@/pages/ConteoCiclicoPage'));
+const CuadreCajaPage = lazyWithRetry(() => import('@/pages/CuadreCajaPage'));
+const TendenciaProductoPage = lazyWithRetry(() => import('@/pages/TendenciaProductoPage'));
+const AuditoriaSensiblesPage = lazyWithRetry(() => import('@/pages/AuditoriaSensiblesPage'));
 
 // Fallback compartido para Suspense
 const PageFallback = () => (

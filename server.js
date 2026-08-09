@@ -1196,6 +1196,7 @@ function emitPedidoChanged(payload) {
   };
   if (reqWh > 0) io.to(`warehouse:${reqWh}`).emit("pedido:changed", envelope);
   if (fromWh > 0) io.to(`warehouse:${fromWh}`).emit("pedido:changed", envelope);
+  io.emit("pedido:changed", envelope);
 
   // Push notification a la bodega que debe despachar
   const pushWh = fromWh || reqWh;
@@ -1361,6 +1362,13 @@ function emitStockChanged(idBodega, payload = {}) {
   const idWh = Number(idBodega || 0);
   if (idWh > 0) {
     io.to(`warehouse:${idWh}`).emit("stock:changed", {
+      action: payload.action || "updated",
+      id_bodega: idWh,
+      nombre_bodega: payload.nombre_bodega || null,
+      id_movimiento: Number(payload.id_movimiento || 0),
+      at: new Date().toISOString(),
+    });
+    io.emit("stock:changed", {
       action: payload.action || "updated",
       id_bodega: idWh,
       nombre_bodega: payload.nombre_bodega || null,
