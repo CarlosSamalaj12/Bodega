@@ -459,7 +459,7 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
   ];
 
   return (
-    <form className="despacho-form" onSubmit={handleSubmit}>
+    <form className="despacho-form" onSubmit={handleSubmit} noValidate>
       {submitError && <div className="despacho-form__error">{submitError}</div>}
 
       <div className="despacho-form__header">

@@ -380,7 +380,7 @@ export function EntradaForm({
   ];
 
   return (
-    <form className="entrada-form" onSubmit={handleSubmit}>
+    <form className="entrada-form" onSubmit={handleSubmit} noValidate>
       {submitError && <div className="entrada-form__error">{submitError}</div>}
 
       <div className="entrada-form__section">

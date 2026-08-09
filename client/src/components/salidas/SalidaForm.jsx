@@ -305,7 +305,7 @@ export function SalidaForm({
   ];
 
   return (
-    <form className="salida-form" onSubmit={handleSubmit}>
+    <form className="salida-form" onSubmit={handleSubmit} noValidate>
       {submitError && <div className="salida-form__error">{submitError}</div>}
 
       <div className="salida-form__section">
