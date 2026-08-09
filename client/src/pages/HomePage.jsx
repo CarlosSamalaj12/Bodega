@@ -149,7 +149,7 @@ export default function HomePage() {
       value: r?.total_dinero != null ? Number(r.total_dinero).toLocaleString('es-GT', { minimumFractionDigits: 2 }) : '—',
       subtitle: 'Costo total en existencia',
       variant: 'accent',
-      icon: '₡',
+      icon: 'Q',
     },
     {
       title: 'Pedidos x despachar',
