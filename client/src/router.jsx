@@ -6,26 +6,36 @@ import { ErrorBoundary, RouteErrorFallback } from '@/components/shared/ErrorBoun
 import { PermissionGuard } from '@/components/shared/PermissionGuard';
 
 // Envoltorio de lazy que intenta recargar la página limpia si falla la carga del chunk dinámico.
-// Evita pantallas rotas persistentes al cambiar de versión o por micro-cortes de red.
+// Hace reintentos automáticos en caso de micro-cortes de red antes de forzar el reload.
 function lazyWithRetry(componentImport) {
   return lazy(async () => {
-    try {
-      return await componentImport();
-    } catch (error) {
-      console.error('[lazyWithRetry] Error cargando componente dinámico:', error);
-      const errorMsg = (error?.message || '').toLowerCase();
-      if (
-        errorMsg.includes('failed to fetch') ||
-        errorMsg.includes('dynamically imported') ||
-        errorMsg.includes('expected a javascript-or-wasm') ||
-        errorMsg.includes('dynamic import') ||
-        errorMsg.includes('load module script') ||
-        errorMsg.includes('mime type')
-      ) {
-        console.warn('[lazyWithRetry] Falla de carga dinámica detectada. Forzando recarga de página...');
-        window.location.reload();
+    const maxRetries = 2; // Reintentar hasta 2 veces (3 intentos en total)
+    const retryDelay = 1500; // Esperar 1.5s entre intentos
+
+    for (let i = 0; i <= maxRetries; i++) {
+      try {
+        return await componentImport();
+      } catch (error) {
+        if (i === maxRetries) {
+          console.error('[lazyWithRetry] Falla definitiva al cargar componente dinámico:', error);
+          const errorMsg = (error?.message || '').toLowerCase();
+          if (
+            errorMsg.includes('failed to fetch') ||
+            errorMsg.includes('dynamically imported') ||
+            errorMsg.includes('expected a javascript-or-wasm') ||
+            errorMsg.includes('dynamic import') ||
+            errorMsg.includes('load module script') ||
+            errorMsg.includes('mime type')
+          ) {
+            console.warn('[lazyWithRetry] Falla de versión o red persistente. Forzando recarga de página...');
+            window.location.reload();
+          }
+          throw error;
+        }
+
+        console.warn(`[lazyWithRetry] Error al importar módulo. Reintento ${i + 1}/${maxRetries} en ${retryDelay}ms...`, error);
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
       }
-      throw error;
     }
   });
 }

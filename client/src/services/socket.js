@@ -13,6 +13,11 @@ export function getSocket() {
     withCredentials: true,
     transports: ['websocket', 'polling'],
     autoConnect: true,
+    reconnection: true,
+    reconnectionAttempts: Infinity, // Seguir intentando reconectar siempre ante caídas de red
+    reconnectionDelay: 1000,        // Iniciar intentos de reconexión en 1s
+    reconnectionDelayMax: 5000,     // Esperar como máximo 5s entre reintentos
+    timeout: 20000,                 // Timeout de conexión de 20s
   });
 
   socket.on('connect_error', (err) => {
