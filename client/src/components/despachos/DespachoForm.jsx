@@ -222,7 +222,7 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
     e.preventDefault();
     setSubmitError(null);
 
-    const linesAFulfill = lines.filter((l) => l.cantidad > 0 && !l.anulada);
+    const linesAFulfill = lines.filter((l) => Number(l.cantidad) > 0 && !l.anulada);
     const linesAnuladas = lines.filter((l) => l.anulada);
 
     if (linesAFulfill.length === 0 && linesAnuladas.length === 0) {
@@ -232,7 +232,7 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
 
     // Bloquear el despacho si alguna línea supera el stock disponible (vigente).
     // Se evalúa ANTES de la justificación: el error de stock es más concreto.
-    const sinStock = linesAFulfill.filter((l) => l.cantidad > Number(l.stock || 0));
+    const sinStock = linesAFulfill.filter((l) => Number(l.cantidad) > Number(l.stock || 0));
     if (sinStock.length > 0) {
       setSubmitError(
         `Stock insuficiente para: ${sinStock.map((l) => l.nombre_producto).join(', ')}. Ajusta la cantidad o anula la línea.`
@@ -254,7 +254,7 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
           justificacion: justificacion.trim() || null,
           lines: linesAFulfill.map((l) => ({
             id_pedido_detalle: l.id_pedido_detalle,
-            qty: l.cantidad,
+            qty: Number(l.cantidad),
           })),
         });
         skipped = Array.isArray(res?.skipped) ? res.skipped : [];
@@ -355,19 +355,25 @@ export function DespachoForm({ pedido, submitting, onSubmittingChange, onDone, o
           return <span className="despacho-form__pill despacho-form__pill--void">Anulada</span>;
         }
         const cant = Number(l.cantidad) || 0;
-        const pend = Number(l.pendiente) || 0;
+        const pend = Number(l.pendiente || 0);
         const overStock = cant > Number(l.stock || 0);
         const sobreDespacho = cant > pend;
         return (
           <div className="despacho-form__cantidad-cell">
             <input
-              type="number"
-              className={`input despacho-form__input ${overStock ? 'despacho-form__input--warn' : ''} ${sobreDespacho ? 'despacho-form__input--info' : ''}`}
-              min="0"
-              step="0.001"
+              type="text"
               inputMode="decimal"
+              className={`input despacho-form__input ${overStock ? 'despacho-form__input--warn' : ''} ${sobreDespacho ? 'despacho-form__input--info' : ''}`}
               value={l.cantidad}
-              onChange={(e) => setCantidad(idx, e.target.value)}
+              onChange={(e) => {
+                let val = e.target.value;
+                // Reemplazar comas por puntos decimales
+                val = val.replace(',', '.');
+                // Expresión regular para permitir dígitos, punto opcional y decimales (ej: "", "3", "3.", "3.5")
+                if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                  setCantidad(idx, val);
+                }
+              }}
               disabled={l.pendiente === 0 || l.anulada}
               title={sobreDespacho ? `Estás despachando ${(cant - pend).toFixed(3)} sobre lo solicitado` : ''}
             />

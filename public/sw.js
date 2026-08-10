@@ -72,7 +72,21 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Everything else (static, CDN) → cache-first
+  // HTML principal / Raíz / Navegaciones de documento → network-first.
+  // Esto garantiza que al abrir la app con conexión a internet se obtenga el index.html
+  // más reciente que apunta a los chunks de JavaScript correctos. Solo se cae al
+  // cache en modo offline.
+  const isNavigation = request.mode === "navigate" || 
+                       url.pathname === "/" || 
+                       url.pathname === "/index.html" ||
+                       !url.pathname.includes("."); // Rutas SPA de react-router (sin extensión)
+
+  if (isNavigation) {
+    event.respondWith(networkFirst(request, STATIC_CACHE));
+    return;
+  }
+
+  // Todo lo demás (assets estáticos, CDN, imágenes, CSS/JS de Vite con hash único) → cache-first
   event.respondWith(cacheFirst(request, STATIC_CACHE));
 });
 
