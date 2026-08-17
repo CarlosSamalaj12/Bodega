@@ -1953,6 +1953,25 @@ async function ensureUsersNoAutoLogoutColumn() {
   }
 }
 
+async function ensureUsersShortcutsConfigColumn() {
+  // Columna JSON para guardar la configuración personalizada de atajos
+  // (keybindings) por usuario. Si no existe, la creamos con default NULL.
+  const [rows] = await pool.query(
+    `SELECT COUNT(*) AS c
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA=DATABASE()
+       AND TABLE_NAME='usuarios'
+       AND COLUMN_NAME='shortcuts_config'`
+  );
+  const exists = Number(rows?.[0]?.c || 0) > 0;
+  if (!exists) {
+    await pool.query(
+      `ALTER TABLE usuarios
+       ADD COLUMN shortcuts_config JSON NULL DEFAULT NULL`
+    );
+  }
+}
+
 async function ensureDailyCloseTables() {
   await pool.query(
     `CREATE TABLE IF NOT EXISTS cierre_dia (
@@ -2297,6 +2316,9 @@ ensurePushSubscriptionsTable().catch((e) => {
 });
 ensureUsersNoAutoLogoutColumn().catch((e) => {
   console.error("No se pudo crear columna usuarios.no_auto_logout:", e);
+});
+ensureUsersShortcutsConfigColumn().catch((e) => {
+  console.error("No se pudo crear columna usuarios.shortcuts_config:", e);
 });
 ensureDailyCloseTables().catch((e) => {
   console.error("No se pudo crear tablas de cierre diario:", e);
@@ -11408,6 +11430,96 @@ app.get("/api/me/permisos", auth, async (req, res) => {
       catalogo: PERM_CATALOG,
       is_admin_role: Number(scope?.is_admin_role ? 1 : 0),
     });
+  } catch (e) {
+    return res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+/* =========================
+   USUARIOS (SHORTCUTS / ATAJOS)
+   El cliente (frontend) es el dueño del catálogo de atajos disponibles.
+   Aquí solo persistimos el mapa { id_atajo -> combinacion } que el usuario
+   haya personalizado. El cliente hace merge con sus defaults locales.
+========================= */
+app.get("/api/me/shortcuts", auth, async (req, res) => {
+  try {
+    const id_usuario = Number(req.user?.id_user || 0);
+    if (!id_usuario) return res.status(400).json({ error: "Usuario invalido" });
+    await ensureUsersShortcutsConfigColumn();
+    const [rows] = await pool.query(
+      `SELECT shortcuts_config
+       FROM usuarios
+       WHERE id_usuario=:id_usuario
+       LIMIT 1`,
+      { id_usuario }
+    );
+    // MariaDB/MySQL pueden devolver el JSON como string o ya parseado,
+    // según el driver. Normalizamos a objeto JS.
+    const raw = rows?.[0]?.shortcuts_config;
+    let shortcuts = null;
+    if (raw == null) {
+      shortcuts = null;
+    } else if (typeof raw === "string") {
+      try { shortcuts = JSON.parse(raw); } catch { shortcuts = null; }
+    } else if (typeof raw === "object") {
+      shortcuts = raw;
+    }
+    res.json({ id_usuario, shortcuts: shortcuts || {} });
+  } catch (e) {
+    return res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+app.put("/api/me/shortcuts", auth, async (req, res) => {
+  try {
+    const id_usuario = Number(req.user?.id_user || 0);
+    if (!id_usuario) return res.status(401).json({ error: "Usuario invalido" });
+    await ensureUsersShortcutsConfigColumn();
+
+    const body = req.body || {};
+    // Esperamos: { shortcuts: { [actionId]: "Ctrl+Shift+K", ... } }
+    // Validamos estructura para no meter basura en la DB.
+    if (body.shortcuts && typeof body.shortcuts !== "object") {
+      return res.status(400).json({ error: "shortcuts debe ser un objeto" });
+    }
+    const mapIn = body.shortcuts && typeof body.shortcuts === "object" ? body.shortcuts : {};
+    const cleaned = {};
+    for (const [k, v] of Object.entries(mapIn)) {
+      const id = String(k || "").trim();
+      const combo = typeof v === "string" ? v.trim() : "";
+      if (!id || !combo) continue;
+      // Limitar a un tamaño razonable para evitar payloads absurdos.
+      if (combo.length > 64) continue;
+      // Solo letras, dígitos, '+', '-', espacios. Evita inyecciones de UI.
+      if (!/^[A-Za-z0-9+ \-_]+$/.test(combo)) continue;
+      cleaned[id] = combo;
+    }
+    const serialized = JSON.stringify(cleaned);
+
+    await pool.query(
+      `UPDATE usuarios
+       SET shortcuts_config=:cfg
+       WHERE id_usuario=:id_usuario`,
+      { cfg: serialized, id_usuario }
+    );
+
+    res.json({ ok: true, id_usuario, shortcuts: cleaned });
+  } catch (e) {
+    return res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+app.delete("/api/me/shortcuts", auth, async (req, res) => {
+  try {
+    const id_usuario = Number(req.user?.id_user || 0);
+    if (!id_usuario) return res.status(401).json({ error: "Usuario invalido" });
+    await pool.query(
+      `UPDATE usuarios
+       SET shortcuts_config=NULL
+       WHERE id_usuario=:id_usuario`,
+      { id_usuario }
+    );
+    res.json({ ok: true, id_usuario, shortcuts: {} });
   } catch (e) {
     return res.status(500).json({ error: String(e.message || e) });
   }

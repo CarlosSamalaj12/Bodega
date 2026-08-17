@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -298,6 +298,21 @@ export default function AjustesPage() {
                   </Button>
                 </div>
               )}
+            </Card>
+
+            {/* === Atajos de teclado === */}
+            <Card header={<h3 className="ajustes-page__section-title">⌨️ Atajos de teclado</h3>}>
+              <p className="ajustes-page__hint" style={{ marginBottom: '0.75rem' }}>
+                Personaliza los atajos (teclas rápidas) del CRM. F3 guarda
+                formularios, F1 agrega líneas, N abre nuevos movimientos.
+                Los cambios se sincronizan con tu cuenta para que estén
+                disponibles en cualquier dispositivo.
+              </p>
+              <div className="ajustes-page__actions" style={{ marginTop: '0.5rem' }}>
+                <Link to="/ajustes/atajos">
+                  <Button variant="secondary">Personalizar atajos →</Button>
+                </Link>
+              </div>
             </Card>
           </>
         )}

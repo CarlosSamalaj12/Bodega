@@ -66,6 +66,7 @@ const ReporteSalidasPage = lazyWithRetry(() => import('@/pages/ReporteSalidasPag
 const CorteDiarioPage = lazyWithRetry(() => import('@/pages/CorteDiarioPage'));
 const ReportePedidosPage = lazyWithRetry(() => import('@/pages/ReportePedidosPage'));
 const AjustesPage = lazyWithRetry(() => import('@/pages/AjustesPage'));
+const ShortcutsPage = lazyWithRetry(() => import('@/pages/ShortcutsPage'));
 const TransferenciasPage = lazyWithRetry(() => import('@/pages/TransferenciasPage'));
 const ConteoCiclicoPage = lazyWithRetry(() => import('@/pages/ConteoCiclicoPage'));
 const CuadreCajaPage = lazyWithRetry(() => import('@/pages/CuadreCajaPage'));
@@ -152,6 +153,14 @@ export const router = createBrowserRouter([
         element: (
           <PermissionGuard permissionKey="section.view.ajustes">
             <AjustesPage />
+          </PermissionGuard>
+        ),
+      },
+      {
+        path: 'ajustes/atajos',
+        element: (
+          <PermissionGuard permissionKey="section.view.ajustes">
+            <ShortcutsPage />
           </PermissionGuard>
         ),
       },

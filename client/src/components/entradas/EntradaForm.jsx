@@ -7,6 +7,9 @@ import { ProductPicker } from '@/components/ui/ProductPicker';
 import { LinesEditor } from '@/components/ui/LinesEditor';
 import { Spinner } from '@/components/ui/Spinner';
 import { PinModal } from '@/components/ui/PinModal';
+import { KeyboardKey, ShortcutHint } from '@/components/ui/KeyboardKey';
+import { Shortcuts } from '@/hooks/useShortcut.jsx';
+import { useShortcutsStore } from '@/stores/shortcuts.store';
 import { toast } from '@/components/ui/Toast';
 import { entradasService } from '@/services/entradas.service';
 import { existenciasService } from '@/services/existencias.service';
@@ -239,6 +242,86 @@ export function EntradaForm({
     setPendingPayload(null);
   };
 
+  // -------- Atajos de teclado (F3 guardar, F1 agregar línea, etc.) ---------
+  // Leemos los combos efectivos del store para que respeten overrides
+  // personalizados por el usuario.
+  const getCombo = useShortcutsStore((s) => s.getCombo);
+  const saveCombo = getCombo('form.save');
+  const saveCtrlCombo = getCombo('form.saveCtrl');
+  const addLineCombo = getCombo('form.addLine');
+  const cancelCombo = getCombo('form.cancel');
+  const focusProductCombo = getCombo('form.focusProduct');
+
+  // Atajo: guardar (F3 por defecto)
+  const handleSaveShortcut = useCallback(() => {
+    if (submitting) return;
+    if (!canSubmit) {
+      // Feedback amable: si el form no es válido, intenta submit normal
+      // para que se muestren los errores de validación.
+      handleSubmit({ preventDefault: () => {} });
+      return;
+    }
+    // Disparamos el submit programático.
+    const form = document.getElementById('entrada-form');
+    if (form) {
+      if (typeof form.requestSubmit === 'function') form.requestSubmit();
+      else form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    }
+  }, [submitting, canSubmit, handleSubmit]);
+
+  // Atajo: agregar línea (F1 por defecto)
+  const handleAddLineShortcut = useCallback(() => {
+    if (submitting) return;
+    addLine();
+  }, [submitting, addLine]);
+
+  // Atajo: cancelar
+  const handleCancelShortcut = useCallback(() => {
+    if (submitting) return;
+    onCancel?.();
+  }, [submitting, onCancel]);
+
+  // Atajo: focus en el primer ProductPicker
+  const handleFocusProductShortcut = useCallback(() => {
+    // ProductPicker expone un input con placeholder "Buscar producto…".
+    // Buscamos el primero dentro del form.
+    const form = document.getElementById('entrada-form');
+    if (!form) return;
+    const input = form.querySelector('input[placeholder^="Buscar producto"]');
+    if (input && typeof input.focus === 'function') input.focus();
+  }, []);
+
+  // Componente "fantasma" que registra todos los atajos del formulario.
+  // Solo se monta cuando el form está activo (el padre lo monta con open=true).
+  const formShortcuts = (
+    <Shortcuts
+      map={{
+        'form.save': {
+          handler: handleSaveShortcut,
+          scope: 'form',
+        },
+        'form.saveCtrl': {
+          handler: handleSaveShortcut,
+          scope: 'form',
+        },
+        'form.addLine': {
+          handler: handleAddLineShortcut,
+          scope: 'form',
+        },
+        'form.cancel': {
+          handler: handleCancelShortcut,
+          scope: 'form',
+          ignoreInputs: false, // Ctrl+Backspace debe disparar incluso con foco en un input
+        },
+        'form.focusProduct': {
+          handler: handleFocusProductShortcut,
+          scope: 'form',
+          ignoreInputs: false, // F2 debe disparar incluso con foco en un input
+        },
+      }}
+    />
+  );
+
   // Helper para mostrar el asterisco de campo obligatorio en la cabecera de columna
   const requiredLabel = (text) => (
     <span>
@@ -380,7 +463,13 @@ export function EntradaForm({
   ];
 
   return (
-    <form className="entrada-form" onSubmit={handleSubmit} noValidate>
+    <form
+      className="entrada-form"
+      onSubmit={handleSubmit}
+      noValidate
+      id="entrada-form"
+    >
+      {formShortcuts}
       {submitError && <div className="entrada-form__error">{submitError}</div>}
 
       <div className="entrada-form__section">
@@ -474,20 +563,37 @@ export function EntradaForm({
       </div>
 
       <div className="entrada-form__footer">
-        <Button type="button" variant="ghost" onClick={onCancel} disabled={submitting}>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onCancel}
+          disabled={submitting}
+          title={cancelCombo ? `Cancelar (${cancelCombo})` : 'Cancelar'}
+        >
           Cancelar
+          {cancelCombo && <KeyboardKey combo={cancelCombo} />}
         </Button>
         <Button
           type="button"
           variant="secondary"
           onClick={addLine}
           disabled={submitting}
-          title="Agregar otra línea a este movimiento"
+          title={addLineCombo ? `Agregar otra línea a este movimiento (${addLineCombo})` : 'Agregar otra línea a este movimiento'}
         >
           + Agregar línea
+          {addLineCombo && <KeyboardKey combo={addLineCombo} />}
         </Button>
-        <Button type="submit" variant="primary" disabled={!canSubmit}>
-          {submitting ? <Spinner size={14} /> : `Registrar entrada${totales.lineasValidas ? ` (${totales.lineasValidas})` : ''}`}
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={!canSubmit}
+          title={saveCombo ? `Registrar entrada (${saveCombo}${saveCtrlCombo ? ` o ${saveCtrlCombo}` : ''})` : 'Registrar entrada'}
+        >
+          {submitting ? <Spinner size={14} /> : (
+            <ShortcutHint combo={saveCombo}>
+              {`Registrar entrada${totales.lineasValidas ? ` (${totales.lineasValidas})` : ''}`}
+            </ShortcutHint>
+          )}
         </Button>
       </div>
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
@@ -7,6 +7,9 @@ import { ProductPicker } from '@/components/ui/ProductPicker';
 import { LinesEditor } from '@/components/ui/LinesEditor';
 import { Spinner } from '@/components/ui/Spinner';
 import { Modal } from '@/components/ui/Modal';
+import { KeyboardKey, ShortcutHint } from '@/components/ui/KeyboardKey';
+import { Shortcuts } from '@/hooks/useShortcut.jsx';
+import { useShortcutsStore } from '@/stores/shortcuts.store';
 import { toast } from '@/components/ui/Toast';
 import { pedidosService } from '@/services/pedidos.service';
 import './PedidoForm.scss';
@@ -136,6 +139,54 @@ export function PedidoForm({
     onClose?.();
   };
 
+  // -------- Atajos de teclado (F3 guardar, F1 agregar línea, etc.) ---------
+  const getCombo = useShortcutsStore((s) => s.getCombo);
+  const saveCombo = getCombo('form.save');
+  const saveCtrlCombo = getCombo('form.saveCtrl');
+  const addLineCombo = getCombo('form.addLine');
+  const cancelCombo = getCombo('form.cancel');
+  const focusProductCombo = getCombo('form.focusProduct');
+
+  const handleSaveShortcut = useCallback(() => {
+    if (submitting) return;
+    if (!canSubmit) {
+      handleSubmit({ preventDefault: () => {} });
+      return;
+    }
+    handleSubmitClick();
+  }, [submitting, canSubmit, handleSubmit, handleSubmitClick]);
+
+  const handleAddLineShortcut = useCallback(() => {
+    if (submitting) return;
+    addLine();
+  }, [submitting, addLine]);
+
+  const handleCancelShortcut = useCallback(() => {
+    if (submitting) return;
+    onClose?.();
+  }, [submitting, onClose]);
+
+  const handleFocusProductShortcut = useCallback(() => {
+    // El form del pedido es un <form> con id="pedido-form"
+    const form = document.getElementById('pedido-form');
+    if (!form) return;
+    const input = form.querySelector('input[placeholder^="Buscar producto"]');
+    if (input && typeof input.focus === 'function') input.focus();
+  }, []);
+
+  // El Shortcuts solo se monta cuando el modal está abierto (`open`).
+  const formShortcuts = open ? (
+    <Shortcuts
+      map={{
+        'form.save': { handler: handleSaveShortcut, scope: 'form' },
+        'form.saveCtrl': { handler: handleSaveShortcut, scope: 'form' },
+        'form.addLine': { handler: handleAddLineShortcut, scope: 'form' },
+        'form.cancel': { handler: handleCancelShortcut, scope: 'form', ignoreInputs: false },
+        'form.focusProduct': { handler: handleFocusProductShortcut, scope: 'form', ignoreInputs: false },
+      }}
+    />
+  ) : null;
+
   const columns = [
     {
       key: 'producto',
@@ -221,25 +272,33 @@ export function PedidoForm({
           variant="ghost"
           onClick={handleClose}
           disabled={submitting}
+          title={cancelCombo ? `Cancelar (${cancelCombo})` : 'Cancelar'}
         >
           Cancelar
+          {cancelCombo && <KeyboardKey combo={cancelCombo} />}
         </Button>
         <Button
           type="button"
           variant="secondary"
           onClick={addLine}
           disabled={submitting}
-          title="Agregar otra línea al pedido"
+          title={addLineCombo ? `Agregar otra línea al pedido (${addLineCombo})` : 'Agregar otra línea al pedido'}
         >
           + Agregar línea
+          {addLineCombo && <KeyboardKey combo={addLineCombo} />}
         </Button>
         <Button
           type="button"
           variant="primary"
           onClick={handleSubmitClick}
           disabled={!canSubmit}
+          title={saveCombo ? `Enviar pedido (${saveCombo}${saveCtrlCombo ? ` o ${saveCtrlCombo}` : ''})` : 'Enviar pedido'}
         >
-          {submitting ? <Spinner size={14} /> : `Enviar pedido${totales.lineasValidas ? ` (${totales.lineasValidas})` : ''}`}
+          {submitting ? <Spinner size={14} /> : (
+            <ShortcutHint combo={saveCombo}>
+              {`Enviar pedido${totales.lineasValidas ? ` (${totales.lineasValidas})` : ''}`}
+            </ShortcutHint>
+          )}
         </Button>
       </div>
     </div>
@@ -253,6 +312,7 @@ export function PedidoForm({
       size="xl"
       footer={footer}
     >
+      {formShortcuts}
       {submitError && <div className="pedido-form__error">{submitError}</div>}
 
       {catalogError ? (

@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   // Dashboard
   { to: '/', label: 'Inicio', icon: '🏠', section: 'home', group: 'dashboard' },
   { to: '/ajustes', label: 'Ajustes', icon: '⚙️', section: 'ajustes', group: 'dashboard' },
+  { to: '/ajustes/atajos', label: 'Atajos de teclado', icon: '⌨️', section: 'ajustes', group: 'dashboard' },
 
   // Movimientos
   { to: '/entradas', label: 'Entradas', icon: '📥', section: 'entradas', group: 'movimientos' },

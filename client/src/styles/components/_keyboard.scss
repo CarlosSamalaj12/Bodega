@@ -1,0 +1,262 @@
+@use '../abstracts' as *;
+
+// =============================================================
+// Keyboard / Shortcuts
+// Estilos para los badges de teclas y hints de atajos
+// =============================================================
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: $font-mono;
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 3px 6px;
+  min-height: 20px;
+  border-radius: $radius-xs;
+  background: $color-surface;
+  color: $color-text;
+  border: 1px solid $color-stroke;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08), inset 0 -1px 0 rgba(0, 0, 0, 0.04);
+  white-space: nowrap;
+  user-select: none;
+  vertical-align: middle;
+
+  &--inline {
+    margin-left: 6px;
+    font-size: 0.7rem;
+    opacity: 0.85;
+  }
+
+  &--block {
+    font-size: 0.85rem;
+    padding: 5px 9px;
+    min-height: 26px;
+    letter-spacing: 0.02em;
+  }
+}
+
+.shortcut-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+// ============================
+// Modal de ayuda
+// ============================
+
+.shortcuts-help {
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: $space-2 0;
+
+  &__intro {
+    color: $color-text-muted;
+    font-size: $font-size-sm;
+    line-height: $line-height-base;
+    margin: 0 0 $space-2 0;
+  }
+
+  &__category {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+
+    &-title {
+      margin: 0;
+      font-size: $font-size-sm;
+      font-weight: $font-weight-semibold;
+      color: $color-text-muted;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+  }
+
+  &__list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2px;
+    border-radius: $radius-md;
+    overflow: hidden;
+    background: $color-bg-1;
+    border: 1px solid $color-stroke;
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: $space-3;
+    align-items: center;
+    padding: $space-3 $space-4;
+    background: $color-bg-elevated;
+
+    &-label {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    &-title {
+      font-size: $font-size-base;
+      font-weight: $font-weight-medium;
+      color: $color-text;
+    }
+
+    &-desc {
+      font-size: $font-size-xs;
+      color: $color-text-muted;
+      line-height: $line-height-base;
+    }
+
+    &-combo {
+      flex-shrink: 0;
+    }
+
+    @media (min-width: $bp-md) {
+      grid-template-columns: 1.4fr 0.8fr 0.6fr;
+      gap: $space-4;
+    }
+  }
+}
+
+// ============================
+// Página de configuración
+// ============================
+
+.shortcuts-page {
+  display: flex;
+  flex-direction: column;
+  gap: $space-5;
+
+  &__header-actions {
+    display: flex;
+    gap: $space-2;
+    flex-wrap: wrap;
+  }
+
+  &__intro {
+    background: $color-accent-soft;
+    border: 1px solid $color-stroke;
+    border-left: 3px solid $color-accent;
+    border-radius: $radius-md;
+    padding: $space-3 $space-4;
+    color: $color-text;
+    font-size: $font-size-sm;
+    line-height: $line-height-base;
+
+    code {
+      background: $color-surface;
+      border: 1px solid $color-stroke;
+      border-radius: $radius-xs;
+      padding: 1px 5px;
+      font-family: $font-mono;
+      font-size: 0.78em;
+    }
+  }
+
+  &__group {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+  }
+
+  &__group-title {
+    margin: 0;
+    font-size: $font-size-md;
+    font-weight: $font-weight-semibold;
+    color: $color-text;
+  }
+
+  &__group-desc {
+    margin: 0;
+    font-size: $font-size-sm;
+    color: $color-text-muted;
+  }
+
+  &__rows {
+    display: flex;
+    flex-direction: column;
+    border-radius: $radius-md;
+    overflow: hidden;
+    background: $color-bg-1;
+    border: 1px solid $color-stroke;
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    align-items: center;
+    gap: $space-3;
+    padding: $space-3 $space-4;
+    background: $color-bg-elevated;
+    border-bottom: 1px solid $color-stroke;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &-label {
+      min-width: 0;
+
+      .shortcuts-page__row-title {
+        font-size: $font-size-base;
+        font-weight: $font-weight-medium;
+        color: $color-text;
+      }
+
+      .shortcuts-page__row-desc {
+        font-size: $font-size-xs;
+        color: $color-text-muted;
+        line-height: $line-height-base;
+        margin-top: 2px;
+      }
+    }
+
+    &-current {
+      display: flex;
+      align-items: center;
+      gap: $space-2;
+      color: $color-text-muted;
+      font-size: $font-size-xs;
+
+      .kbd {
+        margin-left: 0;
+      }
+    }
+
+    &-actions {
+      display: flex;
+      gap: $space-2;
+    }
+  }
+
+  &__capture {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    padding: $space-2 $space-3;
+    background: $color-accent-soft;
+    border: 1px dashed $color-accent;
+    border-radius: $radius-md;
+    color: $color-text;
+    font-size: $font-size-sm;
+    min-height: 38px;
+
+    &-hint {
+      color: $color-text-muted;
+      font-size: $font-size-xs;
+    }
+  }
+
+  &__conflict {
+    color: $color-danger;
+    font-size: $font-size-xs;
+    margin-top: 4px;
+  }
+}

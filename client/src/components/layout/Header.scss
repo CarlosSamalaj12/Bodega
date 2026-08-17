@@ -15,6 +15,19 @@
   flex-wrap: wrap;
   max-width: 100%;
   overflow: hidden;
+  // Auto-hide: transición suave al ocultar/mostrar según dirección de scroll.
+  // Se activa solo cuando el componente se monta con la prop autoHide=true.
+  transition: transform $transition-base, box-shadow $transition-base;
+  will-change: transform;
+
+  &--hidden {
+    // Desliza el header hacia arriba por encima del viewport.
+    // Como es sticky, no hay "salto" del contenido: al ocultarse, el
+    // siguiente elemento hermano ocupa su lugar y se ve más listado.
+    transform: translateY(-100%);
+    // Quitamos la sombra al estar oculto para no dejar artefactos visuales.
+    box-shadow: none;
+  }
 
   &__title {
     min-width: 0;

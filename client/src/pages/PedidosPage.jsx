@@ -6,6 +6,9 @@ import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { DataList } from '@/components/ui/DataList';
+import { KeyboardKey } from '@/components/ui/KeyboardKey';
+import { Shortcuts } from '@/hooks/useShortcut.jsx';
+import { useShortcutsStore } from '@/stores/shortcuts.store';
 import { useDebounce } from '@/hooks/useDebounce';
 import { toast } from '@/components/ui/Toast';
 import { useAuthStore } from '@/stores/auth.store';
@@ -210,6 +213,30 @@ export default function PedidosPage() {
     return filtered;
   }, [pedidos, debouncedSearch]);
 
+  // -------- Atajos globales de la pantalla de Pedidos --------
+  const getCombo = useShortcutsStore((s) => s.getCombo);
+  const newCombo = getCombo('pedidos.new');
+  const refreshCombo = getCombo('pedidos.refresh');
+
+  const handleNewShortcut = useCallback(() => {
+    if (!canCreate) return;
+    if (modalOpen) return;
+    setModalOpen(true);
+  }, [canCreate, modalOpen]);
+
+  const handleRefreshShortcut = useCallback(() => {
+    loadPedidos();
+  }, [loadPedidos]);
+
+  const pageShortcuts = (
+    <Shortcuts
+      map={{
+        'pedidos.new': { handler: handleNewShortcut, page: ['/pedidos'] },
+        'pedidos.refresh': { handler: handleRefreshShortcut, page: ['/pedidos'] },
+      }}
+    />
+  );
+
   const columns = useMemo(
     () => [
       {
@@ -302,9 +329,11 @@ export default function PedidosPage() {
 
   return (
     <>
+      {pageShortcuts}
       <Header
         title="Realizar pedidos"
         subtitle={`${pedidos.length} pedido${pedidos.length === 1 ? '' : 's'} en total`}
+        autoHide
         actions={
           <div className="pedidos-page__actions">
             {!isMobile && pedidosSorted.length > 0 && (
@@ -312,12 +341,23 @@ export default function PedidosPage() {
                 Exportar CSV
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={loadPedidos}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={loadPedidos}
+              title={refreshCombo ? `Refrescar (${refreshCombo})` : 'Refrescar'}
+            >
               Refrescar
+              {refreshCombo && <KeyboardKey combo={refreshCombo} />}
             </Button>
             {canCreate && (
-              <Button size={isMobile ? 'sm' : 'md'} onClick={() => setModalOpen(true)}>
+              <Button
+                size={isMobile ? 'sm' : 'md'}
+                onClick={() => setModalOpen(true)}
+                title={newCombo ? `Nuevo pedido (${newCombo})` : 'Nuevo pedido'}
+              >
                 + Nuevo pedido
+                {newCombo && <KeyboardKey combo={newCombo} />}
               </Button>
             )}
           </div>

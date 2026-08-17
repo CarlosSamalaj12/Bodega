@@ -5,6 +5,9 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
+import { KeyboardKey } from '@/components/ui/KeyboardKey';
+import { Shortcuts } from '@/hooks/useShortcut.jsx';
+import { useShortcutsStore } from '@/stores/shortcuts.store';
 import { toast } from '@/components/ui/Toast';
 import { useAuthStore } from '@/stores/auth.store';
 import { hasPermission } from '@/utils/permissions';
@@ -96,6 +99,30 @@ export default function EntradasPage() {
     [bodega, user]
   );
 
+  // -------- Atajos globales de la pantalla de Entradas --------
+  const getCombo = useShortcutsStore((s) => s.getCombo);
+  const newCombo = getCombo('entradas.new');
+  const refreshCombo = getCombo('entradas.refresh');
+
+  const handleNewShortcut = useCallback(() => {
+    if (!canCreate) return;
+    if (modalOpen) return; // No abrir un modal sobre otro
+    setModalOpen(true);
+  }, [canCreate, modalOpen]);
+
+  const handleRefreshShortcut = useCallback(() => {
+    setReloadKey((k) => k + 1);
+  }, []);
+
+  const pageShortcuts = (
+    <Shortcuts
+      map={{
+        'entradas.new': { handler: handleNewShortcut, page: ['/entradas'] },
+        'entradas.refresh': { handler: handleRefreshShortcut, page: ['/entradas'] },
+      }}
+    />
+  );
+
   const exportColumns = [
     { key: 'id_movimiento', label: '#' },
     { key: 'fecha', label: 'Fecha' },
@@ -111,17 +138,24 @@ export default function EntradasPage() {
 
   return (
     <>
+      {pageShortcuts}
       <Header
         title="Entradas"
         subtitle="Entradas recientes de la bodega"
+        autoHide
         actions={
           <div className="entradas-page__header-actions">
             <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
               Exportar
             </Button>
             {canCreate && (
-              <Button size={isMobile ? 'sm' : 'md'} onClick={() => setModalOpen(true)}>
+              <Button
+                size={isMobile ? 'sm' : 'md'}
+                onClick={() => setModalOpen(true)}
+                title={newCombo ? `Nueva entrada (${newCombo})` : 'Nueva entrada'}
+              >
                 + Nueva entrada
+                {newCombo && <KeyboardKey combo={newCombo} />}
               </Button>
             )}
           </div>

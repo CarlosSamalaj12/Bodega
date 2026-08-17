@@ -9,11 +9,15 @@ import { playNotificationSound } from '@/utils/sound';
 import { useAlertNotifications } from '@/hooks/useAlertNotifications';
 import { initPushService, subscribeToPush } from '@/services/push.service';
 import { useAuthStore } from '@/stores/auth.store';
+import { useShortcutsStore } from '@/stores/shortcuts.store';
+import { Shortcuts } from '@/hooks/useShortcut.jsx';
+import { ShortcutsHelpModal } from '@/components/shared/ShortcutsHelpModal';
 import './AppLayout.scss';
 
 export function AppLayout() {
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -53,6 +57,28 @@ export function AppLayout() {
       // se toleran y el próximo mount vuelve a intentar.
     });
   }, [isAuthenticated]);
+
+  // Cargar atajos personalizados del usuario (en paralelo al refresh de
+  // permisos). Fire-and-forget; si falla, los defaults siguen activos.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    useShortcutsStore.getState().load();
+  }, [isAuthenticated]);
+
+  // ── Atajos globales (disponibles en cualquier pantalla) ──
+  const openHelp = () => setShortcutsHelpOpen(true);
+  const closeHelp = () => setShortcutsHelpOpen(false);
+
+  const globalShortcuts = (
+    <Shortcuts
+      map={{
+        'help.showShortcuts': { handler: openHelp },
+        'modal.close': { handler: closeHelp },
+        'nav.goHome': { handler: () => navigate('/') },
+        'nav.goAjustes': { handler: () => navigate('/ajustes') },
+      }}
+    />
+  );
 
   // Cierra el drawer en móvil al cambiar de ruta
   useEffect(() => {
@@ -190,6 +216,7 @@ export function AppLayout() {
 
   return (
     <div className={`app-layout ${!isDesktop && sidebarOpen ? 'app-layout--drawer-open' : ''}`}>
+      {globalShortcuts}
       <Sidebar
         isDesktop={isDesktop}
         isOpen={sidebarOpen}
@@ -222,6 +249,12 @@ export function AppLayout() {
           </svg>
         </button>
       )}
+
+      {/* Modal de ayuda de atajos (abre con Shift+/) */}
+      <ShortcutsHelpModal
+        open={shortcutsHelpOpen}
+        onClose={() => setShortcutsHelpOpen(false)}
+      />
     </div>
   );
 }

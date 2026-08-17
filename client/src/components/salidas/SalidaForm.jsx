@@ -7,6 +7,9 @@ import { ProductPicker } from '@/components/ui/ProductPicker';
 import { LinesEditor } from '@/components/ui/LinesEditor';
 import { Spinner } from '@/components/ui/Spinner';
 import { PinModal } from '@/components/ui/PinModal';
+import { KeyboardKey, ShortcutHint } from '@/components/ui/KeyboardKey';
+import { Shortcuts } from '@/hooks/useShortcut.jsx';
+import { useShortcutsStore } from '@/stores/shortcuts.store';
 import { toast } from '@/components/ui/Toast';
 import { salidasService } from '@/services/salidas.service';
 import { existenciasService } from '@/services/existencias.service';
@@ -207,6 +210,56 @@ export function SalidaForm({
     setPendingPayload(null);
   };
 
+  // -------- Atajos de teclado (F3 guardar, F1 agregar línea, etc.) ---------
+  const getCombo = useShortcutsStore((s) => s.getCombo);
+  const saveCombo = getCombo('form.save');
+  const saveCtrlCombo = getCombo('form.saveCtrl');
+  const addLineCombo = getCombo('form.addLine');
+  const cancelCombo = getCombo('form.cancel');
+  const focusProductCombo = getCombo('form.focusProduct');
+
+  const handleSaveShortcut = useCallback(() => {
+    if (submitting) return;
+    if (!canSubmit) {
+      handleSubmit({ preventDefault: () => {} });
+      return;
+    }
+    const form = document.getElementById('salida-form');
+    if (form) {
+      if (typeof form.requestSubmit === 'function') form.requestSubmit();
+      else form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    }
+  }, [submitting, canSubmit, handleSubmit]);
+
+  const handleAddLineShortcut = useCallback(() => {
+    if (submitting) return;
+    addLine();
+  }, [submitting, addLine]);
+
+  const handleCancelShortcut = useCallback(() => {
+    if (submitting) return;
+    onCancel?.();
+  }, [submitting, onCancel]);
+
+  const handleFocusProductShortcut = useCallback(() => {
+    const form = document.getElementById('salida-form');
+    if (!form) return;
+    const input = form.querySelector('input[placeholder^="Buscar producto"]');
+    if (input && typeof input.focus === 'function') input.focus();
+  }, []);
+
+  const formShortcuts = (
+    <Shortcuts
+      map={{
+        'form.save': { handler: handleSaveShortcut, scope: 'form' },
+        'form.saveCtrl': { handler: handleSaveShortcut, scope: 'form' },
+        'form.addLine': { handler: handleAddLineShortcut, scope: 'form' },
+        'form.cancel': { handler: handleCancelShortcut, scope: 'form', ignoreInputs: false },
+        'form.focusProduct': { handler: handleFocusProductShortcut, scope: 'form', ignoreInputs: false },
+      }}
+    />
+  );
+
   // Helper para mostrar el asterisco de campo obligatorio en la cabecera de columna
   const requiredLabel = (text) => (
     <span>
@@ -305,7 +358,13 @@ export function SalidaForm({
   ];
 
   return (
-    <form className="salida-form" onSubmit={handleSubmit} noValidate>
+    <form
+      className="salida-form"
+      onSubmit={handleSubmit}
+      noValidate
+      id="salida-form"
+    >
+      {formShortcuts}
       {submitError && <div className="salida-form__error">{submitError}</div>}
 
       <div className="salida-form__section">
@@ -381,20 +440,37 @@ export function SalidaForm({
       </div>
 
       <div className="salida-form__footer">
-        <Button type="button" variant="ghost" onClick={onCancel} disabled={submitting}>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onCancel}
+          disabled={submitting}
+          title={cancelCombo ? `Cancelar (${cancelCombo})` : 'Cancelar'}
+        >
           Cancelar
+          {cancelCombo && <KeyboardKey combo={cancelCombo} />}
         </Button>
         <Button
           type="button"
           variant="secondary"
           onClick={addLine}
           disabled={submitting}
-          title="Agregar otra línea a este movimiento"
+          title={addLineCombo ? `Agregar otra línea a este movimiento (${addLineCombo})` : 'Agregar otra línea a este movimiento'}
         >
           + Agregar línea
+          {addLineCombo && <KeyboardKey combo={addLineCombo} />}
         </Button>
-        <Button type="submit" variant="primary" disabled={!canSubmit}>
-          {submitting ? <Spinner size={14} /> : `Registrar salida${totales.lineasValidas ? ` (${totales.lineasValidas})` : ''}`}
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={!canSubmit}
+          title={saveCombo ? `Registrar salida (${saveCombo}${saveCtrlCombo ? ` o ${saveCtrlCombo}` : ''})` : 'Registrar salida'}
+        >
+          {submitting ? <Spinner size={14} /> : (
+            <ShortcutHint combo={saveCombo}>
+              {`Registrar salida${totales.lineasValidas ? ` (${totales.lineasValidas})` : ''}`}
+            </ShortcutHint>
+          )}
         </Button>
       </div>
 

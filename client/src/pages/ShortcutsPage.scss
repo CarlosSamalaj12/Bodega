@@ -1,0 +1,5 @@
+@use '@/styles/abstracts' as *;
+
+// Reutilizamos los estilos base de la página definidos en
+// styles/components/_keyboard.scss, pero exponemos el contenedor
+// "shortcuts-page" como root del SCSS del componente.

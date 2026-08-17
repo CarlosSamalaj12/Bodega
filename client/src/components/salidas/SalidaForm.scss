@@ -97,15 +97,29 @@
   }
 
   &__footer {
+    // Sticky dentro del body del modal: el footer siempre se ve al fondo
+    // aunque el usuario scrollee para ver más líneas. Usa un fondo sólido
+    // con sombra superior para destacar sobre el contenido.
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    // `align-self: stretch` explícito para evitar el bug conocido donde
+    // position: sticky no se ancla correctamente dentro de un flex
+    // container con align-items: stretch (default).
+    align-self: stretch;
     display: flex;
     justify-content: flex-end;
     gap: $space-3;
-    padding-top: $space-4;
+    padding: $space-4 0 $space-3;
+    margin: $space-4 (-$space-5) (-$space-5);
+    background: var(--color-bg-elevated);
     border-top: 1px solid $color-stroke;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.06);
 
     @media (max-width: $bp-md) {
       flex-direction: column-reverse;
       gap: $space-2;
+      margin: $space-4 (-$space-4) (-$space-4);
     }
   }
 

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { authService } from '@/services/auth.service';
+import { useShortcutsStore } from '@/stores/shortcuts.store';
 
 // Store de autenticación con Zustand
 export const useAuthStore = create((set, get) => ({
@@ -21,6 +22,9 @@ export const useAuthStore = create((set, get) => ({
         isLoading: false,
         error: null,
       });
+      // Cargar atajos personalizados del usuario desde el backend.
+      // Fire-and-forget: si falla, los defaults locales siguen activos.
+      useShortcutsStore.getState().load();
       return data;
     } catch (e) {
       const message = e?.response?.data?.error || e.message || 'Error al iniciar sesión';
@@ -31,6 +35,8 @@ export const useAuthStore = create((set, get) => ({
 
   logout() {
     authService.logout();
+    // Limpiar también los atajos personalizados del usuario saliente.
+    useShortcutsStore.getState().reset();
     set({ user: null, isAuthenticated: false, error: null });
   },
 
