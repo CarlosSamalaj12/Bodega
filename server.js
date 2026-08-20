@@ -6144,6 +6144,7 @@ app.get("/api/reportes/existencias", auth, async (req, res) => {
     ...qf.params,
   };
 
+  const visibilityClauseEx = buildProductWarehouseVisibilityClause("p.id_producto", "id_bodega");
   const [[countRow]] = await pool.query(
     `SELECT COUNT(*) AS total
      FROM v_stock_por_lote v
@@ -6154,6 +6155,7 @@ app.get("/api/reportes/existencias", auth, async (req, res) => {
      WHERE ${show_zero ? "v.stock >= 0" : "v.stock > 0"}
        AND ${accessFilter ? `v.id_bodega IN (${accessFilter.sql})` : "1=1"}
        AND (:id_bodega IS NULL OR v.id_bodega=:id_bodega)
+       AND ${visibilityClauseEx}
        AND ${qf.clause}
        AND (:from_date IS NULL OR v.fecha_vencimiento IS NULL OR v.fecha_vencimiento >= :from_date)
        AND (:to_date IS NULL OR v.fecha_vencimiento IS NULL OR v.fecha_vencimiento <= :to_date)
@@ -6253,6 +6255,7 @@ const [rows] = await pool.query(
      WHERE ${show_zero ? "v.stock >= 0" : "v.stock > 0"}
        AND ${accessFilter ? `v.id_bodega IN (${accessFilter.sql})` : "1=1"}
        AND (:id_bodega IS NULL OR v.id_bodega=:id_bodega)
+       AND ${visibilityClauseEx}
        AND ${qf.clause}
        AND (:from_date IS NULL OR v.fecha_vencimiento IS NULL OR v.fecha_vencimiento >= :from_date)
        AND (:to_date IS NULL OR v.fecha_vencimiento IS NULL OR v.fecha_vencimiento <= :to_date)
@@ -6392,6 +6395,7 @@ app.get("/api/reportes/existencias/alertas", auth, async (req, res) => {
        )
        AND ${accessFilter ? `v.id_bodega IN (${accessFilter.sql})` : "1=1"}
        AND (:id_bodega IS NULL OR v.id_bodega=:id_bodega)
+       AND ${buildProductWarehouseVisibilityClause("p.id_producto", "id_bodega")}
        AND ${qf.clause}
        AND (:from_date IS NULL OR v.fecha_vencimiento IS NULL OR v.fecha_vencimiento >= :from_date)
        AND (:to_date IS NULL OR v.fecha_vencimiento IS NULL OR v.fecha_vencimiento <= :to_date)
@@ -6445,6 +6449,7 @@ app.get("/api/reportes/existencias/stock-minimo", auth, async (req, res) => {
          AND v.stock < l.minimo
          AND ${accessFilter ? `v.id_bodega IN (${accessFilter.sql})` : "1=1"}
          AND (:id_bodega IS NULL OR v.id_bodega=:id_bodega)
+         AND ${buildProductWarehouseVisibilityClause("p.id_producto", "id_bodega")}
          AND ${qf.clause}
          AND (:id_categoria IS NULL OR p.id_categoria=:id_categoria)
          AND (:id_subcategoria IS NULL OR p.id_subcategoria=:id_subcategoria)
