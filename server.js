@@ -6188,7 +6188,8 @@ app.get("/api/reportes/existencias", auth, async (req, res) => {
      JOIN productos p ON p.id_producto=v.id_producto
      LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
      LEFT JOIN limites_producto_bodega lpb ON lpb.id_producto=v.id_producto AND lpb.id_bodega=v.id_bodega
-     WHERE ${show_zero ? "v.stock >= 0" : "v.stock > 0"}
+     WHERE p.activo = 1
+       AND ${show_zero ? "v.stock >= 0" : "v.stock > 0"}
        AND ${accessFilter ? `v.id_bodega IN (${accessFilter.sql})` : "1=1"}
        AND (:id_bodega IS NULL OR v.id_bodega=:id_bodega)
        AND ${visibilityClauseEx}
@@ -6288,7 +6289,8 @@ const [rows] = await pool.query(
            AND lpb.id_producto=v.id_producto
            AND lpb.activo=1
      LEFT JOIN reglas_subcategoria rs ON rs.id_subcategoria=p.id_subcategoria AND rs.activo=1
-     WHERE ${show_zero ? "v.stock >= 0" : "v.stock > 0"}
+     WHERE p.activo = 1
+        AND ${show_zero ? "v.stock >= 0" : "v.stock > 0"}
        AND ${accessFilter ? `v.id_bodega IN (${accessFilter.sql})` : "1=1"}
        AND (:id_bodega IS NULL OR v.id_bodega=:id_bodega)
        AND ${visibilityClauseEx}
@@ -6420,7 +6422,8 @@ app.get("/api/reportes/existencias/alertas", auth, async (req, res) => {
      JOIN productos p ON p.id_producto=v.id_producto
      LEFT JOIN subcategorias sc ON sc.id_subcategoria=p.id_subcategoria
      LEFT JOIN reglas_subcategoria rs ON rs.id_subcategoria=p.id_subcategoria AND rs.activo=1
-     WHERE ${show_zero ? "v.stock >= 0" : "v.stock > 0"}
+     WHERE p.activo = 1
+        AND ${show_zero ? "v.stock >= 0" : "v.stock > 0"}
        AND (
          (v.fecha_vencimiento IS NOT NULL AND DATEDIFF(v.fecha_vencimiento, CURDATE()) <= :days)
          OR (
@@ -6480,7 +6483,8 @@ app.get("/api/reportes/existencias/stock-minimo", auth, async (req, res) => {
        JOIN bodegas b ON b.id_bodega=v.id_bodega
        JOIN productos p ON p.id_producto=v.id_producto
        JOIN limites_producto_bodega l ON l.id_bodega=v.id_bodega AND l.id_producto=v.id_producto
-       WHERE l.activo=1
+       WHERE p.activo = 1
+          AND l.activo=1
          AND l.minimo > 0
          AND v.stock < l.minimo
          AND ${accessFilter ? `v.id_bodega IN (${accessFilter.sql})` : "1=1"}
