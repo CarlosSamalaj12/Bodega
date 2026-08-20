@@ -4272,6 +4272,17 @@ app.post("/api/productos", auth, requirePermission("action.create_update", "crea
     );
     await saveProductVisibleWarehouseIds(conn, r.insertId, visibleWarehouseIds);
     await conn.commit();
+
+    try {
+      io.emit("stock:changed", {
+        action: "catalog_changed",
+        id_producto: Number(r.insertId),
+        at: new Date().toISOString()
+      });
+    } catch (wsErr) {
+      console.error("Error al emitir WebSocket en creación de producto:", wsErr);
+    }
+
     res.json({ ok: true, id_producto: r.insertId });
   } catch (e) {
     try {
@@ -4334,6 +4345,17 @@ app.patch("/api/productos/:id", auth, requirePermission("action.create_update", 
     );
     if (!r.affectedRows) return res.status(404).json({ error: "Producto no existe" });
     await saveProductVisibleWarehouseIds(conn, id_producto, visibleWarehouseIds);
+
+    try {
+      io.emit("stock:changed", {
+        action: "catalog_changed",
+        id_producto,
+        at: new Date().toISOString()
+      });
+    } catch (wsErr) {
+      console.error("Error al emitir WebSocket en edición de producto:", wsErr);
+    }
+
     res.json({ ok: true });
   } catch (e) {
     if (e && e.code === "ER_DUP_ENTRY") {
