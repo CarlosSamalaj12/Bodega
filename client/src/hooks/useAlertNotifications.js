@@ -6,6 +6,8 @@ import { requestNotificationPermission, showAlertaNotification } from '@/service
 import { useAuthStore } from '@/stores/auth.store';
 import { toast } from '@/components/ui/Toast';
 import { playAlertCriticalSound, playNotificationSound } from '@/utils/sound';
+import { useStockScope } from '@/hooks/useStockScope';
+import { isEventForCurrentBodega } from '@/utils/notifyScope';
 import api from '@/services/api';
 
 let alertasSnapshot = []; // caché compartido entre instancias del hook
@@ -25,6 +27,14 @@ let permSolicitado = false;
 export function useAlertNotifications() {
   const user = useAuthStore((s) => s.user);
   const navigate = useNavigate();
+  // Scope de bodegas para que las notificaciones respeten el rol:
+  // admin/reportes con restricción (REPORTE) solo ven lo de sus bodegas
+  // permitidas; el bodeguero solo ve lo de SU bodega.
+  const { scope: stockScope } = useStockScope();
+  const canAllBodegas = Boolean(stockScope?.can_all_bodegas);
+  const allowedBodegaIds = Array.isArray(stockScope?.allowed_warehouse_ids)
+    ? stockScope.allowed_warehouse_ids
+    : [];
 
   const checkAlertas = useCallback(async () => {
     if (!user?.id_warehouse) return;
@@ -123,19 +133,29 @@ export function useAlertNotifications() {
     };
 
     const handleStockChanged = (payload) => {
-      // Solo recargar alertas y notificar si el movimiento es de mi bodega
-      const payloadBodega = Number(payload?.id_bodega || 0);
-      const myBodega = Number(user?.id_warehouse || 0);
-      const isMyWarehouse = !payloadBodega || !myBodega || payloadBodega === myBodega;
+      // Filtro por bodega: si el evento no toca la bodega del usuario
+      // (o las bodegas permitidas si es admin/reportes con restricción),
+      // NO mostrar toast ni recargar alertas. Esto evita que un bodeguero
+      // vea notificaciones de entradas/salidas de otras áreas.
+      //
+      // Antes esta condición era `!payloadBodega || !myBodega ||
+      // payloadBodega === myBodega`, que dejaba pasar TODO cuando
+      // faltaba el id_bodega en el payload (p.ej. catalog_changed),
+      // provocando que se mostrara el toast también en esos casos.
+      const isMine = isEventForCurrentBodega(payload, {
+        userBodegaId: user?.id_warehouse,
+        canAllBodegas,
+        allowedBodegaIds,
+      });
 
-      if (isMyWarehouse) {
-        checkAlertas();
+      if (!isMine) return;
 
-        if (payload?.action === 'entrada') {
-          toast.success(`Entrada registrada en ${payload.nombre_bodega || 'tu bodega'}`);
-        } else if (payload?.action === 'salida') {
-          toast.info(`Salida registrada en ${payload.nombre_bodega || 'tu bodega'}`);
-        }
+      checkAlertas();
+
+      if (payload?.action === 'entrada') {
+        toast.success(`Entrada registrada en ${payload.nombre_bodega || 'tu bodega'}`);
+      } else if (payload?.action === 'salida') {
+        toast.info(`Salida registrada en ${payload.nombre_bodega || 'tu bodega'}`);
       }
     };
 
@@ -146,7 +166,7 @@ export function useAlertNotifications() {
       socket.off('pedido:changed', handlePedidoChanged);
       socket.off('stock:changed', handleStockChanged);
     };
-  }, [user?.id_warehouse, checkAlertas]);
+  }, [user?.id_warehouse, checkAlertas, canAllBodegas, allowedBodegaIds]);
 
   return null;
 }

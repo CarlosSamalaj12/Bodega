@@ -4,27 +4,26 @@ import App from './App';
 import { useThemeStore } from './stores/theme.store';
 import './styles/main.scss';
 
-// Solo en desarrollo: desregistrar Service Workers y limpiar cachés ajenos.
-// Un SW viejo (de builds previos en este mismo origen) intercepta los fetches
-// y sirve index.html/módulos mezclados de versiones distintas → dos copias de
-// React en el mismo árbol → "Invalid hook call" intermitente al recargar.
-if (import.meta.env.DEV && 'serviceWorker' in navigator) {
+// Limpiar Service Workers de otros paths (p.ej. registros viejos de builds
+// anteriores o de extensiones) que podrían tener cachés incompatibles.
+// No tocamos /sw.js aunque sea una versión anterior: el handler de abajo
+// lo va a actualizar in-place vía skipWaiting + clients.claim.
+if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then((regs) => {
-    for (const reg of regs) reg.unregister();
+    for (const reg of regs) {
+      const isOurSw = reg.active && new URL(reg.active.scriptURL).pathname === '/sw.js';
+      if (!isOurSw) reg.unregister();
+    }
   });
-  if ('caches' in window) {
-    caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
-  }
 }
 
-// En producción: registrar y mantener al día el Service Worker propio
-// (public/sw.js, servido por Express). Antes esto no se hacía desde la app
-// React, así que un SW viejo de builds anteriores podía quedar "huérfano"
-// controlando la página con cache-first y sirviendo index.html/bundles
-// antiguos para siempre (por eso algunos usuarios veían versiones viejas).
-// Con updateViaCache:'none' + skipWaiting + recarga al activar, la primera
-// visita tras un deploy actualiza el SW y purga las cachés viejas de inmediato.
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+// Registrar el Service Worker propio (public/sw.js, servido por Express)
+// en DEV y PROD. Esto es necesario para que Chrome/Edge ofrezcan el
+// prompt de "Instalar app" en la barra de direcciones, que requiere SW
+// registrado + manifest enlazado en el HTML. Con updateViaCache:'none'
+// + skipWaiting + recarga al activar, la primera visita tras un deploy
+// actualiza el SW y purga las cachés viejas de inmediato.
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
       const reg = await navigator.serviceWorker.register('/sw.js', {

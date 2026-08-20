@@ -3,15 +3,19 @@ import api from './api';
 export const pedidosService = {
   /**
    * Listar pedidos.
-   * @param scope 'mine' (los que pedí) o 'dispatch' (los que debo surtir)
+   * @param scope 'mine' (los que pedí), 'dispatch' (los que debo surtir) o
+   *              'all' (todas las bodegas; solo admin/reportes).
+   *              Sin scope: el backend decide según el rol.
    * @param status filtrar por estado
    * @param from fecha desde (YYYY-MM-DD)
    * @param to fecha hasta (YYYY-MM-DD)
    * @param limit máximo de filas (por defecto el servidor usa 500)
+   * @param warehouse id de bodega para acotar (id_bodega_surtidor en
+   *                  scope=dispatch, id_bodega_solicita en scope=mine/all)
    */
-  async list({ scope, status, from, to, limit } = {}) {
+  async list({ scope, status, from, to, limit, warehouse } = {}) {
     const { data } = await api.get('/api/orders', {
-      params: { scope, status, from, to, limit },
+      params: { scope, status, from, to, limit, warehouse },
     });
     return data;
   },

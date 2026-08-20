@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { Spinner } from '@/components/ui/Spinner';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { DataList } from '@/components/ui/DataList';
 import { toast } from '@/components/ui/Toast';
@@ -30,28 +28,57 @@ const TABS = [
   { key: 'minimo', label: 'Stock Mínimo', icon: '📦' },
 ];
 
+// ──────────────────────────────────────────────────────────────
+// Tipo de alerta con icono + severidad.
+// `severity` (0..2) la usa la fila para pintarse de un color de borde
+// y la usa el indicador para mostrar un dot pulsante en los críticos.
+// ──────────────────────────────────────────────────────────────
 function getTipoAlerta(item) {
   const dias = item.dias_para_vencer;
-  if (dias != null && dias < 0) return { label: 'Vencido', variant: 'danger', order: 0 };
-  if (dias != null && dias <= 3) return { label: 'Vence hoy/imminent', variant: 'danger', order: 1 };
+  if (dias != null && dias < 0) {
+    return { label: 'Vencido', variant: 'danger', icon: '⛔', severity: 2, order: 0 };
+  }
+  if (dias != null && dias <= 3) {
+    return { label: `Vence en ${dias}d`, variant: 'danger', icon: '🔥', severity: 2, order: 1 };
+  }
   if (item.dias_restantes_regla != null && item.dias_restantes_regla <= 0) {
-    return { label: 'Regla vencida', variant: 'danger', order: 2 };
+    return { label: 'Regla vencida', variant: 'danger', icon: '⛔', severity: 2, order: 2 };
   }
   if (item.dias_restantes_regla != null && item.dias_alerta_antes != null && item.dias_restantes_regla <= item.dias_alerta_antes) {
-    return { label: 'Regla próxima', variant: 'warning', order: 3 };
+    return { label: 'Regla próxima', variant: 'warning', icon: '⏰', severity: 1, order: 3 };
   }
   if (dias != null && item.dias_alerta_antes != null && dias <= item.dias_alerta_antes) {
-    return { label: `Vence en ${dias}d`, variant: 'warning', order: 4 };
+    return { label: `Vence en ${dias}d`, variant: 'warning', icon: '📅', severity: 1, order: 4 };
   }
-  return { label: `${dias != null ? dias + 'd' : '—'}`, variant: 'info', order: 5 };
+  return { label: `${dias != null ? dias + 'd' : '—'}`, variant: 'info', icon: '🕒', severity: 0, order: 5 };
 }
 
 function getMinimoAlerta(r) {
   const diff = Number(r.diferencia_minimo || 0);
   const stock = Number(r.stock || 0);
-  if (stock <= 0) return { label: 'Sin stock', variant: 'danger', order: 0 };
-  if (diff >= 5) return { label: 'Muy bajo', variant: 'danger', order: 1 };
-  return { label: 'Bajo mínimo', variant: 'warning', order: 2 };
+  if (stock <= 0) {
+    return { label: 'Sin stock', variant: 'danger', icon: '⛔', severity: 2, order: 0 };
+  }
+  if (diff >= 5) {
+    return { label: `Muy bajo (−${diff})`, variant: 'danger', icon: '🔥', severity: 2, order: 1 };
+  }
+  return { label: `Bajo mínimo (−${diff})`, variant: 'warning', icon: '⚠️', severity: 1, order: 2 };
+}
+
+/**
+ * Indicador visual de la severidad de la alerta. Combina un badge
+ * coloreado con icono + dot pulsante en los críticos. Reemplaza al
+ * <Badge> plano anterior para que las alertas se vean de un vistazo
+ * sin tener que leer el texto.
+ */
+function AlertIndicator({ tipo, withDot = true }) {
+  return (
+    <span className={`alertas-page__indicator alertas-page__indicator--${tipo.variant} alertas-page__indicator--sev${tipo.severity}`}>
+      {withDot && tipo.severity >= 2 && <span className="alertas-page__indicator-dot" aria-hidden="true" />}
+      <span className="alertas-page__indicator-icon" aria-hidden="true">{tipo.icon}</span>
+      <span className="alertas-page__indicator-label">{tipo.label}</span>
+    </span>
+  );
 }
 
 export default function AlertasPage() {
@@ -243,9 +270,8 @@ export default function AlertasPage() {
       render: (r) => {
         if (!r.fecha_vencimiento) return <span className="alertas-page__muted">—</span>;
         const t = getTipoAlerta(r);
-        const isCritical = t.order <= 1;
         return (
-          <span className={`alertas-page__vencimiento ${isCritical ? 'alertas-page__vencimiento--critico' : ''}`}>
+          <span className={`alertas-page__vencimiento alertas-page__vencimiento--sev${t.severity}`}>
             {formatDate(r.fecha_vencimiento)}
           </span>
         );
@@ -254,15 +280,16 @@ export default function AlertasPage() {
     {
       key: 'dias_para_vencer',
       label: 'Días',
-      width: 70,
+      width: 80,
       align: 'right',
       hideOnMobile: true,
       render: (r) => {
         const d = r.dias_para_vencer;
         if (d == null) return <span className="alertas-page__muted">—</span>;
+        const sev = d < 0 ? 2 : d <= 3 ? 2 : d <= 7 ? 1 : 0;
         return (
-          <span className={`alertas-page__dias ${d < 0 ? 'alertas-page__dias--vencido' : ''}`}>
-            {d >= 0 ? d : `−${Math.abs(d)}`}
+          <span className={`alertas-page__dias alertas-page__dias--sev${sev}`}>
+            {d >= 0 ? `${d}d` : `−${Math.abs(d)}d`}
           </span>
         );
       },
@@ -278,15 +305,9 @@ export default function AlertasPage() {
     {
       key: 'alerta',
       label: 'Alerta',
-      width: 150,
-      render: (r) => {
-        const t = getTipoAlerta(r);
-        return <Badge variant={t.variant}>{t.label}</Badge>;
-      },
-      cardMeta: (r) => {
-        const t = getTipoAlerta(r);
-        return <Badge variant={t.variant}>{t.label}</Badge>;
-      },
+      width: 180,
+      render: (r) => <AlertIndicator tipo={getTipoAlerta(r)} />,
+      cardMeta: (r) => <AlertIndicator tipo={getTipoAlerta(r)} withDot={false} />,
     },
     {
       key: '__kardex',
@@ -324,11 +345,15 @@ export default function AlertasPage() {
       label: 'Stock',
       width: 80,
       align: 'right',
-      render: (r) => (
-        <span className={`alertas-page__stock ${Number(r.stock) <= 0 ? 'alertas-page__stock--critico' : ''}`}>
-          {Number(r.stock)}
-        </span>
-      ),
+      render: (r) => {
+        const stock = Number(r.stock || 0);
+        const sev = stock <= 0 ? 2 : Number(r.diferencia_minimo || 0) >= 5 ? 2 : 1;
+        return (
+          <span className={`alertas-page__stock alertas-page__stock--sev${sev}`}>
+            {stock}
+          </span>
+        );
+      },
     },
     {
       key: 'minimo',
@@ -352,8 +377,9 @@ export default function AlertasPage() {
       align: 'right',
       render: (r) => {
         const diff = Number(r.diferencia_minimo || 0);
+        const sev = diff >= 5 ? 2 : diff > 0 ? 1 : 0;
         return (
-          <span className={`alertas-page__diferencia ${diff >= 5 ? 'alertas-page__diferencia--critico' : ''}`}>
+          <span className={`alertas-page__diferencia alertas-page__diferencia--sev${sev}`}>
             −{diff}
           </span>
         );
@@ -362,15 +388,9 @@ export default function AlertasPage() {
     {
       key: 'alerta',
       label: 'Alerta',
-      width: 120,
-      render: (r) => {
-        const t = getMinimoAlerta(r);
-        return <Badge variant={t.variant}>{t.label}</Badge>;
-      },
-      cardMeta: (r) => {
-        const t = getMinimoAlerta(r);
-        return <Badge variant={t.variant}>{t.label}</Badge>;
-      },
+      width: 180,
+      render: (r) => <AlertIndicator tipo={getMinimoAlerta(r)} />,
+      cardMeta: (r) => <AlertIndicator tipo={getMinimoAlerta(r)} withDot={false} />,
     },
     {
       key: '__kardex',
@@ -605,6 +625,13 @@ export default function AlertasPage() {
               ? `${r.id_bodega}-${r.id_producto}-${r.lote || ''}-${r.fecha_vencimiento || ''}`
               : `${r.id_bodega}-${r.id_producto}`
           }
+          // Resaltar la fila según la severidad de la alerta: borde
+          // izquierdo de color + fondo sutil para que las críticas salten
+          // a la vista sin tener que leer el badge.
+          rowClass={(r) => {
+            const t = tipo === 'vencimiento' ? getTipoAlerta(r) : getMinimoAlerta(r);
+            return `alertas-page__row alertas-page__row--sev${t.severity}`;
+          }}
           onRowClick={(r) => {
             const q = r.nombre_producto || r.sku || '';
             navigate(`/existencias?q=${encodeURIComponent(q)}`);

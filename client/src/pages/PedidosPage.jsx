@@ -7,9 +7,11 @@ import { Badge } from '@/components/ui/Badge';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { DataList } from '@/components/ui/DataList';
 import { KeyboardKey } from '@/components/ui/KeyboardKey';
+import { Select } from '@/components/ui/Select';
 import { Shortcuts } from '@/hooks/useShortcut.jsx';
 import { useShortcutsStore } from '@/stores/shortcuts.store';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useStockScope } from '@/hooks/useStockScope';
 import { toast } from '@/components/ui/Toast';
 import { useAuthStore } from '@/stores/auth.store';
 import { hasPermission } from '@/utils/permissions';
@@ -24,6 +26,18 @@ import { PedidoForm } from '@/components/pedidos/PedidoForm';
 import { getSocket } from '@/services/socket';
 import { ConfirmarRecepcionModal } from '@/components/pedidos/ConfirmarRecepcionModal';
 import './PedidosPage.scss';
+
+// Vistas disponibles en "Realizar pedidos".
+//   - mine    : pedidos que YO creé (default, también para bodegueros).
+//   - dispatch: pedidos que MI BODEGA despachó (útil para que el bodeguero
+//               vea lo que salió de su bodega sin entrar a "Despachar").
+//   - all     : todas las bodegas. Solo visible para admin/reportes; el
+//               backend devuelve 403 si un bodeguero intenta usarla.
+const VIEW_OPTIONS_BASE = [
+  { value: 'mine', label: 'Mis pedidos' },
+  { value: 'dispatch', label: 'Despachados por mi bodega' },
+];
+const VIEW_OPTION_ALL = { value: 'all', label: 'Todas las bodegas' };
 
 const ESTADO_LABELS = {
   PENDIENTE: { label: 'Pendiente', variant: 'warning' },
@@ -53,6 +67,30 @@ export default function PedidosPage() {
   const permisos = user?.permisos || {};
   const canCreate = hasPermission(permisos, 'action.create_update');
   const isMobile = !useMediaQuery('(min-width: 768px)');
+
+  // Scope de bodegas del usuario (admin/reportes → canAllBodegas=true).
+  // Se usa para decidir si mostrar la vista "Todas las bodegas" y el
+  // selector de bodega, y para alimentar ese selector con las bodegas
+  // permitidas (respeta hasWarehouseRestrictions del rol REPORTE).
+  const { scope: stockScope, bodegas: scopeBodegas, loading: loadingScope } = useStockScope();
+  const canAllBodegas = Boolean(stockScope?.can_all_bodegas);
+  const userBodegaId = Number(user?.id_warehouse || 0);
+
+  // Vista activa. 'mine' es la default y se aplica a todos los roles;
+  // 'all' se suma a la lista solo si el usuario es admin o tiene rol
+  // con acceso a múltiples bodegas. 'dispatch' está disponible para
+  // todos y siempre filtra por la bodega del usuario.
+  const [view, setView] = useState('mine');
+  // Filtro de bodega solicitante. Solo se aplica a las vistas donde
+  // tiene sentido acotar (todas); para 'mine' y 'dispatch' la bodega
+  // ya está implícita en el filtro del backend.
+  const [filterBodegaId, setFilterBodegaId] = useState('');
+
+  const viewOptions = useMemo(() => {
+    const opts = [...VIEW_OPTIONS_BASE];
+    if (canAllBodegas) opts.push(VIEW_OPTION_ALL);
+    return opts;
+  }, [canAllBodegas]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [createdPedido, setCreatedPedido] = useState(null);
@@ -92,7 +130,16 @@ export default function PedidosPage() {
     setLoadingPedidos(true);
     const fetchId = ++fetchIdRef.current;
     try {
-      const data = await pedidosService.list({ from: dateFrom, to: dateTo, limit: 500 });
+      const params = { from: dateFrom, to: dateTo, limit: 500 };
+      // Mapear la vista UI → scope del backend. El filtro ?warehouse se
+      // manda solo cuando hay una bodega explícita seleccionada (vista
+      // 'all' con un dropdown aplicado); en el resto el backend ya filtra
+      // por el usuario o por la bodega del usuario según corresponda.
+      params.scope = view;
+      if (view === 'all' && filterBodegaId) {
+        params.warehouse = Number(filterBodegaId);
+      }
+      const data = await pedidosService.list(params);
       if (fetchId !== fetchIdRef.current) return; // descartamos respuesta de fetch anterior
       setPedidos(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -102,12 +149,25 @@ export default function PedidosPage() {
     } finally {
       if (fetchId === fetchIdRef.current) setLoadingPedidos(false);
     }
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, view, filterBodegaId]);
 
   useEffect(() => {
     loadCatalogs();
     loadPedidos();
   }, [loadCatalogs, loadPedidos]);
+
+  // Defensivo: si la vista actual desaparece de las opciones (p.ej. el
+  // usuario perdió el permiso can_all_bodegas entre montajes), caemos a
+  // 'mine' para no dejar un valor que el Select no pueda representar.
+  useEffect(() => {
+    if (!loadingScope && viewOptions.length > 0) {
+      const allowed = viewOptions.some((o) => o.value === view);
+      if (!allowed) {
+        setView('mine');
+        setFilterBodegaId('');
+      }
+    }
+  }, [loadingScope, viewOptions, view]);
 
   useEffect(() => {
     let socket;
@@ -253,12 +313,17 @@ export default function PedidosPage() {
       },
       {
         key: 'nombre_bodega_surtidor',
-        label: 'Bodega destino',
+        // En "Mis pedidos" es la bodega a la que le pido (destino del
+        // stock); en "Despachados por mi bodega" / "Todas" es la bodega
+        // que despacha.
+        label: view === 'mine' ? 'Bodega destino' : 'Bodega que despacha',
         render: (p) => p.nombre_bodega_surtidor || '—',
       },
       {
         key: 'nombre_bodega_solicita',
-        label: 'Tu bodega',
+        // En "Mis pedidos" es la bodega desde la que pedí (la mía);
+        // en "Despachados" / "Todas" es la bodega que está pidiendo.
+        label: view === 'mine' ? 'Tu bodega' : 'Bodega solicitante',
         render: (p) => p.nombre_bodega_solicita || '—',
       },
       {
@@ -324,15 +389,50 @@ export default function PedidosPage() {
         ),
       },
     ],
-    []
+    [view]
   );
+
+  // Subtítulo dinámico según la vista activa. Refleja el conteo y la
+  // bodega (cuando aplica) para que el usuario tenga claro qué está viendo.
+  const headerSubtitle = useMemo(() => {
+    const count = pedidos.length;
+    const countLabel = `${count} pedido${count === 1 ? '' : 's'}`;
+    if (view === 'mine') {
+      return `${countLabel} creado${count === 1 ? '' : 's'} por ti`;
+    }
+    if (view === 'dispatch') {
+      const bodegaName =
+        scopeBodegas.find((b) => Number(b.id_bodega) === userBodegaId)?.nombre_bodega ||
+        'tu bodega';
+      return `${countLabel} despachado${count === 1 ? '' : 's'} por ${bodegaName}`;
+    }
+    // view === 'all'
+    if (filterBodegaId) {
+      const bodegaName = scopeBodegas.find((b) => Number(b.id_bodega) === Number(filterBodegaId))?.nombre_bodega;
+      return bodegaName
+        ? `${countLabel} de ${bodegaName}`
+        : `${countLabel} en total`;
+    }
+    return `${countLabel} en total`;
+  }, [pedidos.length, view, filterBodegaId, scopeBodegas, userBodegaId]);
+
+  // Etiqueta del selector de bodega del filtro. Aparece solo cuando
+  // estamos en "Todas las bodegas" (admin/reportes) y queremos acotar
+  // a una bodega específica.
+  const filterBodegaOptions = useMemo(() => {
+    const opts = [{ value: '', label: 'Todas las bodegas' }];
+    for (const b of scopeBodegas || []) {
+      opts.push({ value: String(b.id_bodega), label: b.nombre_bodega });
+    }
+    return opts;
+  }, [scopeBodegas]);
 
   return (
     <>
       {pageShortcuts}
       <Header
         title="Realizar pedidos"
-        subtitle={`${pedidos.length} pedido${pedidos.length === 1 ? '' : 's'} en total`}
+        subtitle={headerSubtitle}
         autoHide
         actions={
           <div className="pedidos-page__actions">
@@ -383,6 +483,34 @@ export default function PedidosPage() {
 
         <Card compact>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ minWidth: 200, flex: '0 0 auto' }}>
+              <Select
+                aria-label="Vista de pedidos"
+                value={view}
+                onChange={(e) => {
+                  setView(e.target.value);
+                  // Al cambiar de vista limpiamos el filtro de bodega para
+                  // no arrastrar uno que no tenga sentido en la nueva
+                  // vista (p.ej. pasar de "Todas +X" a "Mis pedidos").
+                  setFilterBodegaId('');
+                }}
+                options={viewOptions}
+                disabled={loadingScope && viewOptions.length <= 1}
+                title="Qué pedidos quieres ver"
+              />
+            </div>
+            {view === 'all' && canAllBodegas && (
+              <div style={{ minWidth: 200, flex: '0 0 auto' }}>
+                <Select
+                  aria-label="Filtrar por bodega"
+                  value={filterBodegaId}
+                  onChange={(e) => setFilterBodegaId(e.target.value)}
+                  options={filterBodegaOptions}
+                  disabled={loadingScope}
+                  title="Acotar la vista a una sola bodega"
+                />
+              </div>
+            )}
             <SearchInput
               value={search}
               onChange={setSearch}
@@ -430,8 +558,18 @@ export default function PedidosPage() {
           loading={loadingPedidos}
           keyField="id_pedido"
           emptyTitle={search ? 'Sin resultados' : 'Sin pedidos'}
-          emptyMessage={search ? 'Intenta con otros términos.' : 'Cuando crees un pedido aparecerá aquí.'}
-          emptyAction={!search && canCreate ? <Button onClick={() => setModalOpen(true)}>Crear primer pedido</Button> : null}
+          emptyMessage={
+            search
+              ? 'Intenta con otros términos.'
+              : view === 'dispatch'
+                ? 'Tu bodega aún no ha despachado pedidos en este rango.'
+                : view === 'all'
+                  ? (filterBodegaId
+                      ? 'No hay pedidos para la bodega seleccionada en este rango.'
+                      : 'No hay pedidos en este rango.')
+                  : 'Cuando crees un pedido aparecerá aquí.'
+          }
+          emptyAction={!search && view === 'mine' && canCreate ? <Button onClick={() => setModalOpen(true)}>Crear primer pedido</Button> : null}
         />
       </div>
 

@@ -9418,8 +9418,49 @@ app.get("/api/orders", auth, async (req, res) => {
       Object.assign(params, inClause.params);
     }
   } else if (scopeParam === "mine") {
+    // "Mis pedidos": solo los que YO creé. El bodeguero llega aquí siempre
+    // que pida su propia vista; admin/reportes también pueden usar este
+    // scope si quieren acotar a un usuario específico en el futuro.
     where.push("p.id_usuario_solicita=:uid");
     params.uid = req.user.id_user;
+    // Filtro opcional por bodega solicitante (id_bodega_solicita=X). Para
+    // bodegueros normalmente coincide con su propia bodega, pero queda
+    // abierto por si un admin/reporte quiere usar este scope acotado.
+    if (whParam > 0) {
+      where.push("p.id_bodega_solicita=:wh_req");
+      params.wh_req = whParam;
+    }
+  } else if (scopeParam === "all") {
+    // "Todas las bodegas": solo admin/reportes. El bodeguero que intente
+    // usar este scope recibe 403 (no debe ver pedidos de otras áreas).
+    if (!stockScope.can_all_bodegas) {
+      return res.status(403).json({ error: "Sin permisos para ver pedidos de otras bodegas" });
+    }
+    if (whParam > 0) {
+      where.push("p.id_bodega_solicita=:wh_req");
+      params.wh_req = whParam;
+    } else if (stockScope.has_warehouse_restrictions) {
+      // REPORTE con bodegas restringidas: limita la vista a su lista.
+      const inClause = buildNamedInClause(stockScope.allowed_warehouse_ids, "ordw_all");
+      where.push(`p.id_bodega_solicita IN (${inClause.sql})`);
+      Object.assign(params, inClause.params);
+    }
+  } else {
+    // Sin scope explícito:
+    //   - admin/reportes -> ven todo (compatibilidad con la página
+    //     "Despachar" y con cualquier consumidor existente que no envíe
+    //     scope todavía).
+    //   - bodegueros     -> por defecto solo los pedidos que ellos
+    //     crearon. Esto blinda el endpoint aunque el front olvide pasar
+    //     scope, evitando que un bodeguero vea pedidos de otras áreas.
+    if (!stockScope.can_all_bodegas) {
+      where.push("p.id_usuario_solicita=:uid");
+      params.uid = req.user.id_user;
+    } else if (stockScope.has_warehouse_restrictions) {
+      const inClause = buildNamedInClause(stockScope.allowed_warehouse_ids, "ordw_def");
+      where.push(`p.id_bodega_solicita IN (${inClause.sql})`);
+      Object.assign(params, inClause.params);
+    }
   }
   const whereSql = where.length ? "WHERE " + where.join(" AND ") : "";
   // Límite de seguridad: evita respuestas gigantes cuando no hay filtros.

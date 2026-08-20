@@ -1,6 +1,6 @@
 {
   "name": "bodega-app",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "main": "server.js",
   "scripts": {
@@ -8,7 +8,8 @@
     "start": "node server.js",
     "client": "cd client && npm run dev",
     "dev:all": "concurrently -n server,client -c blue,magenta \"node server.js\" \"cd client && npm run dev\"",
-    "build:client": "cd client && npm run build",
+    "bump:version": "node scripts/bump-version.cjs",
+    "build:client": "node scripts/bump-version.cjs && cd client && npm run build",
     "test:stock": "node test_reconcile_stock.cjs && node test_kardex_triggers.cjs && node test_reversa_e2e.cjs && node test_despacho_rapido.cjs && node test_bench_reportes.cjs && node test_stock_history.cjs",
     "test:stock:fix": "node test_reconcile_stock.cjs --fix && node test_kardex_triggers.cjs && node test_reversa_e2e.cjs && node test_despacho_rapido.cjs && node test_bench_reportes.cjs && node test_stock_history.cjs",
     "deploy:stock": "npm run test:stock:fix",

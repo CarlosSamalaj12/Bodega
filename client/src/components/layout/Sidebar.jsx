@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth.store';
 import { useDispatchStore } from '@/stores/dispatch.store';
+import { useAppVersionStore } from '@/stores/appVersion.store';
 import { hasPermission } from '@/utils/permissions';
 import api from '@/services/api';
 import { getSocket } from '@/services/socket';
@@ -63,6 +64,12 @@ function SidebarContent({ onLinkClick, collapsed, onToggle }) {
   const user = useAuthStore((s) => s.user);
   const permissions = user?.permisos || {};
   const newDispatchCount = useDispatchStore((s) => s.newCount);
+  // Versión de la app (inyectada en build) y versión publicada en el server.
+  // `pendingUpdate` se enciende cuando el polling detecta una diferencia.
+  const builtVersion = useAppVersionStore((s) => s.builtVersion);
+  const serverVersion = useAppVersionStore((s) => s.serverVersion);
+  const builtCommit = useAppVersionStore((s) => s.builtCommit);
+  const pendingUpdate = useAppVersionStore((s) => s.pendingUpdate);
   const [logoApp, setLogoApp] = useState(null);
   const [alertCount, setAlertCount] = useState(0);
   const lastAlertCountRef = useRef(0);
@@ -223,6 +230,26 @@ function SidebarContent({ onLinkClick, collapsed, onToggle }) {
             <div className="sidebar__user-name">{user?.full_name || user?.username || 'Usuario'}</div>
             <div className="sidebar__user-role">{user?.role_name || '—'}</div>
           </div>
+        </div>
+
+        {/* Versión de la app. `pendingUpdate` se enciende cuando el
+            useVersionCheck detecta que la versión publicada en el server
+            no coincide con la baked-in. El toast ya avisa al usuario; el
+            indicador es solo una pista visual persistente. */}
+        <div
+          className={`sidebar__version ${pendingUpdate ? 'sidebar__version--pending' : ''}`}
+          title={
+            pendingUpdate
+              ? `Versión local ${builtVersion} · Servidor ${serverVersion}. Click "Actualizar" en el toast para recargar.`
+              : `Versión ${builtVersion}${builtCommit ? ` · ${builtCommit}` : ''}`
+          }
+        >
+          <span className="sidebar__version-label">v{builtVersion}</span>
+          {pendingUpdate && (
+            <span className="sidebar__version-badge" aria-label="Actualización disponible">
+              ↑ {serverVersion}
+            </span>
+          )}
         </div>
       </div>
     </>

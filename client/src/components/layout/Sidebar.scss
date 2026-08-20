@@ -210,6 +210,45 @@
     color: $color-text-muted;
   }
 
+  // ---- Versión de la app (inyectada en build) ----
+  &__version {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    margin-top: $space-2;
+    padding: $space-1 $space-3;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    font-family: $font-mono;
+    transition: opacity $transition-base, visibility $transition-base;
+  }
+
+  &__version-label {
+    opacity: 0.7;
+  }
+
+  &__version-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    border-radius: $radius-sm;
+    background: $color-warning-soft;
+    color: $color-warning;
+    font-weight: $font-weight-semibold;
+    font-size: $font-size-xs;
+    animation: pulse-pending 1.6s ease-in-out infinite;
+  }
+
+  &__version--pending &__version-label {
+    opacity: 1;
+    color: $color-text;
+  }
+
+  @keyframes pulse-pending {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+
   // ---- Botón toggle colapsar/expandir ----
   &__toggle {
     display: flex;
@@ -283,7 +322,8 @@
   .sidebar__brand-sub,
   .sidebar__label,
   .sidebar__user-info,
-  .sidebar__section-title {
+  .sidebar__section-title,
+  .sidebar__version {
     opacity: 0;
     visibility: hidden;
   }

@@ -7,6 +7,8 @@ import { getSocket } from '@/services/socket';
 import { useDispatchStore } from '@/stores/dispatch.store';
 import { playNotificationSound } from '@/utils/sound';
 import { useAlertNotifications } from '@/hooks/useAlertNotifications';
+import { useStockScope } from '@/hooks/useStockScope';
+import { isEventForCurrentBodega } from '@/utils/notifyScope';
 import { initPushService, subscribeToPush } from '@/services/push.service';
 import { useAuthStore } from '@/stores/auth.store';
 import { useShortcutsStore } from '@/stores/shortcuts.store';
@@ -26,6 +28,15 @@ export function AppLayout() {
   const notifyNew = useDispatchStore((s) => s.notifyNew);
   const pushInitRef = useRef(false);
   const permsBootstrappedRef = useRef(false);
+
+  // Scope de bodegas para filtrar las notificaciones en tiempo real.
+  // Sin este filtro, los bodegueros veían toasts y contadores de
+  // "pedidos por despachar" / "entrada/salida" de OTRAS bodegas.
+  const { scope: stockScope } = useStockScope();
+  const canAllBodegas = Boolean(stockScope?.can_all_bodegas);
+  const allowedBodegaIds = Array.isArray(stockScope?.allowed_warehouse_ids)
+    ? stockScope.allowed_warehouse_ids
+    : [];
 
   // Notificaciones de alertas (stock mínimo, vencimientos, etc.)
   useAlertNotifications();
@@ -125,6 +136,19 @@ export function AppLayout() {
       const idPedido = Number(payload?.id_pedido || 0);
       if (!idPedido) return;
 
+      // Filtro por bodega: solo notificar si el pedido involucra la
+      // bodega del usuario (solicitante o surtidor). Antes este handler
+      // no filtraba, así que un bodeguero recibía el toast y el badge
+      // de "pedidos por despachar" por CUALQUIER pedido creado en
+      // CUALQUIER bodega del sistema.
+      if (!isEventForCurrentBodega(payload, {
+        userBodegaId: user?.id_warehouse,
+        canAllBodegas,
+        allowedBodegaIds,
+      })) {
+        return;
+      }
+
       const status = String(payload?.status || '').toUpperCase();
       const action = String(payload?.action || '').toLowerCase();
       const isNew = action === 'created' || action === 'new';
@@ -146,15 +170,17 @@ export function AppLayout() {
       const idMov = Number(payload?.id_movimiento || 0);
       if (!idMov) return;
 
-      // Solo notificar si el movimiento involucra la bodega del usuario
-      const userWarehouse = Number(user?.id_warehouse || 0);
-      const bodegaOrigen = Number(payload?.id_bodega_origen || payload?.id_bodega || 0);
-      const bodegaDestino = Number(payload?.id_bodega_destino || 0);
-      const involucraMinBodega = !userWarehouse
-        || bodegaOrigen === userWarehouse
-        || bodegaDestino === userWarehouse
-        || (!bodegaOrigen && !bodegaDestino); // sin info de bodega → mostrar igual
-      if (!involucraMinBodega) return;
+      // Mismo filtro de bodega que arriba. Antes la condición incluía
+      // `(!bodegaOrigen && !bodegaDestino)` que significaba "si no
+      // viene info de bodega, mostrar igual" — eso era un bypass que
+      // dejaba pasar eventos de otras bodegas.
+      if (!isEventForCurrentBodega(payload, {
+        userBodegaId: user?.id_warehouse,
+        canAllBodegas,
+        allowedBodegaIds,
+      })) {
+        return;
+      }
 
       const tipo = String(payload?.tipo || payload?.tipo_movimiento || '').toUpperCase();
       const action = String(payload?.action || '').toLowerCase();
@@ -221,7 +247,7 @@ export function AppLayout() {
       socket.off('movimiento:changed', movHandler);
       socket.off('permisos:changed', permisosHandler);
     };
-  }, [notifyNew]);
+  }, [notifyNew, user?.id_warehouse, canAllBodegas, allowedBodegaIds]);
 
   return (
     <div className={`app-layout ${!isDesktop && sidebarOpen ? 'app-layout--drawer-open' : ''}`}>

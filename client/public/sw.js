@@ -66,14 +66,6 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.includes("/api/print/")) return;
   if (url.pathname.includes("/api/session-policy")) return;
 
-  // /version.json: SIEMPRE fresco (sin cache, sin SW). Lo usa
-  // useVersionCheck para detectar despliegues nuevos; si quedara cacheado
-  // nunca veríamos actualizaciones hasta que el propio SW se actualizara.
-  if (url.pathname === "/version.json") {
-    event.respondWith(fetch(request, { cache: "no-store" }));
-    return;
-  }
-
   // API calls → network-first
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(networkFirst(request, API_CACHE));
