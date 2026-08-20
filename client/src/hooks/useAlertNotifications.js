@@ -123,13 +123,19 @@ export function useAlertNotifications() {
     };
 
     const handleStockChanged = (payload) => {
-      checkAlertas();
+      // Solo recargar alertas y notificar si el movimiento es de mi bodega
+      const payloadBodega = Number(payload?.id_bodega || 0);
+      const myBodega = Number(user?.id_warehouse || 0);
+      const isMyWarehouse = !payloadBodega || !myBodega || payloadBodega === myBodega;
 
-      // Mostrar toast de cambio de stock
-      if (payload?.action === 'entrada') {
-        toast.success(`Entrada registrada en ${payload.nombre_bodega || 'tu bodega'}`);
-      } else if (payload?.action === 'salida') {
-        toast.info(`Salida registrada en ${payload.nombre_bodega || 'tu bodega'}`);
+      if (isMyWarehouse) {
+        checkAlertas();
+
+        if (payload?.action === 'entrada') {
+          toast.success(`Entrada registrada en ${payload.nombre_bodega || 'tu bodega'}`);
+        } else if (payload?.action === 'salida') {
+          toast.info(`Salida registrada en ${payload.nombre_bodega || 'tu bodega'}`);
+        }
       }
     };
 

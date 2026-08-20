@@ -6144,7 +6144,21 @@ app.get("/api/reportes/existencias", auth, async (req, res) => {
     ...qf.params,
   };
 
-  const visibilityClauseEx = buildProductWarehouseVisibilityClause("p.id_producto", "id_bodega");
+  // Filtra por visibilidad usando la bodega de CADA FILA (v.id_bodega), no el parámetro
+  // :id_bodega (que puede ser NULL en la vista global del admin). Esto garantiza que
+  // los productos restringidos no aparezcan aunque el admin no haya seleccionado bodega.
+  const visibilityClauseEx = `(
+    NOT EXISTS (
+      SELECT 1 FROM producto_bodegas_visibilidad pbv_all
+      WHERE pbv_all.id_producto = p.id_producto
+    )
+    OR EXISTS (
+      SELECT 1 FROM producto_bodegas_visibilidad pbv_allow
+      WHERE pbv_allow.id_producto = p.id_producto
+        AND pbv_allow.id_bodega = v.id_bodega
+        AND pbv_allow.visible = 1
+    )
+  )`;
   const [[countRow]] = await pool.query(
     `SELECT COUNT(*) AS total
      FROM v_stock_por_lote v
@@ -6395,7 +6409,7 @@ app.get("/api/reportes/existencias/alertas", auth, async (req, res) => {
        )
        AND ${accessFilter ? `v.id_bodega IN (${accessFilter.sql})` : "1=1"}
        AND (:id_bodega IS NULL OR v.id_bodega=:id_bodega)
-       AND ${buildProductWarehouseVisibilityClause("p.id_producto", "id_bodega")}
+       AND (NOT EXISTS (SELECT 1 FROM producto_bodegas_visibilidad pbv_a WHERE pbv_a.id_producto=p.id_producto) OR EXISTS (SELECT 1 FROM producto_bodegas_visibilidad pbv_b WHERE pbv_b.id_producto=p.id_producto AND pbv_b.id_bodega=v.id_bodega AND pbv_b.visible=1))
        AND ${qf.clause}
        AND (:from_date IS NULL OR v.fecha_vencimiento IS NULL OR v.fecha_vencimiento >= :from_date)
        AND (:to_date IS NULL OR v.fecha_vencimiento IS NULL OR v.fecha_vencimiento <= :to_date)
@@ -6449,7 +6463,7 @@ app.get("/api/reportes/existencias/stock-minimo", auth, async (req, res) => {
          AND v.stock < l.minimo
          AND ${accessFilter ? `v.id_bodega IN (${accessFilter.sql})` : "1=1"}
          AND (:id_bodega IS NULL OR v.id_bodega=:id_bodega)
-         AND ${buildProductWarehouseVisibilityClause("p.id_producto", "id_bodega")}
+         AND (NOT EXISTS (SELECT 1 FROM producto_bodegas_visibilidad pbv_a WHERE pbv_a.id_producto=p.id_producto) OR EXISTS (SELECT 1 FROM producto_bodegas_visibilidad pbv_b WHERE pbv_b.id_producto=p.id_producto AND pbv_b.id_bodega=v.id_bodega AND pbv_b.visible=1))
          AND ${qf.clause}
          AND (:id_categoria IS NULL OR p.id_categoria=:id_categoria)
          AND (:id_subcategoria IS NULL OR p.id_subcategoria=:id_subcategoria)

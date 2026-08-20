@@ -142,10 +142,19 @@ export function AppLayout() {
     };
     socket.on('pedido:changed', pedidoHandler);
 
-    // ---- Movimientos (entradas/salidas) ----
     const movHandler = (payload) => {
       const idMov = Number(payload?.id_movimiento || 0);
       if (!idMov) return;
+
+      // Solo notificar si el movimiento involucra la bodega del usuario
+      const userWarehouse = Number(user?.id_warehouse || 0);
+      const bodegaOrigen = Number(payload?.id_bodega_origen || payload?.id_bodega || 0);
+      const bodegaDestino = Number(payload?.id_bodega_destino || 0);
+      const involucraMinBodega = !userWarehouse
+        || bodegaOrigen === userWarehouse
+        || bodegaDestino === userWarehouse
+        || (!bodegaOrigen && !bodegaDestino); // sin info de bodega → mostrar igual
+      if (!involucraMinBodega) return;
 
       const tipo = String(payload?.tipo || payload?.tipo_movimiento || '').toUpperCase();
       const action = String(payload?.action || '').toLowerCase();
