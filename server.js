@@ -1622,6 +1622,58 @@ function buildProductWarehouseVisibilityClause(productExpr, warehouseParamName) 
   )`;
 }
 
+/**
+ * Genera un SKU sugerido en el server: prefijo de 3 letras derivado
+ * de la categoría + 4 chars alfanuméricos aleatorios. Si la categoría
+ * no tiene letras útiles, usa "PRD". Si el SKU generado ya existe,
+ * reintenta hasta 10 veces con un random nuevo; en el peor caso
+ * cae a un sufijo timestamp (improbable, ~36^4 = 1.7M combinaciones
+ * por prefijo).
+ *
+ * Esto es el fallback del server: el front-end YA genera un SKU al
+ * abrir el form (ver utils/skuGenerator.js), así que normalmente
+ * nunca llega aquí con sku=null. Pero si llega (integración externa,
+ * migración, bug del front), el server no rompe el INSERT.
+ */
+async function generateServerSKU(conn, categoryName) {
+  const prefix = deriveServerPrefix(categoryName);
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const candidate = `${prefix}-${randomServerCode(4)}`;
+    // Verificamos contra la tabla por el índice único de sku.
+    // Si alguien más acaba de insertar el mismo SKU entre nuestro
+    // SELECT y el INSERT posterior, el UNIQUE INDEX nos lo chilla
+    // con ER_DUP_ENTRY (manejado en el catch del caller).
+    // eslint-disable-next-line no-await-in-loop
+    const [[hit]] = await conn.query(
+      `SELECT 1 FROM productos WHERE sku = :sku LIMIT 1`,
+      { sku: candidate }
+    );
+    if (!hit) return candidate;
+  }
+  // Si los 10 intentos撞aron (suerte pésima con ~1.7M combos),
+  // fallback con timestamp.
+  return `${prefix}-${Date.now().toString(36).toUpperCase()}`;
+}
+
+function deriveServerPrefix(categoryName) {
+  if (!categoryName) return 'PRD';
+  const cleaned = String(categoryName)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z]/g, '');
+  if (cleaned.length === 0) return 'PRD';
+  return cleaned.substring(0, 3).toUpperCase();
+}
+
+function randomServerCode(length) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let out = '';
+  for (let i = 0; i < length; i++) {
+    out += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return out;
+}
+
 async function areWarehouseIdsValid(conn, ids) {
   const list = normalizeWarehouseIdList(ids);
   if (!list.length) return true;
@@ -4257,13 +4309,27 @@ app.post("/api/productos", auth, requirePermission("action.create_update", "crea
       return res.status(400).json({ error: "Una o mas bodegas visibles no son validas o no estan activas" });
     }
 
+    // Si el front no mandó SKU (o lo mandó vacío), lo autogeneramos
+    // acá usando la categoría como semilla. El front-end YA genera uno
+    // al abrir el modal (ver utils/skuGenerator.js), así que este
+    // path es el fallback de seguridad para integraciones externas,
+    // migraciones o si alguien bypasea el form.
+    let finalSku = sku && String(sku).trim() ? String(sku).trim() : null;
+    if (!finalSku) {
+      const [[catRow]] = await conn.query(
+        `SELECT nombre_categoria FROM categorias WHERE id_categoria = :id LIMIT 1`,
+        { id: id_categoria }
+      );
+      finalSku = await generateServerSKU(conn, catRow?.nombre_categoria);
+    }
+
     const [r] = await conn.query(
       `INSERT INTO productos
        (nombre_producto, sku, id_medida, id_categoria, id_subcategoria, activo)
        VALUES (:nombre_producto, :sku, :id_medida, :id_categoria, :id_subcategoria, :activo)`,
       {
         nombre_producto,
-        sku: sku || null,
+        sku: finalSku,
         id_medida,
         id_categoria,
         id_subcategoria: id_subcategoria || null,
@@ -4283,13 +4349,13 @@ app.post("/api/productos", auth, requirePermission("action.create_update", "crea
       console.error("Error al emitir WebSocket en creación de producto:", wsErr);
     }
 
-    res.json({ ok: true, id_producto: r.insertId });
+    res.json({ ok: true, id_producto: r.insertId, sku: finalSku });
   } catch (e) {
     try {
       await conn.rollback();
     } catch {}
     if (e && e.code === "ER_DUP_ENTRY") {
-      return res.status(400).json({ error: "El producto ya existe" });
+      return res.status(400).json({ error: "El SKU ya existe, prueba con otro" });
     }
     return res.status(500).json({ error: String(e.message || e) });
   } finally {

@@ -152,6 +152,14 @@ export function printPedidoPos80mm(pedido, opts = {}) {
       border-bottom: 2px solid #000;
     }
 
+    /* Zebra muy sutil para el ticket 80mm (no compite con el texto
+       ni con la impresión térmica). El fondo usa un gris muy claro
+       que en la mayoría de las impresoras térmicas apenas se nota,
+       pero en pantalla y al exportar a PDF sí marca la diferencia. */
+    .lines-table tbody tr:nth-child(even) td {
+      background: #f6f6f6;
+    }
+
     .lines-table td {
       padding: 4px 2px;
       vertical-align: top;
@@ -252,6 +260,16 @@ export function printPedidoPos80mm(pedido, opts = {}) {
       .totals-section { margin-top: 2mm; }
       .totals-section div { padding: 1mm 0; }
       .footer { margin-top: 5mm; padding-top: 4mm; }
+
+      /* Mismo problema que en el PDF letter size: sin esto Chrome
+         borra el background del zebra al imprimir. */
+      *,
+      *::before,
+      *::after {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+      }
     }
   </style>
 </head>
@@ -578,6 +596,18 @@ export function printPedidoLetterSize(pedido, opts = {}) {
       font-variant-numeric: tabular-nums;
     }
 
+    /* Zebra striping — filas alternadas con fondo gris muy claro para
+       mejorar la legibilidad en pedidos largos. Se aplica a las filas
+       pares (2ª, 4ª, 6ª, …) para no competir con la primera fila bajo
+       el thead oscuro. Un hover sutil en gris-azulado ayuda a
+       identificar la fila al pasar el mouse sobre un producto. */
+    table.items tbody tr:nth-child(even) td {
+      background: #f4f4f4;
+    }
+    table.items tbody tr:hover td {
+      background: #e8eef5;
+    }
+
     table.items tfoot td {
       padding: 3pt 4pt;
       font-weight: 700;
@@ -695,6 +725,20 @@ export function printPedidoLetterSize(pedido, opts = {}) {
     @media print {
       body { margin: 0; }
       .no-print { display: none; }
+
+      /* Forzar al motor de impresión a respetar los colores de fondo
+         (zebra striping, thead oscuro, .obs-text, etc.). Sin esto,
+         Chrome/Edge por defecto ELIMINA los background-color para
+         ahorrar tinta y el zebra no aparece al imprimir en papel ni
+         al "Guardar como PDF" desde el diálogo del navegador (aunque
+         sí aparece en la previsualización de pantalla). */
+      *,
+      *::before,
+      *::after {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+      }
     }
 
     .no-print {

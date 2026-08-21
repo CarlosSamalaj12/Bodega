@@ -188,7 +188,11 @@ export function downloadPDF(rows, opts = {}) {
         fontSize: 7,
       },
       alternateRowStyles: {
-        fillColor: [245, 245, 245],
+        // Gris azulado claro para zebra visible pero sin gritar.
+        // El header sigue siendo gris oscuro (#3c3c3c) para que la
+        // jerarquía visual sea header > filas claras/impares > filas
+        // alternas. Antes era #f5f5f5 (demasiado cerca del blanco).
+        fillColor: [233, 240, 248],
       },
       margin: { left: 14, right: 14 },
     });

@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
+import { generateSKUForced } from '@/utils/skuGenerator';
 import './ProductoForm.scss';
 
 const EMPTY = {
@@ -56,12 +57,21 @@ export function ProductoForm({
         id_bodegas_visibles: initial.id_bodegas_visibles || [],
       });
     } else {
+      // Modo crear: pre-rellenamos el SKU con uno generado a partir de
+      // la categoría por defecto (si hay). El usuario puede editarlo o
+      // pulsar "Regenerar" para pedir otro. Si no hay categoría aún,
+      // usamos "PRD-XXXX" como prefijo.
+      const initialCat = categorias.find(
+        (c) => Number(c.id_categoria) === Number(EMPTY.id_categoria)
+      );
+      const suggestedSku = generateSKUForced(initialCat?.nombre_categoria);
       setValues({
         ...EMPTY,
+        sku: suggestedSku,
         id_bodegas_visibles: buildInitialVisibilidad(defaultBodegaId, bodegas),
       });
     }
-  }, [initial, defaultBodegaId, bodegas]);
+  }, [initial, defaultBodegaId, bodegas, categorias]);
 
   // Subcategorías filtradas por categoría
   const subcategoriasFiltradas = values.id_categoria
@@ -111,6 +121,13 @@ export function ProductoForm({
     });
   };
 
+  // Regenera un SKU basado en la categoría seleccionada actualmente.
+  // Solo se usa en modo crear (no toca productos ya guardados).
+  const handleRegenerateSKU = () => {
+    const cat = categorias.find((c) => Number(c.id_categoria) === Number(values.id_categoria));
+    set('sku', generateSKUForced(cat?.nombre_categoria));
+  };
+
   return (
     <form className="producto-form" onSubmit={handleSubmit}>
       {error && <div className="producto-form__error">{error}</div>}
@@ -124,13 +141,32 @@ export function ProductoForm({
           autoFocus
           placeholder="Ej. Harina de trigo"
         />
-        <Input
-          label="SKU"
-          value={values.sku}
-          onChange={(e) => set('sku', e.target.value)}
-          placeholder="Opcional"
-          hint="Código único interno"
-        />
+        {/* SKU con botón "Regenerar" a la derecha. Usamos un wrapper
+            propio en vez de modificar Input para no acoplar ese
+            componente a esta lógica puntual. */}
+        <div className="producto-form__sku">
+          <Input
+            label="SKU"
+            value={values.sku}
+            onChange={(e) => set('sku', e.target.value)}
+            placeholder="Generado automáticamente"
+            hint="Código único interno. Déjalo o personalízalo."
+            disabled={isEdit}
+          />
+          {!isEdit && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="producto-form__sku-regen"
+              onClick={handleRegenerateSKU}
+              title="Generar otro SKU"
+              aria-label="Regenerar SKU"
+            >
+              ↻ Regenerar
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="producto-form__row">

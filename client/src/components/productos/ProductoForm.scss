@@ -11,6 +11,30 @@
     gap: $space-3;
   }
 
+  // ---- SKU con botón "Regenerar" a la derecha ----
+  &__sku {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: $space-2;
+
+    // El botón debe quedar alineado con la base del input (no del label).
+    // El input tiene su label arriba; el botón va pegado al input.
+    grid-template-rows: auto auto;
+
+    > :first-child {
+      // El Input (field) ocupa la columna 1
+      grid-column: 1;
+      grid-row: 1 / span 2;
+    }
+  }
+
+  &__sku-regen {
+    grid-column: 2;
+    grid-row: 2;
+    white-space: nowrap;
+  }
+
   &__field {
     display: flex;
     flex-direction: column;
