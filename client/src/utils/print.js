@@ -176,19 +176,39 @@ export function printPedidoPos80mm(pedido, opts = {}) {
 
     .line-note {
       display: block;
-      margin-top: 2px;
-      font-size: 11px;
-      font-style: italic;
-      font-weight: normal;
-      color: #444;
-      line-height: 1.15;
+      margin-top: 3px;
+      padding: 2px 4px;
+      font-size: 14px;
+      font-style: normal;
+      font-weight: bold;
+      color: #000;
+      line-height: 1.2;
       white-space: normal;
       word-break: break-word;
+      border: 1px dashed #000;
+      border-radius: 2px;
+      background: #fffbe6;
     }
     .line-note::before {
       content: "Nota: ";
       font-style: normal;
       font-weight: bold;
+      text-transform: uppercase;
+    }
+
+    /* Observaciones generales del pedido en el encabezado del ticket.
+       Mismo tratamiento que .line-note: negrita, grande y con marco para
+       que se lea sin esfuerzo en la impresión térmica. */
+    .info-table .obs-value {
+      font-size: 15px;
+      font-weight: bold;
+      color: #000;
+      padding: 2px 4px;
+      border: 1px dashed #000;
+      border-radius: 2px;
+      background: #fffbe6;
+      white-space: normal;
+      word-break: break-word;
     }
 
     .lines-table td.right {
@@ -300,7 +320,7 @@ export function printPedidoPos80mm(pedido, opts = {}) {
       ${pedido.observaciones ? `
       <tr>
         <td class="label">Observaciones:</td>
-        <td class="value">${esc(pedido.observaciones)}</td>
+        <td class="value obs-value">${esc(pedido.observaciones)}</td>
       </tr>` : ''}
     </table>
 
