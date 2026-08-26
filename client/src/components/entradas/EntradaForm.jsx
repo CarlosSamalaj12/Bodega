@@ -13,6 +13,7 @@ import { useShortcutsStore } from '@/stores/shortcuts.store';
 import { toast } from '@/components/ui/Toast';
 import { entradasService } from '@/services/entradas.service';
 import { existenciasService } from '@/services/existencias.service';
+import { preventNumberWheel } from '@/utils/inputWheel';
 import './EntradaForm.scss';
 
 const EMPTY_LINE = {
@@ -23,6 +24,15 @@ const EMPTY_LINE = {
   precio: '',
   lote: '',
   caducidad: '',
+};
+
+// Fecha local de hoy en formato YYYY-MM-DD (comparable con el input type="date")
+const todayYmd = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
 };
 
 export function EntradaForm({
@@ -105,14 +115,19 @@ export function EntradaForm({
     return { total, lineasValidas };
   }, [lines]);
 
-  // Validar una línea: producto, cantidad > 0, precio, lote y caducidad son obligatorios
+  // Validar una línea: producto, cantidad > 0, precio, lote y caducidad son obligatorios.
+  // Además, no se permite registrar productos cuya fecha de vencimiento ya pasó.
   const validateLine = (l) => {
     const errors = {};
     if (!l.id_producto) errors.id_producto = 'Selecciona un producto';
     if (!l.cantidad || Number(l.cantidad) <= 0) errors.cantidad = 'Cantidad > 0';
     if (l.precio === '' || l.precio == null || Number(l.precio) < 0) errors.precio = 'Costo requerido';
     if (!String(l.lote || '').trim()) errors.lote = 'Lote requerido';
-    if (!l.caducidad) errors.caducidad = 'Caducidad requerida';
+    if (!l.caducidad) {
+      errors.caducidad = 'Caducidad requerida';
+    } else if (l.caducidad < todayYmd()) {
+      errors.caducidad = 'La fecha de vencimiento ya pasó';
+    }
     return errors;
   };
 
@@ -138,7 +153,7 @@ export function EntradaForm({
     lines.every((l) => l.id_producto && Number(l.cantidad) > 0) &&
     lines.every((l) => l.precio !== '' && Number(l.precio) >= 0) &&
     lines.every((l) => String(l.lote || '').trim()) &&
-    lines.every((l) => l.caducidad) &&
+    lines.every((l) => l.caducidad && l.caducidad >= todayYmd()) &&
     !submitting;
 
   const handleNoDocumentoBlur = async () => {
@@ -157,7 +172,7 @@ export function EntradaForm({
 
     // Validar todas las líneas
     if (!validateAll()) {
-      setSubmitError('Completa todos los campos obligatorios de cada línea (producto, cantidad, costo, lote y caducidad).');
+      setSubmitError('Completa todos los campos obligatorios de cada línea (producto, cantidad, costo, lote y caducidad). La caducidad no puede ser anterior a hoy.');
       return;
     }
 
@@ -373,6 +388,7 @@ export function EntradaForm({
               step="0.001"
               inputMode="decimal"
               value={l.cantidad}
+              onWheel={preventNumberWheel}
               onChange={(e) => setLine(idx, { cantidad: e.target.value })}
               placeholder="0"
               required
@@ -396,6 +412,7 @@ export function EntradaForm({
               min="0"
               step="0.01"
               value={l.precio}
+              onWheel={preventNumberWheel}
               onChange={(e) => setLine(idx, { precio: e.target.value })}
               placeholder="0.00"
               required
@@ -440,6 +457,7 @@ export function EntradaForm({
               type="date"
               className={`input entrada-form__text ${err ? 'input--error' : ''}`}
               value={l.caducidad}
+              min={todayYmd()}
               onChange={(e) => setLine(idx, { caducidad: e.target.value })}
               required
             />

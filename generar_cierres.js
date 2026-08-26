@@ -9,21 +9,30 @@
 
 import { pool } from './db.js';
 
-// Helper: formatear fecha a YYYY-MM-DD
+// Helper: formatear fecha a YYYY-MM-DD (hora LOCAL — toISOString mezclaría UTC)
 function ymd(value) {
   if (!value) return null;
   try {
-    return new Date(value).toISOString().slice(0, 10);
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
   } catch {
     return null;
   }
 }
 
-// Helper: sumar días a una fecha YYYY-MM-DD
+// Helper: sumar días a una fecha YYYY-MM-DD (mediodía local evita corrimiento UTC/DST)
 function addDaysYmd(baseYmd, days) {
-  const d = new Date(`${baseYmd}T00:00:00`);
+  const d = new Date(`${baseYmd}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
   d.setDate(d.getDate() + Number(days || 0));
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
 }
 
 /**

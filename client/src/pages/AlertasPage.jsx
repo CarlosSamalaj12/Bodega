@@ -304,7 +304,7 @@ export default function AlertasPage() {
     },
     {
       key: 'alerta',
-      label: 'Alerta',
+      label: 'Rotación de producto',
       width: 180,
       render: (r) => <AlertIndicator tipo={getTipoAlerta(r)} />,
       cardMeta: (r) => <AlertIndicator tipo={getTipoAlerta(r)} withDot={false} />,

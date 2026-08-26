@@ -193,7 +193,10 @@ export default function CorteDiarioPage() {
     return rows
       .filter((r) => {
         const c = conteosFinales[r.id_producto];
-        return c != null && Number.isFinite(Number(c)) && !getConteoErrorMsg(r);
+        if (c == null || !Number.isFinite(Number(c)) || getConteoErrorMsg(r)) return false;
+        // Solo con diferencia real: si el conteo coincide con la existencia
+        // actual no hay nada que ajustar.
+        return Number(c) !== Number(r.existencia_actual);
       })
       .map((r) => ({
         id_producto: Number(r.id_producto),
@@ -774,7 +777,7 @@ export default function CorteDiarioPage() {
             }}>
               <strong style={{ color: '#dc3545' }}>⚠ Hay conteos inválidos</strong>
               <p style={{ margin: '8px 0 0', fontSize: '13px', color: '#721c24' }}>
-                {conteosConError} producto(s) tienen un conteo final menor a 0. Estos productos se muestran resaltados en rojo en la tabla.
+                {conteosConError} producto(s) tienen un conteo final inválido (negativo o mayor a la existencia actual). Estos productos se muestran resaltados en rojo en la tabla.
               </p>
             </div>
           )}

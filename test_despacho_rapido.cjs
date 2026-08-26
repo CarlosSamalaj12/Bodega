@@ -349,8 +349,7 @@ async function replicaFulfill(conn, { id_pedido, lines, justificacion = null, ac
 
     await conn.query(
       `UPDATE pedido_detalle
-       SET cantidad_surtida = cantidad_surtida + ?,
-           estado_linea = CASE
+       SET estado_linea = CASE
              WHEN (cantidad_surtida + ?) >= cantidad_solicitada THEN 'DESPACHADO'
              ELSE 'PENDIENTE'
            END,
@@ -358,10 +357,11 @@ async function replicaFulfill(conn, { id_pedido, lines, justificacion = null, ac
              WHEN ? IS NULL OR ?='' THEN justificacion_linea
              WHEN (cantidad_surtida + ?) != cantidad_solicitada THEN ?
              ELSE justificacion_linea
-           END
+           END,
+           cantidad_surtida = cantidad_surtida + ?
        WHERE id_pedido_detalle=?`,
-      [fulfilledNow, fulfilledNow, justificacionTxt || null, justificacionTxt || null,
-       fulfilledNow, justificacionTxt || null, id_pedido_detalle]
+      [fulfilledNow, justificacionTxt || null, justificacionTxt || null,
+       fulfilledNow, justificacionTxt || null, fulfilledNow, id_pedido_detalle]
     );
   }
 
@@ -553,6 +553,7 @@ async function getLinea(conn, idPedDet) {
     const L_A1 = `ZZDESP_${ts}_A1`; // vence 2027-06-01 (FEFO primero)
     const L_A2 = `ZZDESP_${ts}_A2`; // vence 2028-01-01
     const L_AX = `ZZDESP_${ts}_AX`; // vencida 2020-01-01 → NO despachable
+    const L_A3 = `ZZDESP_${ts}_A3`; // vence 2029-01-01 (S6: regresión estado_linea)
     const L_B1 = `ZZDESP_${ts}_B1`;
     const L_CX = `ZZDESP_${ts}_CX`; // vencida 2021-01-01 → NO despachable
 
@@ -710,6 +711,43 @@ async function getLinea(conn, idPedDet) {
     check("S5e) movimiento del fulfill fallido revertido (0 huérfanos)", Number(movP4.c) === 0, `movs=${movP4.c}`);
     await assertGroup("S5f) stock_actual CX(vencida)=30 intacto", conn, BOD_SUR, P_C, L_CX, "2021-01-01");
 
+    // ── PEDIDO 5: regresión estado_linea — despacho PARCIAL ≥50% en un solo call ──
+    // MySQL evalúa las asignaciones del UPDATE de una sola tabla de izquierda a
+    // derecha: si `cantidad_surtida` se actualizara antes que `estado_linea`,
+    // la condición (cantidad_surtida + add) duplicaría el add y marcaría
+    // DESPACHADO una línea solo surtida a la mitad (50/100). El endpoint
+    // actualiza cantidad_surtida al FINAL del SET; aquí se verifica que 50/100
+    // queda PENDIENTE (y no DESPACHADO prematuro).
+    await insertEntrada(conn, { id_motivo: MOT_ENT, id_bodega: BOD_SUR, id_usuario: USR_SUR, id_producto: P_A, lote: L_A3, fec: "2029-01-01", cantidad: 100, costo: 10 });
+    const p5 = await createPedido(conn, {
+      id_usuario_solicita: USR_SOL, id_bodega_solicita: BOD_SOL, id_bodega_surtidor: BOD_SUR,
+      lines: [{ id_producto: P_A, cantidad: 100 }],
+    });
+    const L8 = p5.dets[0];
+    const r7 = await replicaFulfill(conn, {
+      id_pedido: p5.idPedido, actorWarehouse: BOD_SUR, actorUserId: USR_SUR, justificacion: "Mitad por ahora",
+      lines: [{ id_pedido_detalle: L8.id_pedido_detalle, qty: 50 }],
+    });
+    check("S6a) fulfill parcial 50/100 responde ok", r7.ok === true, r7.ok ? r7.estado : r7.error);
+    const l8 = await getLinea(conn, L8.id_pedido_detalle);
+    check("S6b) L8 surtida 50/100 PENDIENTE (no DESPACHADO prematuro)",
+      Number(l8.cantidad_surtida) === 50 && String(l8.estado_linea) === "PENDIENTE",
+      `${l8.cantidad_surtida}/${l8.cantidad_solicitada} ${l8.estado_linea}`);
+    check("S6c) L8 justificacion_linea registrada en el parcial",
+      String(l8.justificacion_linea || "") === "Mitad por ahora", `just=${l8.justificacion_linea}`);
+    const r8 = await replicaFulfill(conn, {
+      id_pedido: p5.idPedido, actorWarehouse: BOD_SUR, actorUserId: USR_SUR, justificacion: "Mitad por ahora",
+      lines: [{ id_pedido_detalle: L8.id_pedido_detalle, qty: 50 }],
+    });
+    check("S6d) fulfill 50 restantes responde ok", r8.ok === true, r8.ok ? r8.estado : r8.error);
+    const l8b = await getLinea(conn, L8.id_pedido_detalle);
+    check("S6e) L8 100/100 DESPACHADO al completar",
+      Number(l8b.cantidad_surtida) === 100 && String(l8b.estado_linea) === "DESPACHADO",
+      `${l8b.cantidad_surtida}/${l8b.cantidad_solicitada} ${l8b.estado_linea}`);
+    const [[p5e]] = await conn.query(`SELECT estado FROM pedido_encabezado WHERE id_pedido=?`, [p5.idPedido]);
+    check("S6f) Pedido COMPLETADO tras completar", p5e.estado === "COMPLETADO", p5e.estado);
+    await assertGroup("S6g) stock_actual A3=0 tras despachar 100", conn, BOD_SUR, P_A, L_A3, "2029-01-01");
+
     // ── Consistencia global ──
     const { mism, exp, act } = await fullConsistency(conn);
     check("Consistencia global stock_actual vs kardex", mism === 0, `grupos kardex=${exp} | filas stock_actual=${act}`);
@@ -723,8 +761,8 @@ async function getLinea(conn, idPedDet) {
     const [[st]] = await conn.query(`SELECT COUNT(*) AS c FROM stock_actual WHERE lote LIKE 'ZZDESP%'`);
     check("ROLLBACK: sin filas de prueba en stock_actual", Number(st.c) === 0);
     const [[pe]] = await conn.query(
-      `SELECT COUNT(*) AS c FROM pedido_encabezado WHERE id_pedido IN (?, ?, ?, ?)`,
-      [p1.idPedido, p2.idPedido, p3.idPedido, p4.idPedido]);
+      `SELECT COUNT(*) AS c FROM pedido_encabezado WHERE id_pedido IN (?, ?, ?, ?, ?)`,
+      [p1.idPedido, p2.idPedido, p3.idPedido, p4.idPedido, p5.idPedido]);
     check("ROLLBACK: sin pedidos de prueba", Number(pe.c) === 0);
   } catch (e) {
     await conn.rollback().catch(() => {});

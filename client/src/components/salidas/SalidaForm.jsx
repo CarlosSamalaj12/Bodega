@@ -13,6 +13,7 @@ import { useShortcutsStore } from '@/stores/shortcuts.store';
 import { toast } from '@/components/ui/Toast';
 import { salidasService } from '@/services/salidas.service';
 import { existenciasService } from '@/services/existencias.service';
+import { preventNumberWheel } from '@/utils/inputWheel';
 import './SalidaForm.scss';
 
 const EMPTY_LINE = {
@@ -28,6 +29,7 @@ const EMPTY_LINE = {
 export function SalidaForm({
   motivos = [],
   bodegaNombre = '',
+  requierePrecioSalida = false,
   submitting = false,
   onSubmittingChange,
   onCreated,
@@ -99,12 +101,18 @@ export function SalidaForm({
     return { total, lineasValidas };
   }, [lines]);
 
-  // Validar una línea: producto, cantidad > 0 y precio de salida son obligatorios
+  // Validar una línea: producto, cantidad > 0 y, solo si la bodega lo exige,
+  // precio de salida obligatorio (requiere_precio_salida). El backend aplica la
+  // misma regla; aquí solo se adelanta la validación para mejor UX.
   const validateLine = (l) => {
     const errors = {};
     if (!l.id_producto) errors.id_producto = 'Selecciona un producto';
     if (!l.cantidad || Number(l.cantidad) <= 0) errors.cantidad = 'Cantidad > 0';
-    if (l.precio === '' || l.precio == null || Number(l.precio) < 0) errors.precio = 'Precio requerido';
+    if (l.precio === '' || l.precio == null) {
+      if (requierePrecioSalida) errors.precio = 'Precio requerido';
+    } else if (Number(l.precio) < 0) {
+      errors.precio = 'Precio no puede ser negativo';
+    }
     return errors;
   };
 
@@ -120,13 +128,16 @@ export function SalidaForm({
     });
     setLineErrors(errs);
     return ok;
-  }, [lines]);
+  }, [lines, requierePrecioSalida]);
 
   const canSubmit =
     cabecera.id_motivo &&
     cabecera.no_documento.trim() &&
     lines.every((l) => l.id_producto && Number(l.cantidad) > 0) &&
-    lines.every((l) => l.precio !== '' && Number(l.precio) >= 0) &&
+    lines.every((l) => {
+      if (l.precio === '' || l.precio == null) return !requierePrecioSalida;
+      return Number(l.precio) >= 0;
+    }) &&
     !submitting;
 
   const handleSubmit = async (e) => {
@@ -135,7 +146,10 @@ export function SalidaForm({
 
     // Validar todas las líneas
     if (!validateAll()) {
-      setSubmitError('Completa todos los campos obligatorios de cada línea (producto, cantidad y precio de salida).');
+      setSubmitError(
+        'Completa todos los campos obligatorios de cada línea (producto y cantidad).' +
+        (requierePrecioSalida ? ' El precio de salida es obligatorio para esta bodega.' : '')
+      );
       return;
     }
 
@@ -311,6 +325,7 @@ export function SalidaForm({
               step="0.001"
               inputMode="decimal"
               value={l.cantidad}
+              onWheel={preventNumberWheel}
               onChange={(e) => setLine(idx, { cantidad: e.target.value })}
               placeholder="0"
               required
@@ -322,7 +337,7 @@ export function SalidaForm({
     },
     {
       key: 'precio',
-      label: requiredLabel('Precio de salida'),
+      label: requierePrecioSalida ? requiredLabel('Precio de salida') : 'Precio de salida',
       width: 120,
       render: (l, idx) => {
         const err = lineErrors[idx]?.precio;
@@ -334,10 +349,13 @@ export function SalidaForm({
               min="0"
               step="0.01"
               value={l.precio}
+              onWheel={preventNumberWheel}
               onChange={(e) => setLine(idx, { precio: e.target.value })}
               placeholder="0.00"
-              title="Precio unitario al que se registra la salida. Si la bodega lo requiere, es obligatorio."
-              required
+              title={requierePrecioSalida
+                ? 'Precio unitario al que se registra la salida. Es obligatorio para esta bodega.'
+                : 'Precio unitario al que se registra la salida (opcional para esta bodega).'}
+              required={requierePrecioSalida}
             />
             {err && <span className="salida-form__field-error">{err}</span>}
           </div>
@@ -490,6 +508,7 @@ export function SalidaForm({
 SalidaForm.propTypes = {
   motivos: PropTypes.array,
   bodegaNombre: PropTypes.string,
+  requierePrecioSalida: PropTypes.bool,
   submitting: PropTypes.bool,
   onSubmittingChange: PropTypes.func,
   onCreated: PropTypes.func,

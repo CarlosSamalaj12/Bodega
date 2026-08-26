@@ -247,8 +247,8 @@ async function fullConsistency(conn) {
     // update pedido_detalle (como el endpoint)
     await conn.query(
       `UPDATE pedido_detalle
-         SET cantidad_surtida = cantidad_surtida + ?,
-             estado_linea = CASE WHEN (cantidad_surtida + ?) >= cantidad_solicitada THEN 'DESPACHADO' ELSE 'PENDIENTE' END
+         SET estado_linea = CASE WHEN (cantidad_surtida + ?) >= cantidad_solicitada THEN 'DESPACHADO' ELSE 'PENDIENTE' END,
+             cantidad_surtida = cantidad_surtida + ?
        WHERE id_pedido_detalle = ?`,
       [DESP, DESP, idPedDet]
     );
@@ -272,12 +272,12 @@ async function fullConsistency(conn) {
       for (const ln of links) {
         await conn.query(
           `UPDATE pedido_detalle
-             SET cantidad_surtida = GREATEST(cantidad_surtida - ?, 0),
-                 estado_linea = CASE
+             SET estado_linea = CASE
                    WHEN COALESCE(estado_linea, 'PENDIENTE') = 'ANULADO' THEN 'ANULADO'
                    WHEN GREATEST(cantidad_surtida - ?, 0) >= cantidad_solicitada THEN 'DESPACHADO'
                    ELSE 'PENDIENTE'
-                 END
+                 END,
+                 cantidad_surtida = GREATEST(cantidad_surtida - ?, 0)
            WHERE id_pedido_detalle = ?`,
           [ln.cantidad, ln.cantidad, ln.id_pedido_detalle]
         );

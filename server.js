@@ -1486,7 +1486,11 @@ const PERM_CATALOG = [
   { key: "section.view.transferencias", label: "Ver modulo Transferencias", group: "Movimientos", default_active: 0 },
 
   // ── Inventario ──
-  { key: "section.view.productos", label: "Ver modulo Productos", group: "Inventario" },
+  // default_active: 0 => si el usuario NO tiene fila explícita en
+  // usuario_permisos, el permiso queda DENEGADO (fail-closed). Antes era
+  // permisivo por defecto y cualquier usuario sin configurar veía el módulo
+  // de Productos y podía crear/editar sin tener el permiso.
+  { key: "section.view.productos", label: "Ver modulo Productos", group: "Inventario", default_active: 0 },
   { key: "section.view.existencias", label: "Ver modulo Existencias", group: "Inventario", default_active: 0 },
   { key: "section.view.alertas", label: "Ver modulo Alertas", group: "Inventario", default_active: 0 },
   { key: "section.view.conteo-ciclico", label: "Ver modulo Conteo Ciclico", group: "Inventario" },
@@ -1519,7 +1523,7 @@ const PERM_CATALOG = [
   // ── Acciones (no son secciones del sidebar; capabilities) ──
   { key: "action.filter", label: "Usar filtros y busquedas", group: "Acciones" },
   { key: "action.export_excel", label: "Exportar reportes a Excel", group: "Acciones" },
-  { key: "action.create_update", label: "Crear y editar registros", group: "Acciones" },
+  { key: "action.create_update", label: "Crear y editar registros", group: "Acciones", default_active: 0 },
   { key: "action.delete", label: "Eliminar / desactivar registros", group: "Acciones" },
   { key: "action.dispatch", label: "Despachar pedidos", group: "Acciones" },
   { key: "action.sensitive_approve", label: "Aprobar acciones sensibles", group: "Acciones", default_active: 0 },
@@ -2447,11 +2451,11 @@ function onlyToday(dateTimeStr) {
 
 function ymd(value) {
   if (!value) return null;
-  try {
-    return new Date(value).toISOString().slice(0, 10);
-  } catch {
-    return null;
-  }
+  // Fecha LOCAL en YYYY-MM-DD: usar toISOString() mezclaría UTC (p. ej. de
+  // noche en UTC-x devolvería el día siguiente, y en zonas UTC+ las columnas
+  // DATE de MySQL se desplazarían un día atrás). localYmd mantiene el
+  // calendario local, consistente con CURDATE() de MySQL.
+  return localYmd(value);
 }
 
 // Fecha local en formato YYYY-MM-DD (consistente con CURDATE() de MySQL).
@@ -2482,9 +2486,12 @@ function normalizeYmdInput(value) {
 }
 
 function addDaysYmd(baseYmd, days) {
-  const d = new Date(`${baseYmd}T00:00:00`);
+  // Mediodía local (T12:00:00) evita el corrimiento UTC de toISOString y los
+  // saltos por DST al sumar días; el resultado se formatea en hora local.
+  const d = new Date(`${baseYmd}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
   d.setDate(d.getDate() + Number(days || 0));
-  return d.toISOString().slice(0, 10);
+  return localYmd(d);
 }
 
 function dmy(value) {
@@ -3296,11 +3303,13 @@ async function applyConteoFinalLines(conn, { id_bodega, lines, motivo, user, app
 
   // Backdattamos al día que se está cerrando (no a hoy) para que las salidas
   // del conteo final aparezcan reflejadas en el cierre_dia del día correcto.
-  // Hora de cierre: 23:59:59 del día seleccionado.
+  // Hora de cierre: 23:59:59 del día seleccionado. Si no se pasa fecha_cierre,
+  // se usa HOY (nunca el string 'NOW()' como literal: mysql2 lo escaparía como
+  // texto y el INSERT a DATETIME fallaría en modo estricto).
   const fechaCierreNorm = String(fecha_cierre || '').trim();
   const cierreTimestamp = /^\d{4}-\d{2}-\d{2}$/.test(fechaCierreNorm)
     ? `${fechaCierreNorm} 23:59:59`
-    : 'NOW()';
+    : `${localYmd(new Date())} 23:59:59`;
 
   const obsBase = String(observaciones || "").trim();
   const [mhRes] = await conn.query(
@@ -3355,7 +3364,13 @@ async function applyConteoFinalLines(conn, { id_bodega, lines, motivo, user, app
     const qtyRequested = existenciaActual - existenciaFinal;
     if (qtyRequested <= 0) continue;
 
-    const { picks, remaining } = await pickLotsFEFO(conn, id_bodega, id_producto, qtyRequested);
+    // FEFO (primero el lote que vence antes) sobre TODO el stock de la bodega,
+    // INCLUYENDO los lotes vencidos: la base del conteo (existencia_actual del
+    // reporte de corte) suma todo el kardex sin filtrar por vencimiento, así que
+    // la diferencia puede incluir unidades vencidas y estas deben poder salir
+    // del sistema. Es el mismo pickLotsFEFO que usan salidas/despachos, pero con
+    // allowExpired:true (allí solo se permite con motivo Merma/Descomposición).
+    const { picks, remaining } = await pickLotsFEFO(conn, id_bodega, id_producto, qtyRequested, { allowExpired: true });
     if (!picks.length || remaining > 0) {
       throw new Error(`Stock insuficiente para producto ${pName}`);
     }
@@ -5363,6 +5378,9 @@ app.post("/api/entradas", auth, requirePermission("action.create_update", "regis
   const obsFinal =
     pagado ? `${observaciones ? `${observaciones} | ` : ""}Pagado: ${String(pagado)}` : observaciones;
 
+  // Fecha local de hoy (YYYY-MM-DD) para rechazar caducidades ya vencidas.
+  const todayStr = localYmd(new Date());
+
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
@@ -5419,6 +5437,15 @@ app.post("/api/entradas", auth, requirePermission("action.create_update", "regis
       if (!cantidad || cantidad <= 0) continue;
       const costo_unitario = Number(ln.precio || ln.costo_unitario || 0);
 
+      // Restricción: no se permite ingresar productos cuya fecha de vencimiento ya pasó.
+      const fecha_vencimiento = String(ln.caducidad || "").trim() || null;
+      if (fecha_vencimiento && fecha_vencimiento < todayStr) {
+        const [[p]] = await conn.query('SELECT nombre_producto, sku FROM productos WHERE id_producto = ?', [ln.id_producto]);
+        const pName = p ? `"${p.nombre_producto}" (SKU: ${p.sku})` : `producto #${ln.id_producto}`;
+        await conn.rollback();
+        return res.status(400).json({ error: `El producto ${pName} tiene fecha de vencimiento vencida (${fecha_vencimiento}). No se puede registrar la entrada.` });
+      }
+
       const [d] = await conn.query(
         `INSERT INTO movimiento_detalle
          (id_movimiento, id_producto, lote, fecha_vencimiento, cantidad, costo_unitario, observacion_linea)
@@ -5427,7 +5454,7 @@ app.post("/api/entradas", auth, requirePermission("action.create_update", "regis
           id_movimiento,
           id_producto: ln.id_producto,
           lote: ln.lote || null,
-          fecha_vencimiento: ln.caducidad || null,
+          fecha_vencimiento,
           cantidad,
           costo_unitario,
           observacion_linea: ln.observacion_linea || null,
@@ -5445,7 +5472,7 @@ app.post("/api/entradas", auth, requirePermission("action.create_update", "regis
           id_bodega: id_bodega_destino,
           id_producto: ln.id_producto,
           lote: ln.lote || null,
-          fecha_vencimiento: ln.caducidad || null,
+          fecha_vencimiento,
           delta_cantidad: cantidad,
           costo_unitario,
         }
@@ -5521,6 +5548,8 @@ app.post("/api/ajustes", auth, requirePermission("action.create_update", "regist
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
+    // Fecha local de hoy (YYYY-MM-DD) para rechazar caducidades ya vencidas en entradas.
+    const todayStr = localYmd(new Date());
     const [[warehouseRow]] = await conn.query(
       `SELECT id_bodega
        FROM bodegas
@@ -5586,6 +5615,11 @@ app.post("/api/ajustes", auth, requirePermission("action.create_update", "regist
       if (dir === "ENTRADA") {
         const lote = String(ln?.lote || "").trim() || null;
         const fecha_vencimiento = String(ln?.caducidad || "").trim() || null;
+        // Restricción: no se permite ingresar productos cuya fecha de vencimiento ya pasó.
+        if (fecha_vencimiento && fecha_vencimiento < todayStr) {
+          await conn.rollback();
+          return res.status(400).json({ error: `El producto ${pName} tiene fecha de vencimiento vencida (${fecha_vencimiento}). No se puede registrar el ajuste.` });
+        }
         const costo_unitario = Number(ln?.costo_unitario || 0);
         const [d] = await conn.query(
           `INSERT INTO movimiento_detalle
@@ -5699,7 +5733,7 @@ app.post("/api/ajustes", auth, requirePermission("action.create_update", "regist
    SALIDAS DIRECTAS (MOVIMIENTOS + KARDEX)
 ========================= */
 app.post("/api/salidas", auth, requirePermission("action.create_update", "registrar salidas"), enforceDailyCloseBeforeMutations, async (req, res) => {
-  const { id_motivo = null, id_bodega_destino = null, observaciones = null, lines = [] } = req.body || {};
+  const { id_motivo = null, id_bodega_destino = null, no_documento: no_documento_input = null, observaciones = null, lines = [] } = req.body || {};
 
   if (!Array.isArray(lines) || !lines.length) return res.status(400).json({ error: "Sin lineas" });
 
@@ -5804,7 +5838,11 @@ app.post("/api/salidas", auth, requirePermission("action.create_update", "regist
        FROM pedido_encabezado`
     );
     const correlativoPedido = Number(corrPed?.correlativo || 0);
-    const no_documento = correlativoPedido > 0 ? String(correlativoPedido) : null;
+    // Se respeta el No. documento que envía el usuario (el formulario de salidas
+    // lo pide como obligatorio). Solo si no viene, se usa el correlativo de
+    // pedidos como fallback para no cambiar el comportamiento de llamadas previas.
+    const no_documento =
+      String(no_documento_input || "").trim() || (correlativoPedido > 0 ? String(correlativoPedido) : null);
 
     const [mhRes] = await conn.query(
       `INSERT INTO movimiento_encabezado
@@ -9933,10 +9971,14 @@ app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "
       if (projectedSurtida < Number(line.cantidad_solicitada)) {
         requiresJustificacion = true;
       }
+      // OJO MySQL: en un UPDATE de una sola tabla las asignaciones del SET se
+      // evalúan de izquierda a derecha y las siguientes ven el valor YA
+      // actualizado. Por eso `cantidad_surtida` se actualiza AL FINAL: si se
+      // actualizara primero, `(cantidad_surtida + :add)` duplicaría el add y
+      // marcaría DESPACHADO líneas solo despachadas a la mitad.
       await conn.query(
         `UPDATE pedido_detalle
-         SET cantidad_surtida = cantidad_surtida + :add,
-             estado_linea = CASE
+         SET estado_linea = CASE
                WHEN (cantidad_surtida + :add) >= cantidad_solicitada THEN 'DESPACHADO'
                ELSE 'PENDIENTE'
              END,
@@ -9944,7 +9986,8 @@ app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "
                WHEN :justificacion IS NULL OR :justificacion='' THEN justificacion_linea
                WHEN (cantidad_surtida + :add) != cantidad_solicitada THEN :justificacion
                ELSE justificacion_linea
-             END
+             END,
+             cantidad_surtida = cantidad_surtida + :add
          WHERE id_pedido_detalle=:id`,
         {
           add: fulfilledNow,
@@ -10172,12 +10215,12 @@ app.post("/api/orders/:id/revert", auth, requirePermission("action.dispatch", "r
     for (const ln of links) {
       await conn.query(
         `UPDATE pedido_detalle
-         SET cantidad_surtida = GREATEST(cantidad_surtida - :qty, 0),
-             estado_linea = CASE
+         SET estado_linea = CASE
                WHEN COALESCE(estado_linea, 'PENDIENTE')='ANULADO' THEN 'ANULADO'
                WHEN GREATEST(cantidad_surtida - :qty, 0) >= cantidad_solicitada THEN 'DESPACHADO'
                ELSE 'PENDIENTE'
-             END
+             END,
+             cantidad_surtida = GREATEST(cantidad_surtida - :qty, 0)
          WHERE id_pedido_detalle=:id`,
         { qty: ln.cantidad, id: ln.id_pedido_detalle }
       );
@@ -10337,12 +10380,12 @@ app.post("/api/orders/:id/revert-line", auth, requirePermission("action.dispatch
 
     await conn.query(
       `UPDATE pedido_detalle
-       SET cantidad_surtida = GREATEST(cantidad_surtida - :qty, 0),
-           estado_linea = CASE
+       SET estado_linea = CASE
              WHEN COALESCE(estado_linea, 'PENDIENTE')='ANULADO' THEN 'ANULADO'
              WHEN GREATEST(cantidad_surtida - :qty, 0) >= cantidad_solicitada THEN 'DESPACHADO'
              ELSE 'PENDIENTE'
-           END
+           END,
+           cantidad_surtida = GREATEST(cantidad_surtida - :qty, 0)
        WHERE id_pedido_detalle=:id`,
       { qty: reverted_qty, id: id_pedido_detalle }
     );

@@ -260,6 +260,7 @@ export default function SalidasPage() {
             <SalidaForm
               motivos={motivosValidos}
               bodegaNombre={bodegaNombre}
+              requierePrecioSalida={Number(bodega?.requiere_precio_salida || 0) === 1}
               submitting={submitting}
               onSubmittingChange={setSubmitting}
               onCreated={handleCreated}

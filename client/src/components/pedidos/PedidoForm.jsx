@@ -12,6 +12,7 @@ import { Shortcuts } from '@/hooks/useShortcut.jsx';
 import { useShortcutsStore } from '@/stores/shortcuts.store';
 import { toast } from '@/components/ui/Toast';
 import { pedidosService } from '@/services/pedidos.service';
+import { preventNumberWheel } from '@/utils/inputWheel';
 import './PedidoForm.scss';
 
 const EMPTY_LINE = {
@@ -223,6 +224,7 @@ export function PedidoForm({
           step="0.001"
           inputMode="decimal"
           value={l.cantidad}
+          onWheel={preventNumberWheel}
           onChange={(e) => {
             // Permitimos números decimales (ej. 1.5, 1.25). El navegador
             // ya bloquea caracteres no numéricos con type="number" +
