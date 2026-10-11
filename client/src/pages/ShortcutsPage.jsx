@@ -12,6 +12,7 @@ import {
   SHORTCUT_CATALOG,
 } from '@/utils/shortcuts';
 import { toast } from '@/components/ui/Toast';
+import { RotateCcw, AlertTriangle } from 'lucide-react';
 import './ShortcutsPage.scss';
 
 const CATEGORY_LABELS = {
@@ -188,7 +189,8 @@ export default function ShortcutsPage() {
         actions={
           <div className="shortcuts-page__header-actions">
             <Button variant="ghost" onClick={resetAllClick} disabled={saving}>
-              Restablecer todos
+              <RotateCcw size={14} strokeWidth={1.8} />
+              <span>Restablecer todos</span>
             </Button>
           </div>
         }
@@ -230,7 +232,8 @@ export default function ShortcutsPage() {
                               <KeyboardKey combo={draft} variant="block" />
                               {conflict && (
                                 <span className="shortcuts-page__conflict">
-                                  ⚠ En uso por “{conflict.label}”
+                                  <AlertTriangle size={13} strokeWidth={1.8} />
+                                  <span>En uso por “{conflict.label}”</span>
                                 </span>
                               )}
                               <Button
@@ -301,7 +304,7 @@ export default function ShortcutsPage() {
                             disabled={saving || !customized}
                             title={customized ? 'Restablecer este atajo' : 'Ya está en su valor por defecto'}
                           >
-                            ↺
+                            <RotateCcw size={13} strokeWidth={1.8} />
                           </Button>
                         </>
                       )}

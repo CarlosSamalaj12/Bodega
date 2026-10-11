@@ -88,9 +88,13 @@
       }
 
       &::before {
-        content: '▸';
-        font-size: $font-size-sm;
-        color: $color-text-muted;
+        content: '';
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-top: 2px solid $color-text-muted;
+        border-right: 2px solid $color-text-muted;
+        transform: rotate(45deg);
         margin-right: $space-2;
         transition: transform $transition-base;
         flex-shrink: 0;
@@ -99,7 +103,7 @@
 
     // Cuando está abierto, la flecha rota
     &[open] summary::before {
-      transform: rotate(90deg);
+      transform: rotate(135deg);
     }
   }
 
@@ -122,9 +126,13 @@
     }
 
     &::before {
-      content: '▸';
-      font-size: $font-size-sm;
-      color: $color-text-muted;
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-top: 2px solid $color-text-muted;
+      border-right: 2px solid $color-text-muted;
+      transform: rotate(45deg);
       margin-right: $space-2;
       transition: transform $transition-base;
       flex-shrink: 0;

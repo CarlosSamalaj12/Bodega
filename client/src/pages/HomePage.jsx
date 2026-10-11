@@ -14,6 +14,14 @@ import { entradasService } from '@/services/entradas.service';
 import { salidasService } from '@/services/salidas.service';
 import { pedidosService } from '@/services/pedidos.service';
 import { getSocket } from '@/services/socket';
+import {
+  CheckCircle2,
+  Clock,
+  AlertOctagon,
+  TrendingDown,
+  Coins,
+  Truck,
+} from 'lucide-react';
 import './HomePage.scss';
 
 const DashboardCharts = lazy(() => import('@/components/dashboard/DashboardCharts'));
@@ -117,7 +125,7 @@ export default function HomePage() {
       value: r?.productos_vigentes ?? '—',
       subtitle: `${r?.cantidad_vigente ?? 0} unidades`,
       variant: 'success',
-      icon: '◉',
+      icon: <CheckCircle2 size={18} strokeWidth={1.8} />,
       to: '/productos',
     },
     {
@@ -125,7 +133,7 @@ export default function HomePage() {
       value: r?.productos_proximos ?? '—',
       subtitle: `${r?.cantidad_proxima ?? 0} unidades`,
       variant: 'warning',
-      icon: '◐',
+      icon: <Clock size={18} strokeWidth={1.8} />,
       to: '/productos',
     },
     {
@@ -133,7 +141,7 @@ export default function HomePage() {
       value: r?.productos_vencidos ?? '—',
       subtitle: `${r?.cantidad_vencida ?? 0} unidades`,
       variant: 'danger',
-      icon: '◌',
+      icon: <AlertOctagon size={18} strokeWidth={1.8} />,
       to: '/productos',
     },
     {
@@ -141,7 +149,7 @@ export default function HomePage() {
       value: r?.productos_bajo_minimo ?? '—',
       subtitle: `${r?.productos_proximo_minimo ?? 0} próximo${r?.productos_proximo_minimo === 1 ? '' : 's'}`,
       variant: 'danger',
-      icon: '⬇',
+      icon: <TrendingDown size={18} strokeWidth={1.8} />,
       to: '/productos',
     },
     {
@@ -149,14 +157,14 @@ export default function HomePage() {
       value: r?.total_dinero != null ? Number(r.total_dinero).toLocaleString('es-GT', { minimumFractionDigits: 2 }) : '—',
       subtitle: 'Costo total en existencia',
       variant: 'accent',
-      icon: 'Q',
+      icon: <Coins size={18} strokeWidth={1.8} />,
     },
     {
       title: 'Pedidos x despachar',
       value: pedidosPendientes,
       subtitle: `${pedidosPendientes === 1 ? 'pedido pendiente' : 'pedidos pendientes'}`,
       variant: pedidosPendientes > 0 ? 'warning' : 'success',
-      icon: '⇢',
+      icon: <Truck size={18} strokeWidth={1.8} />,
       to: '/pedidos-despachar',
     },
   ], [r, pedidosPendientes]);

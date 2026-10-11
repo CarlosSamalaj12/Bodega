@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { Button } from './Button';
+import { X } from 'lucide-react';
 import './LinesEditor.scss';
 
 /**
@@ -37,11 +38,13 @@ export function LinesEditor({
 
   return (
     <div className={`lines-editor ${compact ? 'lines-editor--compact' : ''} ${className}`}>
-      <div className="lines-editor__toolbar">
-        <Button type="button" size="sm" variant="subtle" onClick={onAdd}>
-          {addLabel}
-        </Button>
-      </div>
+      {onAdd && (
+        <div className="lines-editor__toolbar">
+          <Button type="button" size="sm" variant="subtle" onClick={onAdd}>
+            {addLabel}
+          </Button>
+        </div>
+      )}
 
       {/* ---------- Desktop: tabla ---------- */}
       {!isMobile && (
@@ -80,7 +83,7 @@ export function LinesEditor({
                         title="Quitar línea"
                         aria-label="Quitar línea"
                       >
-                        ✕
+                        <X size={14} strokeWidth={1.8} />
                       </button>
                     </td>
                   </tr>
@@ -123,7 +126,7 @@ export function LinesEditor({
                     title="Quitar línea"
                     aria-label="Quitar línea"
                   >
-                    ✕
+                    <X size={14} strokeWidth={1.8} />
                   </button>
                 </div>
                 {(() => {

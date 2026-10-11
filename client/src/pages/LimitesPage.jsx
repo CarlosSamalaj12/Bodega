@@ -12,6 +12,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { useForm } from '@/hooks/useForm';
 import api from '@/services/api';
 import { catalogosService } from '@/services/catalogos.service';
+import { Plus, Scale, Pencil } from 'lucide-react';
 import './LimitesPage.scss';
 
 const ORDER_KEY = 'lim-order-v1';
@@ -130,7 +131,12 @@ function LimiteForm({ open, onClose, editingKey, editValues, bodegas, onSaved })
   };
 
   return (
-    <Modal open={open} onClose={() => !submitting && onClose()} title={editingKey ? 'Editar límite' : 'Nuevo límite'}>
+    <Modal
+      open={open}
+      onClose={() => !submitting && onClose()}
+      title={editingKey ? 'Editar límite' : 'Nuevo límite'}
+      icon={<Scale size={20} strokeWidth={1.8} />}
+    >
       <form onSubmit={handleSubmit} className="limites-page__form">
         {error && <div className="limites-page__form-error">{error}</div>}
         <div className="limites-page__form-grid">
@@ -307,7 +313,12 @@ export default function LimitesPage() {
       <Header
         title="Límites Mínimos/Máximos"
         subtitle={`${filtered.length} límite${filtered.length === 1 ? '' : 's'}`}
-        actions={<Button onClick={openCreate}>Nuevo límite</Button>}
+        actions={
+          <Button onClick={openCreate}>
+            <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+            <span>Nuevo límite</span>
+          </Button>
+        }
       />
 
       <div className="limites-page">
@@ -318,9 +329,14 @@ export default function LimitesPage() {
         {loading ? (
           <div className="limites-page__state"><Spinner size={20} label="Cargando límites…" /></div>
         ) : filtered.length === 0 ? (
-          <EmptyState icon="⊟" title={search ? 'Sin resultados' : 'Sin límites'}
+          <EmptyState icon={<Scale size={36} strokeWidth={1.5} />} title={search ? 'Sin resultados' : 'Sin límites'}
             message={search ? 'Intenta con otro término.' : 'Configura límites mínimos y máximos de stock por producto y bodega.'}
-            action={!search ? <Button onClick={openCreate}>Crear límite</Button> : null} />
+            action={!search ? (
+              <Button onClick={openCreate}>
+                <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+                <span>Crear límite</span>
+              </Button>
+            ) : null} />
         ) : (
           <div className="limites-page__list">
             {filtered.map((row) => (
@@ -352,7 +368,9 @@ export default function LimitesPage() {
                   <Button size="sm" variant={Number(row.activo) === 1 ? 'subtle' : 'ghost'} onClick={() => handleToggle(row)} title={Number(row.activo) === 1 ? 'Desactivar' : 'Activar'}>
                     {Number(row.activo) === 1 ? 'Desactivar' : 'Activar'}
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => openEdit(row)} title="Editar">✎</Button>
+                  <Button size="sm" variant="ghost" onClick={() => openEdit(row)} title="Editar">
+                    <Pencil size={14} strokeWidth={1.8} aria-hidden="true" />
+                  </Button>
                 </div>
               </DragItem>
             ))}

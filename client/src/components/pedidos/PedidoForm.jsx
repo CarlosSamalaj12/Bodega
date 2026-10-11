@@ -7,6 +7,7 @@ import { ProductPicker } from '@/components/ui/ProductPicker';
 import { LinesEditor } from '@/components/ui/LinesEditor';
 import { Spinner } from '@/components/ui/Spinner';
 import { Modal } from '@/components/ui/Modal';
+import { ClipboardList } from 'lucide-react';
 import { KeyboardKey, ShortcutHint } from '@/components/ui/KeyboardKey';
 import { Shortcuts } from '@/hooks/useShortcut.jsx';
 import { useShortcutsStore } from '@/stores/shortcuts.store';
@@ -311,6 +312,7 @@ export function PedidoForm({
       open={open}
       onClose={handleClose}
       title="Nuevo pedido"
+      icon={<ClipboardList size={20} strokeWidth={1.8} />}
       size="xl"
       footer={footer}
     >

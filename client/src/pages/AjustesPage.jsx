@@ -8,6 +8,7 @@ import { toast } from '@/components/ui/Toast';
 import { useAuthStore } from '@/stores/auth.store';
 import { usePermission } from '@/components/shared/PermissionGuard';
 import api from '@/services/api';
+import { Building2, SlidersHorizontal, Image as ImageIcon, Keyboard, Save, ArrowRight } from 'lucide-react';
 import './AjustesPage.scss';
 
 export default function AjustesPage() {
@@ -178,7 +179,7 @@ export default function AjustesPage() {
         ) : (
           <>
             {/* === Información de la Bodega === */}
-            <Card header={<h3 className="ajustes-page__section-title">🏢 Información de la Bodega</h3>}>
+            <Card header={<h3 className="ajustes-page__section-title"><Building2 size={16} strokeWidth={1.8} /> <span>Información de la Bodega</span></h3>}>
               <div className="ajustes-page__form">
                 <div className="ajustes-page__field">
                   <label className="ajustes-page__label">Nombre</label>
@@ -213,7 +214,7 @@ export default function AjustesPage() {
             </Card>
 
             {/* === Configuración === */}
-            <Card header={<h3 className="ajustes-page__section-title">⚙️ Configuración de Operaciones</h3>}>
+            <Card header={<h3 className="ajustes-page__section-title"><SlidersHorizontal size={16} strokeWidth={1.8} /> <span>Configuración de Operaciones</span></h3>}>
               <div className="ajustes-page__toggles">
                 <label className="ajustes-page__toggle">
                   <input type="checkbox" className="ajustes-page__checkbox" checked={manejaStock} onChange={(e) => setManejaStock(e.target.checked)} />
@@ -256,12 +257,13 @@ export default function AjustesPage() {
             {/* Botón guardar configuración */}
             <div className="ajustes-page__actions">
               <Button variant="primary" onClick={handleSave} disabled={saving || !nombreBodega.trim()}>
-                {saving ? 'Guardando…' : 'Guardar configuración'}
+                <Save size={15} strokeWidth={1.8} />
+                <span>{saving ? 'Guardando…' : 'Guardar configuración'}</span>
               </Button>
             </div>
 
             {/* === Logo de Bodega === */}
-            <Card header={<h3 className="ajustes-page__section-title">🖼️ Logo de la Bodega</h3>}>
+            <Card header={<h3 className="ajustes-page__section-title"><ImageIcon size={16} strokeWidth={1.8} /> <span>Logo de la Bodega</span></h3>}>
               {!canManageLogo && (
                 <p className="ajustes-page__hint" style={{ marginBottom: '0.75rem' }}>
                   Solo lectura: no tienes permiso para modificar el logo. Pide a un administrador que active el permiso <code>action.manage_warehouse_logo</code>.
@@ -294,14 +296,15 @@ export default function AjustesPage() {
               {canManageLogo && hasLogoChanges && (
                 <div className="ajustes-page__actions" style={{ marginTop: '1rem' }}>
                   <Button variant="primary" onClick={handleSaveLogo} disabled={savingLogo}>
-                    {savingLogo ? 'Guardando…' : 'Guardar logo'}
+                    <Save size={15} strokeWidth={1.8} />
+                    <span>{savingLogo ? 'Guardando…' : 'Guardar logo'}</span>
                   </Button>
                 </div>
               )}
             </Card>
 
             {/* === Atajos de teclado === */}
-            <Card header={<h3 className="ajustes-page__section-title">⌨️ Atajos de teclado</h3>}>
+            <Card header={<h3 className="ajustes-page__section-title"><Keyboard size={16} strokeWidth={1.8} /> <span>Atajos de teclado</span></h3>}>
               <p className="ajustes-page__hint" style={{ marginBottom: '0.75rem' }}>
                 Personaliza los atajos (teclas rápidas) del CRM. F3 guarda
                 formularios, F1 agrega líneas, N abre nuevos movimientos.
@@ -310,7 +313,10 @@ export default function AjustesPage() {
               </p>
               <div className="ajustes-page__actions" style={{ marginTop: '0.5rem' }}>
                 <Link to="/ajustes/atajos">
-                  <Button variant="secondary">Personalizar atajos →</Button>
+                  <Button variant="secondary">
+                    <span>Personalizar atajos</span>
+                    <ArrowRight size={14} strokeWidth={1.8} />
+                  </Button>
                 </Link>
               </div>
             </Card>

@@ -25,6 +25,7 @@ import { printPedidoPos80mm } from '@/utils/print';
 import { PedidoForm } from '@/components/pedidos/PedidoForm';
 import { getSocket } from '@/services/socket';
 import { ConfirmarRecepcionModal } from '@/components/pedidos/ConfirmarRecepcionModal';
+import { Plus, Download, RefreshCw, Printer, Check, CheckCircle2 } from 'lucide-react';
 import './PedidosPage.scss';
 
 // Vistas disponibles en "Realizar pedidos".
@@ -340,9 +341,14 @@ export default function PedidosPage() {
         render: (p) => {
           const est = ESTADO_LABELS[p.estado] || { label: p.estado, variant: 'default' };
           return (
-            <span style={{ display: 'inline-flex', gap: '4px', flexWrap: 'wrap' }}>
+            <span style={{ display: 'inline-flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
               <Badge variant={est.variant}>{est.label}</Badge>
-              {isReceiptConfirmed(p) && <Badge variant="success">✓ Recibido</Badge>}
+              {isReceiptConfirmed(p) && (
+                <Badge variant="success">
+                  <Check size={11} strokeWidth={2.5} style={{ marginRight: 2 }} />
+                  Recibido
+                </Badge>
+              )}
               {needsConfirmation(p) && <Badge variant="warning">Por confirmar</Badge>}
             </span>
           );
@@ -358,7 +364,7 @@ export default function PedidosPage() {
         width: 170,
         sortable: false,
         render: (p) => (
-          <span style={{ display: 'inline-flex', gap: '4px' }}>
+          <span style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
             {needsConfirmation(p) && (
               <button
                 type="button"
@@ -368,9 +374,10 @@ export default function PedidosPage() {
                   handleOpenConfirm(p);
                 }}
                 title="Ver lo despachado y confirmar con tu PIN"
-                style={{ padding: '4px 8px', fontSize: '12px' }}
+                style={{ padding: '4px 8px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
               >
-                ✓ Confirmar
+                <Check size={13} strokeWidth={2} />
+                <span>Confirmar</span>
               </button>
             )}
             <button
@@ -381,9 +388,10 @@ export default function PedidosPage() {
                 handleImprimirPedido(p);
               }}
               title="Imprimir ticket"
-              style={{ padding: '4px 8px', fontSize: '12px' }}
+              style={{ padding: '4px 8px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
             >
-              🖨 Imprimir
+              <Printer size={13} strokeWidth={1.8} />
+              <span>Imprimir</span>
             </button>
           </span>
         ),
@@ -438,7 +446,8 @@ export default function PedidosPage() {
           <div className="pedidos-page__actions">
             {!isMobile && pedidosSorted.length > 0 && (
               <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-                Exportar CSV
+                <Download size={15} strokeWidth={1.8} aria-hidden="true" />
+                <span>Exportar</span>
               </Button>
             )}
             <Button
@@ -447,7 +456,8 @@ export default function PedidosPage() {
               onClick={loadPedidos}
               title={refreshCombo ? `Refrescar (${refreshCombo})` : 'Refrescar'}
             >
-              Refrescar
+              <RefreshCw size={15} strokeWidth={1.8} aria-hidden="true" />
+              <span>Refrescar</span>
               {refreshCombo && <KeyboardKey combo={refreshCombo} />}
             </Button>
             {canCreate && (
@@ -456,7 +466,8 @@ export default function PedidosPage() {
                 onClick={() => setModalOpen(true)}
                 title={newCombo ? `Nuevo pedido (${newCombo})` : 'Nuevo pedido'}
               >
-                + Nuevo pedido
+                <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+                <span>Nuevo pedido</span>
                 {newCombo && <KeyboardKey combo={newCombo} />}
               </Button>
             )}
@@ -477,7 +488,7 @@ export default function PedidosPage() {
             <li>Agrega las <strong>líneas</strong> con producto y cantidad.</li>
             <li>Envía — el surtidor recibe la solicitud en su panel.</li>
             <li>El estado pasa de <em>Pendiente</em> a <em>Parcial</em>/<em>Completado</em> cuando surten.</li>
-            <li>Si la bodega lo exige, al recibir revisas el <strong>detalle despachado</strong> y confirmas con tu <strong>PIN</strong> (botón <em>✓ Confirmar</em>).</li>
+            <li>Si la bodega lo exige, al recibir revisas el <strong>detalle despachado</strong> y confirmas con tu <strong>PIN</strong> (botón <em>Confirmar</em>).</li>
           </ol>
         </Card>
 
@@ -622,7 +633,8 @@ export default function PedidosPage() {
       <Modal
         open={!!createdPedido}
         onClose={handleDismissCreated}
-        title="✅ Pedido creado"
+        title="Pedido creado"
+        icon={<CheckCircle2 size={20} strokeWidth={1.8} />}
         size="sm"
       >
         <div style={{ textAlign: 'center', padding: '1rem 0' }}>
@@ -631,7 +643,8 @@ export default function PedidosPage() {
           </p>
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
             <Button variant="primary" onClick={handlePrintPedido}>
-              🖨 Imprimir ticket (80mm)
+              <Printer size={15} strokeWidth={1.8} aria-hidden="true" />
+              <span>Imprimir ticket (80mm)</span>
             </Button>
             <Button variant="ghost" onClick={handleDismissCreated}>
               Cerrar

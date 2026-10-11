@@ -16,6 +16,7 @@ import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import { formatDate } from '@/utils/format';
 import { catalogosService } from '@/services/catalogos.service';
 import api from '@/services/api';
+import { Download, RefreshCw, ArrowDownToLine, ChevronRight } from 'lucide-react';
 import './ReporteEntradasPage.scss';
 
 const RANGE_PRESETS = [
@@ -365,11 +366,13 @@ export default function ReporteEntradasPage() {
             <div className="reporte-entradas__header-actions">
               {!isMobile && (
                 <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-                  Exportar
+                  <Download size={14} strokeWidth={1.8} />
+                  <span>Exportar</span>
                 </Button>
               )}
               <Button variant="ghost" size="sm" onClick={fetchData} disabled={loading}>
-                Refrescar
+                <RefreshCw size={14} strokeWidth={1.8} />
+                <span>Refrescar</span>
               </Button>
             </div>
           ) : undefined
@@ -463,7 +466,7 @@ export default function ReporteEntradasPage() {
         {loading ? (
           <div className="reporte-entradas__state"><Spinner size={20} label="Cargando reporte…" /></div>        ) : grouped.length === 0 ? (
           <EmptyState
-            icon="⇣"
+            icon={<ArrowDownToLine size={36} strokeWidth={1.5} />}
             title="Sin datos"
             message="No hay entradas en el período seleccionado." />
         ) : (
@@ -493,7 +496,7 @@ export default function ReporteEntradasPage() {
                     <tr key={`ent-${g.id_movimiento}`} className="reporte-entradas__mov-row">
                       <td>
                         <button type="button" className="reporte-entradas__expand-btn" onClick={() => toggleExpand(g.id_movimiento)}>
-                          <span className={`reporte-entradas__chevron ${isOpen ? 'reporte-entradas__chevron--open' : ''}`}>▸</span>
+                          <ChevronRight size={14} strokeWidth={1.8} className={`reporte-entradas__chevron ${isOpen ? 'reporte-entradas__chevron--open' : ''}`} />
                         </button>
                       </td>
                       <td><code>#{g.id_movimiento}</code></td>

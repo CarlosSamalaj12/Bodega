@@ -11,6 +11,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { useForm } from '@/hooks/useForm';
 import api from '@/services/api';
 import { catalogosService } from '@/services/catalogos.service';
+import { Plus, SlidersHorizontal, Pencil } from 'lucide-react';
 import './MotivosPage.scss';
 
 const ORDER_KEY = 'mot-order-v1';
@@ -108,7 +109,12 @@ function MotivoForm({ open, onClose, editingId, editValues, onSaved }) {
   }, [open, editingId]);
 
   return (
-    <Modal open={open} onClose={() => !submitting && onClose()} title={editingId ? 'Editar motivo' : 'Nuevo motivo'}>
+    <Modal
+      open={open}
+      onClose={() => !submitting && onClose()}
+      title={editingId ? 'Editar motivo' : 'Nuevo motivo'}
+      icon={<SlidersHorizontal size={20} strokeWidth={1.8} />}
+    >
       <form onSubmit={handleSubmit} className="motivos-page__form">
         {error && <div className="motivos-page__form-error">{error}</div>}
         <div className="motivos-page__field">
@@ -228,7 +234,12 @@ export default function MotivosPage() {
       <Header
         title="Motivos de movimiento"
         subtitle={`${items.length} motivo${items.length === 1 ? '' : 's'}`}
-        actions={<Button onClick={openCreate}>Nuevo motivo</Button>}
+        actions={
+          <Button onClick={openCreate}>
+            <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+            <span>Nuevo motivo</span>
+          </Button>
+        }
       />
 
       <div className="motivos-page">
@@ -239,9 +250,14 @@ export default function MotivosPage() {
         {loading ? (
           <div className="motivos-page__state"><Spinner size={20} label="Cargando motivos…" /></div>
         ) : filtered.length === 0 ? (
-          <EmptyState icon="◐" title={search ? 'Sin resultados' : 'Sin motivos'}
+          <EmptyState icon={<SlidersHorizontal size={36} strokeWidth={1.5} />} title={search ? 'Sin resultados' : 'Sin motivos'}
             message={search ? 'Intenta con otro término.' : 'Agrega el primer motivo.'}
-            action={!search ? <Button onClick={openCreate}>Crear motivo</Button> : null} />
+            action={!search ? (
+              <Button onClick={openCreate}>
+                <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+                <span>Crear motivo</span>
+              </Button>
+            ) : null} />
         ) : (
           <div className="motivos-page__list">
             {filtered.map((row) => (
@@ -260,7 +276,9 @@ export default function MotivosPage() {
                   <Button size="sm" variant={Number(row.activo) === 1 ? 'subtle' : 'ghost'} onClick={() => handleToggle(row)} title={Number(row.activo) === 1 ? 'Desactivar' : 'Activar'}>
                     {Number(row.activo) === 1 ? 'Desactivar' : 'Activar'}
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => openEdit(row)} title="Editar">✎</Button>
+                  <Button size="sm" variant="ghost" onClick={() => openEdit(row)} title="Editar">
+                    <Pencil size={14} strokeWidth={1.8} aria-hidden="true" />
+                  </Button>
                 </div>
               </DragItem>
             ))}

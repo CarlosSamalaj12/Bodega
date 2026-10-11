@@ -19,6 +19,7 @@ import { formatDate } from '@/utils/format';
 import { catalogosService } from '@/services/catalogos.service';
 import api from '@/services/api';
 import { getSocket } from '@/services/socket';
+import { Lock, History, Printer, RefreshCw, Download, Eye, ArrowLeft, Clock, AlertTriangle, FileText } from 'lucide-react';
 import './CorteDiarioPage.scss';
 
 export default function CorteDiarioPage() {
@@ -421,8 +422,9 @@ export default function CorteDiarioPage() {
               </span>
             )}
             {errMsg ? (
-              <span style={{ fontSize: '10px', color: '#dc3545', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                ⚠ {errMsg}
+              <span style={{ fontSize: '10px', color: '#dc3545', fontWeight: 'bold', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                <AlertTriangle size={11} strokeWidth={2} />
+                <span>{errMsg}</span>
               </span>
             ) : diff != null ? (
               <span style={{
@@ -603,9 +605,12 @@ export default function CorteDiarioPage() {
           <div className="corte-diario__header-actions">
             {canCierre && cierreStatus && !cierreStatus.today_closed && (
               <Button size="sm" variant="primary" onClick={handleCerrarDia}>
-                🔒 {cierreStatus.required_close_date
-                  ? `Cerrar ${formatDate(cierreStatus.required_close_date)}`
-                  : 'Cerrar día'}
+                <Lock size={14} strokeWidth={1.8} />
+                <span>
+                  {cierreStatus.required_close_date
+                    ? `Cerrar ${formatDate(cierreStatus.required_close_date)}`
+                    : 'Cerrar día'}
+                </span>
                 {cierreStatus.days_missing > 1 && (
                   <span style={{ marginLeft: '6px', opacity: 0.85, fontWeight: 400 }}>
                     ({cierreStatus.days_missing} pendientes)
@@ -614,17 +619,21 @@ export default function CorteDiarioPage() {
               </Button>
             )}
             <Button variant="ghost" size="sm" onClick={openHistorial} title="Ver cierres guardados de días anteriores">
-              📜 Historial
+              <History size={14} strokeWidth={1.8} />
+              <span>Historial</span>
             </Button>
             <Button variant="ghost" size="sm" disabled={loading || !data} onClick={handlePrint} title={reportDate ? `Imprimir el corte de ${formatDate(reportDate)}` : 'Imprimir este corte'}>
-              🖨️ Imprimir
+              <Printer size={14} strokeWidth={1.8} />
+              <span>Imprimir</span>
             </Button>
             <Button variant="ghost" size="sm" disabled={loading} onClick={fetchData}>
-              ↻ Refrescar
+              <RefreshCw size={14} strokeWidth={1.8} />
+              <span>Refrescar</span>
             </Button>
             {rows.length > 0 && (
               <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-                Exportar
+                <Download size={14} strokeWidth={1.8} />
+                <span>Exportar</span>
               </Button>
             )}
           </div>
@@ -675,7 +684,9 @@ export default function CorteDiarioPage() {
         {canCierre && cierreStatus && cierreStatus.days_missing > 0 && (
           <Card compact style={{ border: '2px solid #ffc107', background: '#fffbf0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '22px' }}>⚠️</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', color: '#856404' }}>
+                <AlertTriangle size={22} strokeWidth={1.8} />
+              </span>
               <div>
                 <strong style={{ color: '#856404' }}>
                   {cierreStatus.days_missing === 1
@@ -764,6 +775,7 @@ export default function CorteDiarioPage() {
         open={cierreModalOpen}
         onClose={() => !cierreConfirming && setCierreModalOpen(false)}
         title="Cerrar el día"
+        icon={<Lock size={20} strokeWidth={1.8} />}
         size="sm"
       >
         <div className="corte-diario__cierre-modal">
@@ -775,7 +787,10 @@ export default function CorteDiarioPage() {
               borderRadius: '6px',
               marginBottom: '16px'
             }}>
-              <strong style={{ color: '#dc3545' }}>⚠ Hay conteos inválidos</strong>
+              <strong style={{ color: '#dc3545', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <AlertTriangle size={14} strokeWidth={1.8} />
+                <span>Hay conteos inválidos</span>
+              </strong>
               <p style={{ margin: '8px 0 0', fontSize: '13px', color: '#721c24' }}>
                 {conteosConError} producto(s) tienen un conteo final inválido (negativo o mayor a la existencia actual). Estos productos se muestran resaltados en rojo en la tabla.
               </p>
@@ -785,14 +800,17 @@ export default function CorteDiarioPage() {
             <strong>¿Estás seguro de cerrar el día {formatDate(cierreStatus?.required_close_date || cierreStatus?.hoy)}?</strong>
           </p>
           {cierreStatus && cierreStatus.days_missing > 1 && (
-            <p style={{ marginTop: '4px', fontSize: '13px', color: '#856404' }}>
-              ⚠️ Después de este cierre,{' '}
-              <strong>
-                {cierreStatus.days_missing - 1 === 1
-                  ? `te quedará 1 día más por cerrar: ${formatDate(cierreStatus.next_pending_date)}`
-                  : `te quedarán ${cierreStatus.days_missing - 1} días más por cerrar (próximo: ${formatDate(cierreStatus.next_pending_date)})`}
-              </strong>
-              . Cada cierre debe hacerse en orden, del más antiguo al más reciente.
+            <p style={{ marginTop: '4px', fontSize: '13px', color: '#856404', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <AlertTriangle size={14} strokeWidth={1.8} />
+              <span>
+                Después de este cierre,{' '}
+                <strong>
+                  {cierreStatus.days_missing - 1 === 1
+                    ? `te quedará 1 día más por cerrar: ${formatDate(cierreStatus.next_pending_date)}`
+                    : `te quedarán ${cierreStatus.days_missing - 1} días más por cerrar (próximo: ${formatDate(cierreStatus.next_pending_date)})`}
+                </strong>
+                . Cada cierre debe hacerse en orden, del más antiguo al más reciente.
+              </span>
             </p>
           )}
           <p>Este proceso no podrá revertirse. Una vez cerrado el día:</p>
@@ -855,6 +873,7 @@ export default function CorteDiarioPage() {
         open={historialOpen && !detalleCierre && !detalleLoading}
         onClose={() => setHistorialOpen(false)}
         title="Historial de cierres"
+        icon={<History size={20} strokeWidth={1.8} />}
         subtitle="Cierres de días anteriores guardados en el sistema"
         size="xl"
       >
@@ -863,7 +882,7 @@ export default function CorteDiarioPage() {
             <Spinner size={18} label="Cargando cierres…" />
           ) : historialRows.length === 0 ? (
             <EmptyState
-              icon="◷"
+              icon={<Clock size={36} strokeWidth={1.5} />}
               title="Sin cierres guardados"
               message="Aún no se ha realizado ningún cierre de día para esta bodega."
             />
@@ -905,10 +924,11 @@ export default function CorteDiarioPage() {
                       <td>
                         <div className="corte-diario__historial-actions">
                           <Button size="sm" variant="ghost" onClick={() => openDetalleCierre(c)} title="Ver detalle">
-                            👁 Ver
+                            <Eye size={13} strokeWidth={1.8} />
+                            <span>Ver</span>
                           </Button>
                           <Button size="sm" variant="ghost" onClick={() => handlePrintCierre(c)} title="Reimprimir este corte">
-                            🖨
+                            <Printer size={13} strokeWidth={1.8} />
                           </Button>
                         </div>
                       </td>
@@ -926,6 +946,7 @@ export default function CorteDiarioPage() {
         open={(detalleCierre != null || detalleLoading) && historialOpen}
         onClose={() => { setDetalleCierre(null); setHistorialOpen(false); }}
         title={detalleCierre ? `Cierre del ${formatDate(detalleCierre.cierre.fecha_cierre)}` : 'Cargando detalle…'}
+        icon={<FileText size={20} strokeWidth={1.8} />}
         subtitle={detalleCierre ? `${detalleCierre.cierre.nombre_bodega} · cerrado por ${detalleCierre.cierre.creado_por || '—'} · origen: ${detalleCierre.cierre.origen || '—'}` : ''}
         size="xl"
       >
@@ -935,9 +956,18 @@ export default function CorteDiarioPage() {
           ) : detalleCierre ? (
             <>
               <div className="corte-diario__detalle-actions">
-                <Button size="sm" variant="ghost" onClick={() => setDetalleCierre(null)}>← Volver al historial</Button>
-                <Button size="sm" variant="ghost" onClick={() => handlePrintCierre({ fecha_cierre: detalleCierre.cierre.fecha_cierre })}>🖨️ Imprimir</Button>
-                <Button size="sm" variant="ghost" onClick={handleExportCierre}>📥 Exportar CSV</Button>
+                <Button size="sm" variant="ghost" onClick={() => setDetalleCierre(null)}>
+                  <ArrowLeft size={14} strokeWidth={1.8} />
+                  <span>Volver al historial</span>
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => handlePrintCierre({ fecha_cierre: detalleCierre.cierre.fecha_cierre })}>
+                  <Printer size={14} strokeWidth={1.8} />
+                  <span>Imprimir</span>
+                </Button>
+                <Button size="sm" variant="ghost" onClick={handleExportCierre}>
+                  <Download size={14} strokeWidth={1.8} />
+                  <span>Exportar CSV</span>
+                </Button>
               </div>
               {detalleCierre.cierre.observaciones && (
                 <div className="corte-diario__obs">Observaciones: {detalleCierre.cierre.observaciones}</div>

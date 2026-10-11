@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input';
 import { toast } from '@/components/ui/Toast';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { formatDate } from '@/utils/format';
+import { Plus, ClipboardCheck, Eye } from 'lucide-react';
 import api from '@/services/api';
 import './ConteoCiclicoPage.scss';
 
@@ -197,7 +198,8 @@ export default function ConteoCiclicoPage() {
         subtitle={`${conteos.length} conteo${conteos.length === 1 ? '' : 's'}`}
         actions={
           <Button variant="primary" size="sm" onClick={openCreate}>
-            + Nuevo conteo
+            <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+            <span>Nuevo conteo</span>
           </Button>
         }
       />
@@ -206,7 +208,11 @@ export default function ConteoCiclicoPage() {
         {loading ? (
           <div className="conteo-ciclico-page__state"><Spinner size={20} label="Cargando conteos…" /></div>
         ) : conteos.length === 0 ? (
-          <EmptyState icon="📋" title="Sin conteos" message="No hay conteos cíclicos aún. Crea uno nuevo para comenzar." />
+          <EmptyState
+            icon={<ClipboardCheck size={36} strokeWidth={1.5} />}
+            title="Sin conteos"
+            message="No hay conteos cíclicos aún. Crea uno nuevo para comenzar."
+          />
         ) : (
           <div className="conteo-ciclico-page__table-wrapper">
             <table className="table">
@@ -234,7 +240,8 @@ export default function ConteoCiclicoPage() {
                     <td className="conteo-ciclico-page__user">{c.creado_por_nombre || '—'}</td>
                     <td>
                       <Button variant="ghost" size="sm" onClick={() => openDetail(c.id_conteo)}>
-                        Ver
+                        <Eye size={14} strokeWidth={1.8} aria-hidden="true" />
+                        <span>Ver</span>
                       </Button>
                     </td>
                   </tr>
@@ -250,6 +257,7 @@ export default function ConteoCiclicoPage() {
         open={showCreate}
         onClose={() => setShowCreate(false)}
         title="Nuevo conteo cíclico"
+        icon={<ClipboardCheck size={20} strokeWidth={1.8} />}
         size="md"
         footer={
           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
@@ -288,6 +296,7 @@ export default function ConteoCiclicoPage() {
             ? `Conteo #${selectedConteo.id_conteo} — ${selectedConteo.nombre_bodega}`
             : 'Detalle del conteo'
         }
+        icon={<ClipboardCheck size={20} strokeWidth={1.8} />}
         size="xl"
         footer={
           selectedConteo && (

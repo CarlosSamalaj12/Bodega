@@ -1,8 +1,21 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
+import { X } from 'lucide-react';
 
-export function Modal({ open, onClose, title, size = 'md', footer, children }) {
+export function Modal({
+  open,
+  onClose,
+  title,
+  subtitle,
+  icon,
+  headerActions,
+  hideHeader = false,
+  className = '',
+  size = 'md',
+  footer,
+  children,
+}) {
   // Bloquea scroll del body mientras el modal está abierto
   useEffect(() => {
     if (!open) return;
@@ -44,23 +57,34 @@ export function Modal({ open, onClose, title, size = 'md', footer, children }) {
       {/* Se quita el onClick={onClose} para evitar que el modal se cierre al hacer clic fuera por accidente */}
       <div className="modal-backdrop" aria-hidden="true" />
       <div
-        className={`modal ${sizeClass}`}
+        className={`modal ${sizeClass} ${className}`.trim()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="modal__header">
-          <h2 id="modal-title" className="modal__title">{title}</h2>
-          <button
-            type="button"
-            className="modal__close"
-            onClick={onClose}
-            aria-label="Cerrar"
-          >
-            ✕
-          </button>
-        </div>
+        {!hideHeader && (
+          <div className="modal__header">
+            <div className="modal__header-left">
+              {icon && <div className="modal__icon">{icon}</div>}
+              <div>
+                <h2 id="modal-title" className="modal__title">{title}</h2>
+                {subtitle && <p className="modal__subtitle">{subtitle}</p>}
+              </div>
+            </div>
+            <div className="modal__header-actions">
+              {headerActions}
+              <button
+                type="button"
+                className="modal__close"
+                onClick={onClose}
+                aria-label="Cerrar"
+              >
+                <X size={18} strokeWidth={1.8} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+        )}
         <div className="modal__body">{children}</div>
         {footer && <div className="modal__footer">{footer}</div>}
       </div>
@@ -73,6 +97,11 @@ Modal.propTypes = {
   open: PropTypes.bool,
   onClose: PropTypes.func,
   title: PropTypes.node,
+  subtitle: PropTypes.node,
+  icon: PropTypes.node,
+  headerActions: PropTypes.node,
+  hideHeader: PropTypes.bool,
+  className: PropTypes.string,
   size: PropTypes.oneOf(['md', 'lg', 'xl']),
   footer: PropTypes.node,
   children: PropTypes.node,

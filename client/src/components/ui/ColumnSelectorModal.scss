@@ -218,12 +218,13 @@
       position: relative;
 
       &::after {
-        content: '✓';
+        content: '';
         display: block;
-        color: $color-text-inverse;
-        font-size: 12px;
-        font-weight: $font-weight-bold;
-        line-height: 1;
+        width: 4px;
+        height: 8px;
+        border: solid $color-text-inverse;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg) translate(-1px, -1px);
       }
     }
 

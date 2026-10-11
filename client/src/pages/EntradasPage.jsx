@@ -19,6 +19,7 @@ import { MovimientoDetailModal } from '@/components/shared/MovimientoDetailModal
 import { MovimientosListTable } from '@/components/shared/MovimientosListTable';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { PinModal } from '@/components/ui/PinModal';
+import { Plus, Download, ArrowDownToLine } from 'lucide-react';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import './EntradasPage.scss';
 
@@ -146,7 +147,8 @@ export default function EntradasPage() {
         actions={
           <div className="entradas-page__header-actions">
             <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-              Exportar
+              <Download size={15} strokeWidth={1.8} aria-hidden="true" />
+              <span>Exportar</span>
             </Button>
             {canCreate && (
               <Button
@@ -154,7 +156,8 @@ export default function EntradasPage() {
                 onClick={() => setModalOpen(true)}
                 title={newCombo ? `Nueva entrada (${newCombo})` : 'Nueva entrada'}
               >
-                + Nueva entrada
+                <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+                <span>Nueva entrada</span>
                 {newCombo && <KeyboardKey combo={newCombo} />}
               </Button>
             )}
@@ -250,6 +253,7 @@ export default function EntradasPage() {
         open={modalOpen}
         onClose={() => !submitting && setModalOpen(false)}
         title="Nueva entrada"
+        icon={<ArrowDownToLine size={20} strokeWidth={1.8} />}
         size="xl"
       >
         {catalogError ? (

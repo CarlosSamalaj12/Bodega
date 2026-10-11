@@ -11,6 +11,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { useForm } from '@/hooks/useForm';
 import api from '@/services/api';
 import { catalogosService } from '@/services/catalogos.service';
+import { Plus, Clock, Pencil } from 'lucide-react';
 import './ReglasSubcategoriasPage.scss';
 
 const ORDER_KEY = 'reglas-order-v1';
@@ -112,7 +113,12 @@ function ReglaForm({ open, onClose, editingId, editValues, subcategorias, onSave
   }, [subcategorias, editingId]);
 
   return (
-    <Modal open={open} onClose={() => !submitting && onClose()} title={editingId ? 'Editar regla' : 'Nueva regla'}>
+    <Modal
+      open={open}
+      onClose={() => !submitting && onClose()}
+      title={editingId ? 'Editar regla' : 'Nueva regla'}
+      icon={<Clock size={20} strokeWidth={1.8} />}
+    >
       <form onSubmit={handleSubmit} className="reglas-page__form">
         {error && <div className="reglas-page__form-error">{error}</div>}
         <div className="reglas-page__form-grid">
@@ -281,7 +287,12 @@ export default function ReglasSubcategoriasPage() {
       <Header
         title="Reglas de Subcategorías"
         subtitle={`${filtered.length} regla${filtered.length === 1 ? '' : 's'}`}
-        actions={<Button onClick={openCreate}>Nueva regla</Button>}
+        actions={(
+          <Button onClick={openCreate}>
+            <Plus size={16} strokeWidth={1.8} />
+            <span>Nueva regla</span>
+          </Button>
+        )}
       />
 
       <div className="reglas-page">
@@ -292,9 +303,17 @@ export default function ReglasSubcategoriasPage() {
         {loading ? (
           <div className="reglas-page__state"><Spinner size={20} label="Cargando reglas…" /></div>
         ) : filtered.length === 0 ? (
-          <EmptyState icon="⚙" title={search ? 'Sin resultados' : 'Sin reglas'}
+          <EmptyState
+            icon={<Clock size={36} strokeWidth={1.5} />}
+            title={search ? 'Sin resultados' : 'Sin reglas'}
             message={search ? 'Intenta con otro término.' : 'Crea reglas para controlar días de vida y alertas por subcategoría.'}
-            action={!search ? <Button onClick={openCreate}>Crear regla</Button> : null} />
+            action={!search ? (
+              <Button onClick={openCreate}>
+                <Plus size={15} strokeWidth={1.8} />
+                <span>Crear regla</span>
+              </Button>
+            ) : null}
+          />
         ) : (
           <div className="reglas-page__list">
             {filtered.map((row) => (
@@ -332,7 +351,9 @@ export default function ReglasSubcategoriasPage() {
                   <Button size="sm" variant={Number(row.activo) === 1 ? 'subtle' : 'ghost'} onClick={() => handleToggle(row)} title={Number(row.activo) === 1 ? 'Desactivar' : 'Activar'}>
                     {Number(row.activo) === 1 ? 'Desactivar' : 'Activar'}
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => openEdit(row)} title="Editar">✎</Button>
+                  <Button size="sm" variant="ghost" onClick={() => openEdit(row)} title="Editar">
+                    <Pencil size={14} strokeWidth={1.8} />
+                  </Button>
                 </div>
               </DragItem>
             ))}

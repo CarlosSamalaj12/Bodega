@@ -17,6 +17,7 @@ import { catalogosService } from '@/services/catalogos.service';
 import { useAuthStore } from '@/stores/auth.store';
 import { hasPermission } from '@/utils/permissions';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Plus, Download, RefreshCw, Package, Pencil } from 'lucide-react';
 import './ProductosPage.scss';
 
 const ORDER_KEY = 'prod-order-v1';
@@ -291,13 +292,20 @@ export default function ProductosPage() {
             {refreshing && <Spinner size={14} />}
             {ordered.length > 0 && (
               <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-                Exportar CSV
+                <Download size={15} strokeWidth={1.8} aria-hidden="true" />
+                <span>Exportar</span>
               </Button>
             )}
             <Button variant="ghost" size="sm" onClick={() => fetchProductos(true)}>
-              Refrescar
+              <RefreshCw size={15} strokeWidth={1.8} className={refreshing ? 'spin' : ''} aria-hidden="true" />
+              <span>Refrescar</span>
             </Button>
-            {canCreate && <Button size={isMobile ? 'sm' : 'md'} onClick={handleCreate}>Nuevo producto</Button>}
+            {canCreate && (
+              <Button size={isMobile ? 'sm' : 'md'} onClick={handleCreate}>
+                <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+                <span>Nuevo producto</span>
+              </Button>
+            )}
           </div>
         }
       />
@@ -332,7 +340,7 @@ export default function ProductosPage() {
           <div className="productos-page__loading"><Spinner size={20} label="Cargando productos…" /></div>
         ) : ordered.length === 0 ? (
           <EmptyState
-            icon="◧"
+            icon={<Package size={36} strokeWidth={1.5} />}
             title="Sin productos"
             message="No se encontraron productos con los filtros aplicados."
             action={canEdit ? <Button onClick={handleCreate}>Crear primer producto</Button> : null}
@@ -377,7 +385,9 @@ export default function ProductosPage() {
                   </div>
                   <div className="productos-page__item-actions">
                     {canEdit && (
-                      <Button size="sm" variant="ghost" onClick={() => handleEdit(row)} title="Editar">✎</Button>
+                      <Button size="sm" variant="ghost" onClick={() => handleEdit(row)} title="Editar">
+                        <Pencil size={14} strokeWidth={1.8} aria-hidden="true" />
+                      </Button>
                     )}
                     {Boolean(user?.id_warehouse) && Number(row.visible_en_bodega_usuario) === 0 && (
                       <Button size="sm" variant="subtle" onClick={() => handleToggleVisibilidad(row, true)} title="Hacer visible en tu bodega">Mostrar</Button>
@@ -433,6 +443,7 @@ export default function ProductosPage() {
         open={modalOpen}
         onClose={() => !submitting && setModalOpen(false)}
         title={editing ? 'Editar producto' : 'Nuevo producto'}
+        icon={<Package size={20} strokeWidth={1.8} />}
         size="lg"
       >
         <ProductoForm

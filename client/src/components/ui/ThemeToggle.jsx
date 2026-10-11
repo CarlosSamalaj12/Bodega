@@ -1,3 +1,4 @@
+import { Moon, Sun } from 'lucide-react';
 import { useThemeStore } from '@/stores/theme.store';
 import './ThemeToggle.scss';
 
@@ -16,7 +17,11 @@ export function ThemeToggle() {
     >
       <span className="theme-toggle__track">
         <span className={`theme-toggle__thumb ${isDark ? '' : 'theme-toggle__thumb--light'}`}>
-          {isDark ? '🌙' : '☀'}
+          {isDark ? (
+            <Moon size={12} strokeWidth={2} aria-hidden="true" />
+          ) : (
+            <Sun size={12} strokeWidth={2} aria-hidden="true" />
+          )}
         </span>
       </span>
     </button>

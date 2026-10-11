@@ -8,6 +8,7 @@ import { ProductPicker } from '@/components/ui/ProductPicker';
 import { toast } from '@/components/ui/Toast';
 import api from '@/services/api';
 import { catalogosService } from '@/services/catalogos.service';
+import { Search, FileText, TrendingUp, BarChart3 } from 'lucide-react';
 import './TendenciaProductoPage.scss';
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -480,11 +481,13 @@ export default function TendenciaProductoPage() {
 
             <div className="tendencia__filter-group tendencia__filter-group--action">
               <Button variant="primary" onClick={handleSearch} disabled={loading || !selectedProduct}>
-                {loading ? 'Buscando…' : '🔍 Buscar'}
+                <Search size={15} strokeWidth={1.8} />
+                <span>{loading ? 'Buscando…' : 'Buscar'}</span>
               </Button>
               {data && !loading && (
                 <Button variant="ghost" size="sm" onClick={handleExportPdf}>
-                  📄 PDF
+                  <FileText size={15} strokeWidth={1.8} />
+                  <span>PDF</span>
                 </Button>
               )}
             </div>
@@ -700,7 +703,7 @@ export default function TendenciaProductoPage() {
         {/* ── Empty state (searched but no data) ── */}
         {!loading && searched && !data && (
           <EmptyState
-            icon="📈"
+            icon={<TrendingUp size={36} strokeWidth={1.5} />}
             title="Sin resultados"
             message="No se encontraron datos de tendencia para el producto y filtros seleccionados."
           />
@@ -709,7 +712,7 @@ export default function TendenciaProductoPage() {
         {/* ── Initial state ── */}
         {!loading && !searched && !data && (
           <EmptyState
-            icon="📊"
+            icon={<BarChart3 size={36} strokeWidth={1.5} />}
             title="Tendencia de Producto"
             message="Selecciona un producto, ajusta los filtros y presiona Buscar para ver su evolución de precios y demanda."
           />

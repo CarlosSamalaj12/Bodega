@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { create } from 'zustand';
 import { createPortal } from 'react-dom';
+import { X } from 'lucide-react';
 import './Toast.scss';
 
 // Store global de toasts
@@ -66,7 +67,9 @@ export function ToastContainer() {
                 e.stopPropagation();
                 dismiss(t.id);
               }}
-            >✕</button>
+            >
+              <X size={13} strokeWidth={1.8} />
+            </button>
           </div>
         );
       })}

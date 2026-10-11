@@ -4,6 +4,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
 import { formatDate } from '@/utils/format';
 import { getSocket } from '@/services/socket';
+import { ChevronRight, RotateCcw, Check } from 'lucide-react';
 import './MovimientosListTable.scss';
 
 /**
@@ -321,7 +322,8 @@ export function MovimientosListTable({
             onClick={onToggleAnulados}
             title={showAnulados ? 'Ocultar anulados' : 'Mostrar anulados'}
           >
-            {showAnulados ? '✓' : ''} Anulados
+            {showAnulados && <Check size={12} strokeWidth={2.5} aria-hidden="true" />}
+            <span>Anulados</span>
           </button>
         )}
       </div>
@@ -374,7 +376,12 @@ export function MovimientosListTable({
                   >
                     <td onClick={(e) => { e.stopPropagation(); toggleExpand(g.id_movimiento); }}>
                       <button type="button" className="mov-list__expand-btn" aria-label={isOpen ? 'Contraer' : 'Expandir'}>
-                        <span className={`mov-list__chevron ${isOpen ? 'mov-list__chevron--open' : ''}`}>▸</span>
+                        <ChevronRight
+                          size={15}
+                          strokeWidth={2}
+                          className={`mov-list__chevron ${isOpen ? 'mov-list__chevron--open' : ''}`}
+                          aria-hidden="true"
+                        />
                       </button>
                     </td>
                     <td><code>#{g.id_movimiento}</code></td>
@@ -397,7 +404,7 @@ export function MovimientosListTable({
                           onClick={() => onRevertClick(g.id_movimiento)}
                           title={`Revertir ${tipoLabel.toLowerCase()}`}
                         >
-                          ↩
+                          <RotateCcw size={13} strokeWidth={1.8} aria-hidden="true" />
                         </Button>
                       )}
                       {isAnulado && <span className="mov-list__anulado" title="Movimiento anulado">Anulado</span>}

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
 import { Spinner } from '@/components/ui/Spinner';
 import { useProductSearch } from '@/hooks/useProductSearch';
+import { X } from 'lucide-react';
 import './ProductPicker.scss';
 
 /**
@@ -200,7 +201,7 @@ export function ProductPicker({
                 aria-label="Cambiar producto"
                 title="Cambiar producto"
               >
-                ✕
+                <X size={14} strokeWidth={1.8} />
               </button>
             )}
           </div>
@@ -350,7 +351,7 @@ export function ProductPicker({
               aria-label="Limpiar búsqueda"
               title="Limpiar"
             >
-              ✕
+              <X size={14} strokeWidth={1.8} />
             </button>
           )}
         </div>

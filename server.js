@@ -2442,6 +2442,45 @@ ensureConteoCiclicoTables().catch((e) => {
   console.error("No se pudo crear tablas de conteo ciclico:", e);
 });
 
+async function ensureMotivosJustificacionTable() {
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS motivos_justificacion (
+      id_motivo_justificacion INT NOT NULL AUTO_INCREMENT,
+      texto VARCHAR(255) NOT NULL,
+      orden INT NOT NULL DEFAULT 0,
+      activo TINYINT(1) NOT NULL DEFAULT 1,
+      creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      actualizado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id_motivo_justificacion),
+      KEY idx_mj_activo (activo),
+      KEY idx_mj_orden (orden)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`
+  );
+
+  const [rows] = await pool.query(
+    `SELECT COUNT(*) AS total FROM motivos_justificacion WHERE activo = 1`
+  );
+  if ((rows?.[0]?.total || 0) === 0) {
+    const defaults = [
+      "Sin stock suficiente en bodega",
+      "Producto averiado / vencido",
+      "Despacho diferido para mañana",
+      "Error en cantidad solicitada",
+      "Agotado con proveedor",
+    ];
+    for (let i = 0; i < defaults.length; i++) {
+      await pool.query(
+        `INSERT INTO motivos_justificacion (texto, orden, activo) VALUES (:texto, :orden, 1)`,
+        { texto: defaults[i], orden: i + 1 }
+      );
+    }
+  }
+}
+
+ensureMotivosJustificacionTable().catch((e) => {
+  console.error("No se pudo inicializar tabla motivos_justificacion:", e);
+});
+
 
 function onlyToday(dateTimeStr) {
   const d = new Date(dateTimeStr);
@@ -5170,6 +5209,129 @@ app.post("/api/motivos/:id_motivo/deactivate", auth, requirePermission("action.d
     return res.status(500).json({ error: String(e.message || e) });
   } finally {
     conn.release();
+  }
+});
+
+/* ========================================================
+   MOTIVOS JUSTIFICACION PRODUCTO (CHIPS DE DESPACHO)
+======================================================== */
+app.get("/api/motivos-justificacion", auth, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id_motivo_justificacion, texto, orden, activo
+       FROM motivos_justificacion
+       WHERE activo = 1
+       ORDER BY orden ASC, id_motivo_justificacion ASC`
+    );
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+app.post("/api/motivos-justificacion", auth, async (req, res) => {
+  try {
+    const texto = String(req.body?.texto || "").trim();
+    if (!texto) {
+      return res.status(400).json({ error: "El texto del motivo es obligatorio" });
+    }
+    if (texto.length > 255) {
+      return res.status(400).json({ error: "El motivo no puede exceder 255 caracteres" });
+    }
+
+    const [maxOrder] = await pool.query(
+      `SELECT COALESCE(MAX(orden), 0) AS max_orden FROM motivos_justificacion`
+    );
+    const nextOrder = (maxOrder?.[0]?.max_orden || 0) + 1;
+
+    const [r] = await pool.query(
+      `INSERT INTO motivos_justificacion (texto, orden, activo)
+       VALUES (:texto, :orden, 1)`,
+      { texto, orden: nextOrder }
+    );
+    res.json({
+      ok: true,
+      id_motivo_justificacion: r.insertId,
+      texto,
+      orden: nextOrder,
+      activo: 1,
+    });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+app.put("/api/motivos-justificacion/:id", auth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const texto = String(req.body?.texto || "").trim();
+    if (!id) return res.status(400).json({ error: "ID inválido" });
+    if (!texto) return res.status(400).json({ error: "El texto del motivo no puede estar vacío" });
+    if (texto.length > 255) return res.status(400).json({ error: "El motivo no puede exceder 255 caracteres" });
+
+    const [r] = await pool.query(
+      `UPDATE motivos_justificacion
+       SET texto = :texto
+       WHERE id_motivo_justificacion = :id`,
+      { texto, id }
+    );
+    if (!r.affectedRows) {
+      return res.status(404).json({ error: "Motivo no encontrado" });
+    }
+    res.json({ ok: true, id_motivo_justificacion: id, texto });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+app.delete("/api/motivos-justificacion/:id", auth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!id) return res.status(400).json({ error: "ID inválido" });
+
+    const [r] = await pool.query(
+      `UPDATE motivos_justificacion
+       SET activo = 0
+       WHERE id_motivo_justificacion = :id`,
+      { id }
+    );
+    if (!r.affectedRows) {
+      return res.status(404).json({ error: "Motivo no encontrado" });
+    }
+    res.json({ ok: true, id_motivo_justificacion: id });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+app.post("/api/motivos-justificacion/restablecer", auth, async (req, res) => {
+  try {
+    await pool.query(`UPDATE motivos_justificacion SET activo = 0`);
+
+    const defaults = [
+      "Sin stock suficiente en bodega",
+      "Producto averiado / vencido",
+      "Despacho diferido para mañana",
+      "Error en cantidad solicitada",
+      "Agotado con proveedor",
+    ];
+    for (let i = 0; i < defaults.length; i++) {
+      await pool.query(
+        `INSERT INTO motivos_justificacion (texto, orden, activo)
+         VALUES (:texto, :orden, 1)`,
+        { texto: defaults[i], orden: i + 1 }
+      );
+    }
+
+    const [rows] = await pool.query(
+      `SELECT id_motivo_justificacion, texto, orden, activo
+       FROM motivos_justificacion
+       WHERE activo = 1
+       ORDER BY orden ASC, id_motivo_justificacion ASC`
+    );
+    res.json({ ok: true, motivos: rows });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
   }
 });
 
@@ -9706,7 +9868,7 @@ app.get("/api/orders/:id/details", auth, async (req, res) => {
   }
 
   const [lines] = await pool.query(
-    `SELECT d.id_pedido_detalle, d.id_producto, p.nombre_producto,
+    `SELECT d.id_pedido_detalle, d.id_producto, p.nombre_producto, p.sku,
             d.cantidad_solicitada, d.cantidad_surtida,
             COALESCE(d.estado_linea, 'PENDIENTE') AS estado_linea,
             d.justificacion_linea,
@@ -9780,7 +9942,15 @@ app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "
     return res.status(400).json({ error: "Pedido invalido" });
   }
   const { lines = [], justificacion = null } = req.body || {};
-  const justificacionTxt = String(justificacion || "").trim();
+  let justificacionTxt = String(justificacion || "").trim();
+  if (!justificacionTxt) {
+    const lineJusts = lines
+      .map((l) => String(l.justificacion || l.justificacion_linea || "").trim())
+      .filter(Boolean);
+    if (lineJusts.length) {
+      justificacionTxt = lineJusts.join(" | ");
+    }
+  }
   if (!Array.isArray(lines) || !lines.length) return res.status(400).json({ error: "Sin lineas a despachar" });
   if (!beginIdempotentRequest(req, res, { pathKey: `/api/orders/${id_pedido}/fulfill` })) {
     return res.status(409).json({ error: "Solicitud duplicada detectada. Espera unos segundos e intenta de nuevo." });
@@ -9976,6 +10146,7 @@ app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "
       // actualizado. Por eso `cantidad_surtida` se actualiza AL FINAL: si se
       // actualizara primero, `(cantidad_surtida + :add)` duplicaría el add y
       // marcaría DESPACHADO líneas solo despachadas a la mitad.
+      const lnJustTxt = String(ln.justificacion || ln.justificacion_linea || "").trim();
       await conn.query(
         `UPDATE pedido_detalle
          SET estado_linea = CASE
@@ -9983,6 +10154,7 @@ app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "
                ELSE 'PENDIENTE'
              END,
              justificacion_linea = CASE
+               WHEN :line_just IS NOT NULL AND :line_just != '' THEN :line_just
                WHEN :justificacion IS NULL OR :justificacion='' THEN justificacion_linea
                WHEN (cantidad_surtida + :add) != cantidad_solicitada THEN :justificacion
                ELSE justificacion_linea
@@ -9992,6 +10164,7 @@ app.post("/api/orders/:id/fulfill", auth, requirePermission("action.dispatch", "
         {
           add: fulfilledNow,
           id: id_pedido_detalle,
+          line_just: lnJustTxt || null,
           justificacion: justificacionTxt || null,
         }
       );

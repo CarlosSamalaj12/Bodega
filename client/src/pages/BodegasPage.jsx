@@ -12,6 +12,7 @@ import { useForm } from '@/hooks/useForm';
 import { usePermission } from '@/components/shared/PermissionGuard';
 import api from '@/services/api';
 import { catalogosService } from '@/services/catalogos.service';
+import { Plus, Building2, Pencil, Lock, Unlock, Image as ImageIcon } from 'lucide-react';
 import './BodegasPage.scss';
 
 const ORDER_KEY = 'bod-order-v1';
@@ -113,7 +114,12 @@ function BodegaForm({ open, onClose, editingId, editValues, onSaved }) {
   }, [open, editingId]);
 
   return (
-    <Modal open={open} onClose={() => !submitting && onClose()} title={editingId ? 'Editar bodega' : 'Nueva bodega'}>
+    <Modal
+      open={open}
+      onClose={() => !submitting && onClose()}
+      title={editingId ? 'Editar bodega' : 'Nueva bodega'}
+      icon={<Building2 size={20} strokeWidth={1.8} />}
+    >
       <form onSubmit={handleSubmit} className="bodegas-page__form">
         {error && <div className="bodegas-page__form-error">{error}</div>}
         <div className="bodegas-page__form-grid">
@@ -267,6 +273,7 @@ function LogoBodegaModal({ open, onClose, bodega, onSaved }) {
       open={open}
       onClose={() => !saving && onClose()}
       title={bodega ? `Logo de ${bodega.nombre_bodega}` : 'Logo de bodega'}
+      icon={<ImageIcon size={20} strokeWidth={1.8} />}
       size="md"
     >
       {error && <div className="bodegas-page__form-error">{error}</div>}
@@ -455,7 +462,12 @@ export default function BodegasPage() {
       <Header
         title="Bodegas"
         subtitle={`${items.length} bodega${items.length === 1 ? '' : 's'}`}
-        actions={<Button onClick={openCreate}>Nueva bodega</Button>}
+        actions={
+          <Button onClick={openCreate}>
+            <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+            <span>Nueva bodega</span>
+          </Button>
+        }
       />
 
       <div className="bodegas-page">
@@ -466,9 +478,14 @@ export default function BodegasPage() {
         {loading ? (
           <div className="bodegas-page__state"><Spinner size={20} label="Cargando bodegas…" /></div>
         ) : filtered.length === 0 ? (
-          <EmptyState icon="⬚" title={search ? 'Sin resultados' : 'Sin bodegas'}
+          <EmptyState icon={<Building2 size={36} strokeWidth={1.5} />} title={search ? 'Sin resultados' : 'Sin bodegas'}
             message={search ? 'Intenta con otro término.' : 'Agrega la primera bodega.'}
-            action={!search ? <Button onClick={openCreate}>Crear bodega</Button> : null} />
+            action={!search ? (
+              <Button onClick={openCreate}>
+                <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+                <span>Crear bodega</span>
+              </Button>
+            ) : null} />
         ) : (
           <div className="bodegas-page__list">
             {filtered.map((row) => (
@@ -497,7 +514,17 @@ export default function BodegasPage() {
                       onClick={() => handleToggleRecepcion(row)}
                       title="Al despachar desde esta bodega, el solicitante deberá confirmar la recepción con su PIN"
                     >
-                      {Number(row.requiere_confirmacion_recepcion) === 1 ? '🔒 PIN recepción: ON' : '🔓 PIN recepción: OFF'}
+                      {Number(row.requiere_confirmacion_recepcion) === 1 ? (
+                        <>
+                          <Lock size={13} strokeWidth={1.8} aria-hidden="true" />
+                          <span>PIN recepción: ON</span>
+                        </>
+                      ) : (
+                        <>
+                          <Unlock size={13} strokeWidth={1.8} aria-hidden="true" />
+                          <span>PIN recepción: OFF</span>
+                        </>
+                      )}
                     </Button>
                   )}
                   {canManageLogo && (
@@ -507,13 +534,16 @@ export default function BodegasPage() {
                       onClick={() => openLogoModal(row)}
                       title={`Editar logo de ${row.nombre_bodega}`}
                     >
-                      🖼️ Logo
+                      <ImageIcon size={13} strokeWidth={1.8} aria-hidden="true" />
+                      <span>Logo</span>
                     </Button>
                   )}
                   <Button size="sm" variant={Number(row.activo) === 1 ? 'subtle' : 'ghost'} onClick={() => handleToggle(row)} title={Number(row.activo) === 1 ? 'Desactivar' : 'Activar'}>
                     {Number(row.activo) === 1 ? 'Desactivar' : 'Activar'}
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => openEdit(row)} title="Editar">✎</Button>
+                  <Button size="sm" variant="ghost" onClick={() => openEdit(row)} title="Editar">
+                    <Pencil size={14} strokeWidth={1.8} aria-hidden="true" />
+                  </Button>
                 </div>
               </DragItem>
             ))}

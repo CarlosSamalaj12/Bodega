@@ -11,6 +11,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { useForm } from '@/hooks/useForm';
 import api from '@/services/api';
 import { catalogosService } from '@/services/catalogos.service';
+import { Plus, Pencil, Trash2, FolderTree, Tag } from 'lucide-react';
 import './CategoriasPage.scss';
 
 const ID_KEYS = ['id', 'id_categoria', 'id_subcategoria'];
@@ -95,7 +96,12 @@ function CategoriaForm({ open, onClose, editingId, catValues, onSaved }) {
   }, [open, editingId]);
 
   return (
-    <Modal open={open} onClose={() => !submitting && onClose()} title={editingId ? 'Editar categoría' : 'Nueva categoría'}>
+    <Modal
+      open={open}
+      onClose={() => !submitting && onClose()}
+      title={editingId ? 'Editar categoría' : 'Nueva categoría'}
+      icon={<FolderTree size={20} strokeWidth={1.8} />}
+    >
       <form onSubmit={handleSubmit} className="categorias-page__form">
         {error && <div className="categorias-page__form-error">{error}</div>}
         <div className="categorias-page__field">
@@ -165,7 +171,12 @@ function SubcategoriaForm({ open, onClose, editingId, subValues, categorias, onS
   }, [open, editingId]);
 
   return (
-    <Modal open={open} onClose={() => !submitting && onClose()} title={editingId ? 'Editar subcategoría' : 'Nueva subcategoría'}>
+    <Modal
+      open={open}
+      onClose={() => !submitting && onClose()}
+      title={editingId ? 'Editar subcategoría' : 'Nueva subcategoría'}
+      icon={<Tag size={20} strokeWidth={1.8} />}
+    >
       <form onSubmit={handleSubmit} className="categorias-page__form">
         {error && <div className="categorias-page__form-error">{error}</div>}
         <div className="categorias-page__field">
@@ -455,8 +466,12 @@ export default function CategoriasPage() {
           <Button size="sm" variant={Number(row.activo) === 1 ? 'subtle' : 'ghost'} onClick={() => handleToggleCat(row)} title={Number(row.activo) === 1 ? 'Desactivar' : 'Activar'}>
             {Number(row.activo) === 1 ? 'Desactivar' : 'Activar'}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => openCatEdit(row)} title="Editar">✎</Button>
-          <Button size="sm" variant="ghost" onClick={() => handleDeleteCat(row)} title="Eliminar">✕</Button>
+          <Button size="sm" variant="ghost" onClick={() => openCatEdit(row)} title="Editar">
+            <Pencil size={14} strokeWidth={1.8} aria-hidden="true" />
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => handleDeleteCat(row)} title="Eliminar">
+            <Trash2 size={14} strokeWidth={1.8} aria-hidden="true" />
+          </Button>
         </div>
       </DragItem>
     );
@@ -476,8 +491,12 @@ export default function CategoriasPage() {
         <Button size="sm" variant={Number(row.activo) === 1 ? 'subtle' : 'ghost'} onClick={() => handleToggleSub(row)} title={Number(row.activo) === 1 ? 'Desactivar' : 'Activar'}>
           {Number(row.activo) === 1 ? 'Desactivar' : 'Activar'}
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => openSubEdit(row)} title="Editar">✎</Button>
-        <Button size="sm" variant="ghost" onClick={() => handleDeleteSub(row)} title="Eliminar">✕</Button>
+        <Button size="sm" variant="ghost" onClick={() => openSubEdit(row)} title="Editar">
+          <Pencil size={14} strokeWidth={1.8} aria-hidden="true" />
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => handleDeleteSub(row)} title="Eliminar">
+          <Trash2 size={14} strokeWidth={1.8} aria-hidden="true" />
+        </Button>
       </div>
     </DragItem>
   );
@@ -495,14 +514,17 @@ export default function CategoriasPage() {
         <Card className="categorias-page__panel">
           <div className="categorias-page__panel-header">
             <h2 className="categorias-page__panel-title">Categorías</h2>
-            <Button size="sm" onClick={openCatCreate}>Nueva</Button>
+            <Button size="sm" onClick={openCatCreate}>
+              <Plus size={15} strokeWidth={1.8} aria-hidden="true" />
+              <span>Nueva</span>
+            </Button>
           </div>
           <SearchInput value={catSearch} onChange={setCatSearch} placeholder="Buscar categoría…" />
           <div className="categorias-page__panel-body">
             {catLoading ? (
               <div className="categorias-page__state"><Spinner size={16} label="Cargando…" /></div>
             ) : filteredCat.length === 0 ? (
-              <EmptyState icon="◫" title={catSearch ? 'Sin resultados' : 'Sin categorías'} message={catSearch ? 'Intenta con otro término.' : 'Crea la primera categoría.'} />
+              <EmptyState icon={<FolderTree size={36} strokeWidth={1.5} />} title={catSearch ? 'Sin resultados' : 'Sin categorías'} message={catSearch ? 'Intenta con otro término.' : 'Crea la primera categoría.'} />
             ) : (
               <div className="categorias-page__list">
                 {filteredCat.map((row, i) => renderCatItem(row, i))}
@@ -515,7 +537,10 @@ export default function CategoriasPage() {
         <Card className="categorias-page__panel">
           <div className="categorias-page__panel-header">
             <h2 className="categorias-page__panel-title">Subcategorías</h2>
-            <Button size="sm" onClick={openSubCreate}>Nueva</Button>
+            <Button size="sm" onClick={openSubCreate}>
+              <Plus size={15} strokeWidth={1.8} aria-hidden="true" />
+              <span>Nueva</span>
+            </Button>
           </div>
           <div className="categorias-page__sub-filters">
             <SearchInput value={subSearch} onChange={setSubSearch} placeholder="Buscar subcategoría…" />
@@ -528,7 +553,7 @@ export default function CategoriasPage() {
             {subLoading ? (
               <div className="categorias-page__state"><Spinner size={16} label="Cargando…" /></div>
             ) : filteredSub.length === 0 ? (
-              <EmptyState icon="◳" title={subSearch || subCategoriaId ? 'Sin resultados' : 'Sin subcategorías'} message="Crea la primera subcategoría." />
+              <EmptyState icon={<Tag size={36} strokeWidth={1.5} />} title={subSearch || subCategoriaId ? 'Sin resultados' : 'Sin subcategorías'} message="Crea la primera subcategoría." />
             ) : (
               <div className="categorias-page__list">
                 {filteredSub.map((row, i) => renderSubItem(row, i))}

@@ -13,6 +13,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import { formatDate } from '@/utils/format';
+import { Plus, Download, RefreshCw, FileText, Receipt, Printer, Save, ArrowLeft, Trash2, Pencil, Wallet, Search } from 'lucide-react';
 import api from '@/services/api';
 import './CuadreCajaPage.scss';
 
@@ -536,19 +537,24 @@ export default function CuadreCajaPage() {
           actions={
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               <Button size="sm" variant="ghost" onClick={() => setView('list')}>
-                ← Volver
+                <ArrowLeft size={14} strokeWidth={1.8} aria-hidden="true" />
+                <span>Volver</span>
               </Button>
               <Button size="sm" variant="ghost" onClick={handlePdf} disabled={saving}>
-                📄 PDF
+                <FileText size={14} strokeWidth={1.8} aria-hidden="true" />
+                <span>PDF</span>
               </Button>
               <Button size="sm" variant="ghost" onClick={() => handlePrint('pos')} disabled={saving}>
-                🧾 POS 80mm
+                <Receipt size={14} strokeWidth={1.8} aria-hidden="true" />
+                <span>POS 80mm</span>
               </Button>
               <Button size="sm" variant="ghost" onClick={() => handlePrint('carta')} disabled={saving}>
-                📋 Carta
+                <Printer size={14} strokeWidth={1.8} aria-hidden="true" />
+                <span>Carta</span>
               </Button>
               <Button size="sm" variant="primary" onClick={handleSave} disabled={saving}>
-                {saving ? 'Guardando…' : '💾 Guardar'}
+                <Save size={14} strokeWidth={1.8} aria-hidden="true" />
+                <span>{saving ? 'Guardando…' : 'Guardar'}</span>
               </Button>
             </div>
           }
@@ -743,7 +749,9 @@ export default function CuadreCajaPage() {
                               placeholder="0"
                             />
                           </div>
-                          <button className="cuadre-caja__remove-btn" onClick={() => removeVentaRow(idx)}>✕</button>
+                          <button className="cuadre-caja__remove-btn" onClick={() => removeVentaRow(idx)} aria-label="Eliminar fila">
+                            <Trash2 size={13} strokeWidth={1.8} aria-hidden="true" />
+                          </button>
                         </div>
                       ))}
                       <datalist id="ventas-sugeridas">
@@ -763,7 +771,9 @@ export default function CuadreCajaPage() {
                   <section className="cuadre-caja__section">
                     <div className="cuadre-caja__section-header-with-action">
                       <h3 className="cuadre-caja__section-title">Detalle</h3>
-                      <Button size="xs" variant="ghost" onClick={addDetalleRow}>+</Button>
+                      <Button size="xs" variant="ghost" onClick={addDetalleRow} aria-label="Agregar fila">
+                        <Plus size={14} strokeWidth={1.8} aria-hidden="true" />
+                      </Button>
                     </div>
                     <div className="cuadre-caja__mini-table">
                       <div className="cuadre-caja__mini-table-header cuadre-caja__mini-table-header--4col">
@@ -787,7 +797,9 @@ export default function CuadreCajaPage() {
                               className="input input--sm cuadre-caja__num-input" value={row.monto || ''}
                               onChange={(e) => updateDetalleRow(idx, 'monto', e.target.value)} placeholder="0" />
                           </div>
-                          <button className="cuadre-caja__remove-btn" onClick={() => removeDetalleRow(idx)}>✕</button>
+                          <button className="cuadre-caja__remove-btn" onClick={() => removeDetalleRow(idx)} aria-label="Eliminar fila">
+                            <Trash2 size={13} strokeWidth={1.8} aria-hidden="true" />
+                          </button>
                         </div>
                       ))}
                       <div className="cuadre-caja__mini-table-row cuadre-caja__mini-table-row--total cuadre-caja__mini-table-row--4col">
@@ -846,15 +858,18 @@ export default function CuadreCajaPage() {
         actions={
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <Button size="sm" variant="primary" onClick={openNewForm}>
-              + Nuevo cuadre
+              <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+              <span>Nuevo cuadre</span>
             </Button>
             {rows.length > 0 && !loading ? (
               <>
                 <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-                  Exportar
+                  <Download size={15} strokeWidth={1.8} aria-hidden="true" />
+                  <span>Exportar</span>
                 </Button>
                 <Button variant="ghost" size="sm" onClick={fetchData} disabled={loading}>
-                  Refrescar
+                  <RefreshCw size={15} strokeWidth={1.8} className={loading ? 'spin' : ''} aria-hidden="true" />
+                  <span>Refrescar</span>
                 </Button>
               </>
             ) : null}
@@ -884,7 +899,9 @@ export default function CuadreCajaPage() {
               <input type="text" className="input" placeholder="Buscar responsable…"
                 value={responsable} onChange={(e) => setResponsable(e.target.value)} onKeyDown={handleKeyDown} />
               {responsable && (
-                <button type="button" className="cuadre-caja__search-btn" onClick={handleSearchResponsable} title="Buscar" aria-label="Buscar">⌕</button>
+                <button type="button" className="cuadre-caja__search-btn" onClick={handleSearchResponsable} title="Buscar" aria-label="Buscar">
+                  <Search size={14} strokeWidth={1.8} aria-hidden="true" />
+                </button>
               )}
               </div>
             </div>
@@ -901,8 +918,16 @@ export default function CuadreCajaPage() {
         {loading || contextLoading ? (
           <div className="cuadre-caja__state"><Spinner size={20} label="Cargando cuadre de caja…" /></div>
         ) : rows.length === 0 ? (
-          <EmptyState icon="💰" title="Sin registros" message="No hay cuadres de caja para los filtros seleccionados."
-            action={<Button variant="primary" onClick={openNewForm}>+ Crear nuevo cuadre</Button>}
+          <EmptyState
+            icon={<Wallet size={36} strokeWidth={1.5} />}
+            title="Sin registros"
+            message="No hay cuadres de caja para los filtros seleccionados."
+            action={
+              <Button variant="primary" onClick={openNewForm}>
+                <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+                <span>Crear nuevo cuadre</span>
+              </Button>
+            }
           />
         ) : (
           <div className="cuadre-caja__table-wrapper">
@@ -932,8 +957,8 @@ export default function CuadreCajaPage() {
                     {!isMobile && <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{fmtMoneda(r.total_venta_ambiente)}</td>}
                     <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{fmtMoneda(r.gran_total_reporte)}</td>
                     <td>
-                      <Button size="xs" variant="ghost" onClick={(e) => { e.stopPropagation(); openEditForm(r); }}>
-                        ✏️
+                      <Button size="xs" variant="ghost" onClick={(e) => { e.stopPropagation(); openEditForm(r); }} title="Editar">
+                        <Pencil size={13} strokeWidth={1.8} aria-hidden="true" />
                       </Button>
                     </td>
                   </tr>
@@ -971,6 +996,7 @@ export default function CuadreCajaPage() {
         open={detailRow != null}
         onClose={() => { setDetailRow(null); setDetailData(null); }}
         title={`Cuadre de Caja — ${formatDate(detailRow?.fecha)}`}
+        icon={<Wallet size={20} strokeWidth={1.8} />}
         size="md"
       >
         {detailLoading ? (
@@ -1130,13 +1156,16 @@ export default function CuadreCajaPage() {
 
             <div className="cuadre-caja__detail-actions">
               <Button size="sm" variant="ghost" onClick={() => submitDetailPrintForm('pdf')}>
-                📄 PDF
+                <FileText size={14} strokeWidth={1.8} aria-hidden="true" />
+                <span>PDF</span>
               </Button>
               <Button size="sm" variant="ghost" onClick={() => submitDetailPrintForm('pos')}>
-                🧾 POS 80mm
+                <Receipt size={14} strokeWidth={1.8} aria-hidden="true" />
+                <span>POS 80mm</span>
               </Button>
               <Button size="sm" variant="ghost" onClick={() => { setDetailRow(null); openEditForm(detailRow); }}>
-                ✏️ Editar
+                <Pencil size={14} strokeWidth={1.8} aria-hidden="true" />
+                <span>Editar</span>
               </Button>
               <Button size="sm" variant="primary" onClick={() => {
                 setDetailRow(null);

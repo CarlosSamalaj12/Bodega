@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
 import { Badge } from '@/components/ui/Badge';
+import { FileText, RotateCcw } from 'lucide-react';
 import './MovimientoDetailModal.scss';
 
 /**
@@ -48,7 +49,13 @@ export function MovimientoDetailModal({ open, onClose, title, service, idMovimie
   }, [detail]);
 
   return (
-    <Modal open={open} onClose={onClose} title={title || 'Detalle del movimiento'} size="lg">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={title || 'Detalle del movimiento'}
+      icon={<FileText size={20} strokeWidth={1.8} />}
+      size="lg"
+    >
       {loading && (
         <div className="mov-det__loading">
           <Spinner size={18} label="Cargando detalle…" />
@@ -81,7 +88,9 @@ export function MovimientoDetailModal({ open, onClose, title, service, idMovimie
               )}
               {String(detail.estado || '').toUpperCase() === 'ANULADO' && (
                 <div className="mov-det__reversion">
-                  <span className="mov-det__reversion-icon">↩</span>
+                  <span className="mov-det__reversion-icon">
+                    <RotateCcw size={15} strokeWidth={1.8} />
+                  </span>
                   <div className="mov-det__reversion-info">
                     <strong>Movimiento revertido</strong>
                     <span>

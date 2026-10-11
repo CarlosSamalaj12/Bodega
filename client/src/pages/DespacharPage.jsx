@@ -22,8 +22,8 @@ import api from '@/services/api';
 import { pedidosService } from '@/services/pedidos.service';
 import { getSocket } from '@/services/socket';
 import { DespachoForm } from '@/components/despachos/DespachoForm';
-import { RevertPanel } from '@/components/despachos/RevertPanel';
 import { ConfirmarRecepcionModal } from '@/components/pedidos/ConfirmarRecepcionModal';
+import { Printer, Download, RefreshCw, Check, X } from 'lucide-react';
 import './DespacharPage.scss';
 
 const ESTADO_LABELS = {
@@ -361,7 +361,12 @@ export default function DespacharPage() {
           title="Ticket POS 80mm"
           aria-label="Imprimir ticket 80mm"
         >
-          <span className="despachar-page__print-icon" aria-hidden="true">🧾</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
+            <line x1="8" y1="7" x2="16" y2="7" />
+            <line x1="8" y1="11" x2="16" y2="11" />
+            <line x1="8" y1="15" x2="13" y2="15" />
+          </svg>
         </button>
         <button
           type="button"
@@ -370,12 +375,19 @@ export default function DespacharPage() {
           title="Imprimir carta (con firmas)"
           aria-label="Imprimir formato carta"
         >
-          <span className="despachar-page__print-icon" aria-hidden="true">📄</span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+            <polyline points="10 9 9 9 8 9" />
+          </svg>
         </button>
       </div>
       {needsConfirmation(p) && (
         <Button size="sm" variant="primary" onClick={() => handleOpenConfirm(p)} title="El solicitante confirma la recepción con su PIN">
-          ✓ Confirmar recepción
+          <Check size={14} strokeWidth={1.8} />
+          <span>Confirmar recepción</span>
         </Button>
       )}
       {canDispatch && (
@@ -496,7 +508,12 @@ export default function DespacharPage() {
         return (
           <span style={{ display: 'inline-flex', gap: '4px', flexWrap: 'wrap' }}>
             <Badge variant={est.variant}>{est.label}</Badge>
-            {isReceiptConfirmed(p) && <Badge variant="success">✓ Recibido</Badge>}
+            {isReceiptConfirmed(p) && (
+              <Badge variant="success">
+                <Check size={12} strokeWidth={2} style={{ marginRight: 3, verticalAlign: 'middle' }} />
+                Recibido
+              </Badge>
+            )}
             {needsConfirmation(p) && <Badge variant="warning">Por confirmar</Badge>}
           </span>
         );
@@ -526,10 +543,12 @@ export default function DespacharPage() {
             {visibles.length > 0 && (
               <>
                 <Button variant="ghost" size="sm" onClick={() => printOrderListPos80mm(visibles)}>
-                  🖨 Imprimir
+                  <Printer size={14} strokeWidth={1.8} />
+                  <span>Imprimir</span>
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-                  Exportar CSV
+                  <Download size={14} strokeWidth={1.8} />
+                  <span>Exportar CSV</span>
                 </Button>
               </>
             )}
@@ -539,7 +558,8 @@ export default function DespacharPage() {
               </span>
             )}
             <Button variant="ghost" size="sm" onClick={safeLoadPedidos} disabled={loadingRef.current}>
-              {loadingRef.current ? 'Cargando…' : 'Refrescar'}
+              <RefreshCw size={14} strokeWidth={1.8} />
+              <span>{loadingRef.current ? 'Cargando…' : 'Refrescar'}</span>
             </Button>
           </div>
         }
@@ -590,7 +610,8 @@ export default function DespacharPage() {
                   onClick={() => { setDateFrom(''); setDateTo(''); }}
                   title="Quitar filtro de fecha — ver todos los pendientes"
                 >
-                  ✕ Todos
+                  <X size={13} strokeWidth={1.8} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                  <span>Todos</span>
                 </button>
               )}
             </div>
@@ -678,12 +699,13 @@ export default function DespacharPage() {
       <Modal
         open={modalOpen}
         onClose={handleClose}
-        title={activeId ? `Despachar pedido #${activeId}` : 'Despachar'}
+        hideHeader={true}
         size="xl"
+        className="modal--despacho"
       >
         {loadingDetails ? (
-          <div className="despachar-page__loading">
-            <Spinner size={20} label="Cargando líneas…" />
+          <div className="despachar-page__loading" style={{ minHeight: '320px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Spinner size={24} label="Cargando líneas del pedido…" />
           </div>
         ) : (
           <div className="despachar-page__modal-body">
@@ -695,12 +717,6 @@ export default function DespacharPage() {
               onCancel={handleClose}
               onDetailsChange={setActiveDetails}
             />
-            {activeDetails && (
-              <RevertPanel
-                pedido={activeDetails}
-                onDone={handleDone}
-              />
-            )}
           </div>
         )}
       </Modal>

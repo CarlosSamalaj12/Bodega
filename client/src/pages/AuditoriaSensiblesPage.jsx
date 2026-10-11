@@ -15,6 +15,7 @@ import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import { formatDate } from '@/utils/format';
 import api from '@/services/api';
+import { Download, RefreshCw, RotateCcw, ShieldAlert } from 'lucide-react';
 import './AuditoriaSensiblesPage.scss';
 
 const ACTION_KEY_LABELS = {
@@ -179,11 +180,13 @@ export default function AuditoriaSensiblesPage() {
             <div className="auditoria-sensibles__header-actions">
               {!isMobile && (
                 <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-                  Exportar
+                  <Download size={14} strokeWidth={1.8} />
+                  <span>Exportar</span>
                 </Button>
               )}
               <Button variant="ghost" size="sm" onClick={fetchData} disabled={loading}>
-                Refrescar
+                <RefreshCw size={14} strokeWidth={1.8} />
+                <span>Refrescar</span>
               </Button>
             </div>
           ) : undefined
@@ -212,7 +215,8 @@ export default function AuditoriaSensiblesPage() {
 
             {hasActiveFilters && (
               <Button size="sm" variant="ghost" onClick={handleClearFilters}>
-                Limpiar filtros
+                <RotateCcw size={13} strokeWidth={1.8} />
+                <span>Limpiar filtros</span>
               </Button>
             )}
           </div>
@@ -221,7 +225,11 @@ export default function AuditoriaSensiblesPage() {
         {loading ? (
           <div className="auditoria-sensibles__state"><Spinner size={20} label="Cargando auditoría…" /></div>
         ) : rows.length === 0 ? (
-          <EmptyState icon="◉" title="Sin registros" message="No hay acciones sensibles en el período seleccionado." />
+          <EmptyState
+            icon={<ShieldAlert size={36} strokeWidth={1.5} />}
+            title="Sin registros"
+            message="No hay acciones sensibles en el período seleccionado."
+          />
         ) : (
           <div className="auditoria-sensibles__table-wrapper">
             <table className="table table--sm">
@@ -284,6 +292,7 @@ export default function AuditoriaSensiblesPage() {
         open={detailRow != null}
         onClose={() => setDetailRow(null)}
         title={detailRow ? `${ACTION_KEY_LABELS[detailRow.action_key] || 'Acción'} #${detailRow.id_auditoria}` : ''}
+        icon={<ShieldAlert size={20} strokeWidth={1.8} />}
         size="md"
       >
         {detailRow && (

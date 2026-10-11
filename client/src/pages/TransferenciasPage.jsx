@@ -16,6 +16,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
 import { formatDate } from '@/utils/format';
+import { Plus, Download, RefreshCw, ArrowLeftRight, ChevronRight, RotateCcw } from 'lucide-react';
 import api from '@/services/api';
 import { getSocket } from '@/services/socket';
 import './TransferenciasPage.scss';
@@ -443,11 +444,20 @@ export default function TransferenciasPage() {
         subtitle={`${total} transferencia${total === 1 ? '' : 's'} · Pág. ${page} de ${totalPages} · ${totales.totalCantidad.toFixed(2)} unidades`}
         actions={
           <div className="transferencias-page__header-actions">
-            <Button variant="primary" size="sm" onClick={openCreateModal}>+ Nueva transferencia</Button>
+            <Button variant="primary" size="sm" onClick={openCreateModal}>
+              <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+              <span>Nueva transferencia</span>
+            </Button>
             {rows.length > 0 && !loading && !isMobile && (
-              <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>Exportar</Button>
+              <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
+                <Download size={15} strokeWidth={1.8} aria-hidden="true" />
+                <span>Exportar</span>
+              </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={fetchData} disabled={loading}>Refrescar</Button>
+            <Button variant="ghost" size="sm" onClick={fetchData} disabled={loading}>
+              <RefreshCw size={15} strokeWidth={1.8} className={loading ? 'spin' : ''} aria-hidden="true" />
+              <span>Refrescar</span>
+            </Button>
           </div>
         }
       />
@@ -480,7 +490,7 @@ export default function TransferenciasPage() {
         {loading ? (
           <div className="transferencias-page__state"><Spinner size={20} label="Cargando transferencias…" /></div>
         ) : displayRows.length === 0 ? (
-          <EmptyState icon="🔄" title="Sin datos" message="No hay transferencias en el período seleccionado." />
+          <EmptyState icon={<ArrowLeftRight size={36} strokeWidth={1.5} />} title="Sin datos" message="No hay transferencias en el período seleccionado." />
         ) : (
           <div className="transferencias-page__table-wrapper" ref={tableRef}>
             <table className="table table--sm">
@@ -506,7 +516,12 @@ export default function TransferenciasPage() {
                     <tr key={`tra-${g.id_movimiento}`} data-mov-id={g.id_movimiento} className="transferencias-page__mov-row">
                       <td>
                         <button type="button" className="transferencias-page__expand-btn" onClick={() => toggleExpand(g.id_movimiento)}>
-                          <span className={`transferencias-page__chevron ${isOpen ? 'transferencias-page__chevron--open' : ''}`}>▸</span>
+                          <ChevronRight
+                            size={15}
+                            strokeWidth={2}
+                            className={`transferencias-page__chevron ${isOpen ? 'transferencias-page__chevron--open' : ''}`}
+                            aria-hidden="true"
+                          />
                         </button>
                       </td>
                       <td>
@@ -593,7 +608,10 @@ export default function TransferenciasPage() {
                                 {revertingId === g.id_movimiento ? (
                                   <><Spinner size={12} /> Revirtiendo…</>
                                 ) : (
-                                  <>↩ Revertir</>
+                                  <>
+                                    <RotateCcw size={12} strokeWidth={1.8} aria-hidden="true" style={{ marginRight: 4 }} />
+                                    <span>Revertir</span>
+                                  </>
                                 )}
                               </button>
                             </div>
@@ -624,6 +642,7 @@ export default function TransferenciasPage() {
         open={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         title="Nueva transferencia"
+        icon={<ArrowLeftRight size={20} strokeWidth={1.8} />}
         size="lg"
         footer={
           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>

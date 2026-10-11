@@ -18,6 +18,7 @@ import { formatDate } from '@/utils/format';
 import { printPedidoPos80mm } from '@/utils/print';
 import { catalogosService } from '@/services/catalogos.service';
 import api from '@/services/api';
+import { Download, RefreshCw, ClipboardList, Printer, ChevronRight } from 'lucide-react';
 import './ReportePedidosPage.scss';
 
 const RANGE_PRESETS = [
@@ -318,11 +319,13 @@ export default function ReportePedidosPage() {
             <div className="reporte-pedidos__header-actions">
               {!isMobile && (
                 <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-                  Exportar
+                  <Download size={14} strokeWidth={1.8} />
+                  <span>Exportar</span>
                 </Button>
               )}
               <Button variant="ghost" size="sm" onClick={fetchData} disabled={loading}>
-                Refrescar
+                <RefreshCw size={14} strokeWidth={1.8} />
+                <span>Refrescar</span>
               </Button>
             </div>
           ) : undefined
@@ -408,7 +411,11 @@ export default function ReportePedidosPage() {
         {loading ? (
           <div className="reporte-pedidos__state"><Spinner size={20} label="Cargando reporte…" /></div>
         ) : rows.length === 0 ? (
-          <EmptyState icon="📋" title="Sin datos" message="No hay pedidos en el período seleccionado." />
+          <EmptyState
+            icon={<ClipboardList size={36} strokeWidth={1.5} />}
+            title="Sin datos"
+            message="No hay pedidos en el período seleccionado."
+          />
         ) : (
           <div className="reporte-pedidos__table-wrapper">
             <table className="table table--sm">
@@ -436,7 +443,7 @@ export default function ReportePedidosPage() {
                     <tr key={`rep-${g.id_pedido}`} className="reporte-pedidos__ped-row">
                       <td>
                         <button type="button" className="reporte-pedidos__expand-btn" onClick={() => toggleExpand(g.id_pedido)}>
-                          <span className={`reporte-pedidos__chevron ${isOpen ? 'reporte-pedidos__chevron--open' : ''}`}>▸</span>
+                          <ChevronRight size={14} strokeWidth={1.8} className={`reporte-pedidos__chevron ${isOpen ? 'reporte-pedidos__chevron--open' : ''}`} />
                         </button>
                       </td>
                       <td><code>#{g.id_pedido}</code></td>
@@ -510,7 +517,8 @@ export default function ReportePedidosPage() {
                                 printPedidoPos80mm(pedidoParaImprimir, { autoPrint: true });
                               }}
                             >
-                              🖨 Imprimir ticket (80mm)
+                              <Printer size={14} strokeWidth={1.8} />
+                              <span>Imprimir ticket (80mm)</span>
                             </Button>
                           </div>
                           {g.observaciones && <div className="reporte-pedidos__obs">{g.observaciones}</div>}

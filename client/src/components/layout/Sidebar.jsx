@@ -6,6 +6,39 @@ import { useAppVersionStore } from '@/stores/appVersion.store';
 import { hasPermission } from '@/utils/permissions';
 import api from '@/services/api';
 import { getSocket } from '@/services/socket';
+import {
+  Home,
+  Settings,
+  Keyboard,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  ClipboardList,
+  Truck,
+  ArrowLeftRight,
+  Package,
+  BarChart3,
+  AlertTriangle,
+  RefreshCw,
+  BookOpen,
+  FileSpreadsheet,
+  TrendingUp,
+  TrendingDown,
+  Calendar,
+  Wallet,
+  FileText,
+  LineChart,
+  ShieldAlert,
+  FolderTree,
+  Handshake,
+  Ruler,
+  Tag,
+  Users,
+  Building2,
+  SlidersHorizontal,
+  Scale,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 import './Sidebar.scss';
 
 // Grupos de navegación (orden de aparición)
@@ -18,46 +51,46 @@ const GROUP_LABELS = {
   admin: 'Administración',
 };
 
-// Ítems de navegación
+// Ítems de navegación con iconos vectoriales minimalistas
 const NAV_ITEMS = [
   // Dashboard
-  { to: '/', label: 'Inicio', icon: '🏠', section: 'home', group: 'dashboard' },
-  { to: '/ajustes', label: 'Ajustes', icon: '⚙️', section: 'ajustes', group: 'dashboard' },
-  { to: '/ajustes/atajos', label: 'Atajos de teclado', icon: '⌨️', section: 'ajustes', group: 'dashboard' },
+  { to: '/', label: 'Inicio', icon: Home, section: 'home', group: 'dashboard' },
+  { to: '/ajustes', label: 'Ajustes', icon: Settings, section: 'ajustes', group: 'dashboard' },
+  { to: '/ajustes/atajos', label: 'Atajos de teclado', icon: Keyboard, section: 'ajustes', group: 'dashboard' },
 
   // Movimientos
-  { to: '/entradas', label: 'Entradas', icon: '📥', section: 'entradas', group: 'movimientos' },
-  { to: '/salidas', label: 'Salidas', icon: '📤', section: 'salidas', group: 'movimientos' },
-  { to: '/pedidos', label: 'Realizar pedidos', icon: '📋', section: 'pedidos', group: 'movimientos' },
-  { to: '/pedidos-despachar', label: 'Pedidos x Despachar', icon: '🚚', section: 'pedidos-despachar', group: 'movimientos' },
-  { to: '/transferencias', label: 'Transferencias', icon: '🔄', section: 'movimientos', group: 'movimientos' },
+  { to: '/entradas', label: 'Entradas', icon: ArrowDownToLine, section: 'entradas', group: 'movimientos' },
+  { to: '/salidas', label: 'Salidas', icon: ArrowUpFromLine, section: 'salidas', group: 'movimientos' },
+  { to: '/pedidos', label: 'Realizar pedidos', icon: ClipboardList, section: 'pedidos', group: 'movimientos' },
+  { to: '/pedidos-despachar', label: 'Pedidos x Despachar', icon: Truck, section: 'pedidos-despachar', group: 'movimientos' },
+  { to: '/transferencias', label: 'Transferencias', icon: ArrowLeftRight, section: 'movimientos', group: 'movimientos' },
 
   // Inventario
-  { to: '/productos', label: 'Productos', icon: '📦', section: 'productos', group: 'inventario' },
-  { to: '/existencias', label: 'Existencias', icon: '📊', section: 'existencias', group: 'inventario' },
-  { to: '/alertas', label: 'Alertas', icon: '⚠️', section: 'alertas', group: 'inventario' },
-  { to: '/conteo-ciclico', label: 'Conteo Cíclico', icon: '📋', section: 'conteo-ciclico', group: 'inventario' },
+  { to: '/productos', label: 'Productos', icon: Package, section: 'productos', group: 'inventario' },
+  { to: '/existencias', label: 'Existencias', icon: BarChart3, section: 'existencias', group: 'inventario' },
+  { to: '/alertas', label: 'Alertas', icon: AlertTriangle, section: 'alertas', group: 'inventario' },
+  { to: '/conteo-ciclico', label: 'Conteo Cíclico', icon: RefreshCw, section: 'conteo-ciclico', group: 'inventario' },
 
   // Reportes
-  { to: '/kardex', label: 'Kardex por producto', icon: '📒', section: 'kardex', group: 'reportes' },
-  { to: '/kardex-general', label: 'Kardex general', icon: '📋', section: 'kardex-general', group: 'reportes' },
-  { to: '/reporte-entradas', label: 'R. Entradas', icon: '📈', section: 'r-entradas', group: 'reportes' },
-  { to: '/reporte-salidas', label: 'R. Salidas', icon: '📉', section: 'r-salidas', group: 'reportes' },
-  { to: '/corte-diario', label: 'Corte Diario', icon: '📅', section: 'r-corte-diario', group: 'reportes' },
-  { to: '/cuadre-caja', label: 'Cuadre Caja', icon: '💰', section: 'cuadre-caja', group: 'reportes' },
-  { to: '/reporte-pedidos', label: 'R. Pedidos', icon: '📋', section: 'r-pedidos', group: 'reportes' },
-  { to: '/tendencia-producto', label: 'Tendencia Producto', icon: '📈', section: 'tendencia-producto', group: 'reportes' },
-  { to: '/auditoria-sensibles', label: 'Auditoría Sensibles', icon: '🔍', section: 'r-auditoria-sensibles', group: 'reportes' },
+  { to: '/kardex', label: 'Kardex por producto', icon: BookOpen, section: 'kardex', group: 'reportes' },
+  { to: '/kardex-general', label: 'Kardex general', icon: FileSpreadsheet, section: 'kardex-general', group: 'reportes' },
+  { to: '/reporte-entradas', label: 'R. Entradas', icon: TrendingUp, section: 'r-entradas', group: 'reportes' },
+  { to: '/reporte-salidas', label: 'R. Salidas', icon: TrendingDown, section: 'r-salidas', group: 'reportes' },
+  { to: '/corte-diario', label: 'Corte Diario', icon: Calendar, section: 'r-corte-diario', group: 'reportes' },
+  { to: '/cuadre-caja', label: 'Cuadre Caja', icon: Wallet, section: 'cuadre-caja', group: 'reportes' },
+  { to: '/reporte-pedidos', label: 'R. Pedidos', icon: FileText, section: 'r-pedidos', group: 'reportes' },
+  { to: '/tendencia-producto', label: 'Tendencia Producto', icon: LineChart, section: 'tendencia-producto', group: 'reportes' },
+  { to: '/auditoria-sensibles', label: 'Auditoría Sensibles', icon: ShieldAlert, section: 'r-auditoria-sensibles', group: 'reportes' },
 
   // Administración
-  { to: '/categorias', label: 'Categorías / Subcategorías', icon: '🗂️', section: 'categorias', group: 'admin' },
-  { to: '/proveedores', label: 'Proveedores', icon: '🤝', section: 'proveedores', group: 'admin' },
-  { to: '/medidas', label: 'Medidas', icon: '📏', section: 'medidas', group: 'admin' },
-  { to: '/motivos', label: 'Motivos', icon: '💡', section: 'motivos', group: 'admin' },
-  { to: '/usuarios', label: 'Usuarios', icon: '👤', section: 'usuarios', group: 'admin' },
-  { to: '/bodegas', label: 'Bodegas', icon: '🏢', section: 'bodegas', group: 'admin' },
-  { to: '/reglas-subcategorias', label: 'Reglas Subcategorías', icon: '⚙️', section: 'reglas-subcategorias', group: 'admin' },
-  { to: '/limites', label: 'Límites Mín/Máx', icon: '⚖️', section: 'limites', group: 'admin' },
+  { to: '/categorias', label: 'Categorías / Subcategorías', icon: FolderTree, section: 'categorias', group: 'admin' },
+  { to: '/proveedores', label: 'Proveedores', icon: Handshake, section: 'proveedores', group: 'admin' },
+  { to: '/medidas', label: 'Medidas', icon: Ruler, section: 'medidas', group: 'admin' },
+  { to: '/motivos', label: 'Motivos', icon: Tag, section: 'motivos', group: 'admin' },
+  { to: '/usuarios', label: 'Usuarios', icon: Users, section: 'usuarios', group: 'admin' },
+  { to: '/bodegas', label: 'Bodegas', icon: Building2, section: 'bodegas', group: 'admin' },
+  { to: '/reglas-subcategorias', label: 'Reglas Subcategorías', icon: SlidersHorizontal, section: 'reglas-subcategorias', group: 'admin' },
+  { to: '/limites', label: 'Límites Mín/Máx', icon: Scale, section: 'limites', group: 'admin' },
 ];
 
 function SidebarContent({ onLinkClick, collapsed, onToggle }) {
@@ -176,6 +209,7 @@ function SidebarContent({ onLinkClick, collapsed, onToggle }) {
             )}
             {group.items.map((item) => {
               const isDispatchSection = item.section === 'pedidos-despachar';
+              const IconComp = item.icon;
               return (
                 <NavLink
                   key={item.to}
@@ -187,7 +221,9 @@ function SidebarContent({ onLinkClick, collapsed, onToggle }) {
                     `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`
                   }
                 >
-                  <span className="sidebar__icon" aria-hidden="true">{item.icon}</span>
+                  <span className="sidebar__icon" aria-hidden="true">
+                    {IconComp && <IconComp size={18} strokeWidth={1.8} />}
+                  </span>
                   <span className="sidebar__label">{item.label}</span>
                   {isDispatchSection && newDispatchCount > 0 && (
                     <span className="sidebar__badge" aria-label={`${newDispatchCount} pedido${newDispatchCount !== 1 ? 's' : ''} nuevo${newDispatchCount !== 1 ? 's' : ''}`}>
@@ -215,8 +251,12 @@ function SidebarContent({ onLinkClick, collapsed, onToggle }) {
             aria-label={collapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
             title={collapsed ? 'Expandir menú' : 'Colapsar menú'}
           >
-            <span className={`sidebar__toggle-arrow ${collapsed ? 'sidebar__toggle-arrow--collapsed' : ''}`}>
-              ◀
+            <span className="sidebar__toggle-arrow">
+              {collapsed ? (
+                <ChevronRight size={16} strokeWidth={1.8} />
+              ) : (
+                <ChevronLeft size={16} strokeWidth={1.8} />
+              )}
             </span>
             {!collapsed && <span className="sidebar__toggle-label">Colapsar</span>}
           </button>

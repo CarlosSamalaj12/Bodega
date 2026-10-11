@@ -69,12 +69,18 @@
     font-size: $font-size-xs;
     color: $color-accent;
     font-weight: $font-weight-medium;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 
     &::before {
-      content: '🔍 ';
+      content: '';
+      display: inline-block;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
     }
   }
 }

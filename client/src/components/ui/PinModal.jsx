@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import { Button } from './Button';
 import { Input } from './Input';
 import { Spinner } from './Spinner';
+import { Lock, X } from 'lucide-react';
 import './PinModal.scss';
 
 /**
@@ -42,7 +43,12 @@ export function PinModal({ open, title, description, submitting, onConfirm, onCa
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal__header">
-          <h2 id="pin-modal-title" className="modal__title">{title || 'PIN de supervisor'}</h2>
+          <div className="modal__icon">
+            <Lock size={20} strokeWidth={1.8} />
+          </div>
+          <div className="modal__header-text">
+            <h2 id="pin-modal-title" className="modal__title">{title || 'PIN de supervisor'}</h2>
+          </div>
           {!submitting && (
             <button
               type="button"
@@ -50,7 +56,7 @@ export function PinModal({ open, title, description, submitting, onConfirm, onCa
               onClick={onCancel}
               aria-label="Cerrar"
             >
-              ✕
+              <X size={18} strokeWidth={1.8} />
             </button>
           )}
         </div>

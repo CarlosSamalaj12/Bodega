@@ -255,6 +255,9 @@
   }
 
   &__conflict {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     color: $color-danger;
     font-size: $font-size-xs;
     margin-top: 4px;

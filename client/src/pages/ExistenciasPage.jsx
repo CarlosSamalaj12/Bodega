@@ -16,6 +16,7 @@ import { formatDate } from '@/utils/format';
 import { existenciasService } from '@/services/existencias.service';
 import { catalogosService } from '@/services/catalogos.service';
 import { getSocket } from '@/services/socket';
+import { Download, RefreshCw, BarChart3, ChevronRight } from 'lucide-react';
 import './ExistenciasPage.scss';
 
 function getAlertBadge(item) {
@@ -287,7 +288,7 @@ export default function ExistenciasPage() {
     if (grupos.length === 0) {
       return (
         <EmptyState
-          icon="◧"
+          icon={<BarChart3 size={36} strokeWidth={1.5} />}
           title={hasActiveFilters ? 'Sin resultados' : 'Sin existencias'}
           message={hasActiveFilters ? 'Intenta con otros filtros.' : 'No hay productos con stock en el sistema.'}
         />
@@ -310,7 +311,12 @@ export default function ExistenciasPage() {
                   onClick={() => toggleGroup(g.key)}
                   aria-expanded={isOpen}
                 >
-                  <span className="existencias-page__group-card-arrow">{isOpen ? '▾' : '▸'}</span>
+                  <ChevronRight
+                    size={16}
+                    strokeWidth={2}
+                    className={`existencias-page__group-card-arrow ${isOpen ? 'existencias-page__group-card-arrow--open' : ''}`}
+                    aria-hidden="true"
+                  />
                   <div className="existencias-page__group-card-info">
                     <div className="existencias-page__group-card-title">{renderProdName(g)}</div>
                     <div className="existencias-page__group-card-meta">
@@ -398,9 +404,12 @@ export default function ExistenciasPage() {
                     onClick={() => toggleGroup(g.key)}
                   >
                     <td>
-                      <span className={`existencias-page__arrow ${isOpen ? 'existencias-page__arrow--open' : ''}`}>
-                        ▸
-                      </span>
+                      <ChevronRight
+                        size={15}
+                        strokeWidth={2}
+                        className={`existencias-page__arrow ${isOpen ? 'existencias-page__arrow--open' : ''}`}
+                        aria-hidden="true"
+                      />
                     </td>
                     <td>{renderProdName(g)}</td>
                     <td>{g.nombre_bodega}</td>
@@ -484,19 +493,21 @@ export default function ExistenciasPage() {
             : `${total} producto${total === 1 ? '' : 's'}` +
               ` · ${resumen.totalStock} unidades` +
               (resumen.totalValor > 0 ? ` · Q ${resumen.totalValor.toFixed(2)}` : '') +
-              (resumen.bajoMinimo > 0 ? ` · ⚠ ${resumen.bajoMinimo} bajo mínimo` : '') +
-              (expanded.size > 0 ? ` · ▸ ${expanded.size} expandido${expanded.size !== 1 ? 's' : ''}` : '') +
+              (resumen.bajoMinimo > 0 ? ` · ${resumen.bajoMinimo} bajo mínimo` : '') +
+              (expanded.size > 0 ? ` · ${expanded.size} expandido${expanded.size !== 1 ? 's' : ''}` : '') +
               (page > 1 ? ` · Pág. ${page}` : '')
         }
         actions={
           <div className="existencias-page__header-actions">
             {rows.length > 0 && !loading && (
               <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-                Exportar
+                <Download size={15} strokeWidth={1.8} aria-hidden="true" />
+                <span>Exportar</span>
               </Button>
             )}
             <Button variant="ghost" size="sm" onClick={fetchExistencias} disabled={loading}>
-              {loading ? 'Cargando…' : 'Refrescar'}
+              <RefreshCw size={15} strokeWidth={1.8} className={loading ? 'spin' : ''} aria-hidden="true" />
+              <span>{loading ? 'Cargando…' : 'Refrescar'}</span>
             </Button>
           </div>
         }

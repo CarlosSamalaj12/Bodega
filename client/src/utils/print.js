@@ -783,8 +783,14 @@ export function printPedidoLetterSize(pedido, opts = {}) {
 </head>
 <body>
   <div class="no-print">
-    <button onclick="window.print()">🖨 Imprimir</button>
-    <button onclick="window.close()" style="background:#888;margin-left:4pt;">✕ Cerrar</button>
+    <button onclick="window.print()" style="display:inline-flex;align-items:center;gap:6px;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+      <span>Imprimir</span>
+    </button>
+    <button onclick="window.close()" style="display:inline-flex;align-items:center;gap:6px;background:#666;margin-left:4pt;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      <span>Cerrar</span>
+    </button>
   </div>
 
   <div class="page">

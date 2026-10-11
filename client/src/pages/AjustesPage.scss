@@ -27,6 +27,9 @@
     font-size: $font-size-md;
     font-weight: $font-weight-semibold;
     color: $color-text;
+    display: flex;
+    align-items: center;
+    gap: $space-2;
   }
 
   // ---- Formulario ----

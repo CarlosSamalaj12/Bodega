@@ -100,7 +100,7 @@ export function showAlertaNotification(alerta) {
   const tipo = getTipoAlertaNotif(alerta);
   if (!tipo) return;
 
-  const title = `⚠️ ${tipo.emoji} ${tipo.label}`;
+  const title = `Alerta: ${tipo.label}`;
   const body = [
     alerta.nombre_producto,
     alerta.sku ? `SKU: ${alerta.sku}` : '',
@@ -134,27 +134,27 @@ function getTipoAlertaNotif(item) {
 
   // Prioridad: mínimo stock > vencido > próximo a vencer > regla
   if (item.minimo != null && item.stock != null && Number(item.stock) < Number(item.minimo)) {
-    return { label: 'Stock por debajo del mínimo', emoji: '📦' };
+    return { label: 'Stock por debajo del mínimo' };
   }
 
   if (dias != null && dias < 0) {
-    return { label: 'Producto vencido', emoji: '❌' };
+    return { label: 'Producto vencido' };
   }
 
   if (dias != null && dias <= 3) {
-    return { label: 'Vence pronto', emoji: '🔥' };
+    return { label: 'Vence pronto' };
   }
 
   if (dias != null && dias <= 7) {
-    return { label: 'Próximo a vencer', emoji: '⏰' };
+    return { label: 'Próximo a vencer' };
   }
 
   if (item.dias_restantes_regla != null && item.dias_restantes_regla <= 0) {
-    return { label: 'Regla de subcategoría vencida', emoji: '📋' };
+    return { label: 'Regla de subcategoría vencida' };
   }
 
   if (item.dias_restantes_regla != null && item.dias_alerta_antes != null && item.dias_restantes_regla <= item.dias_alerta_antes) {
-    return { label: 'Regla de subcategoría próxima', emoji: '📋' };
+    return { label: 'Regla de subcategoría próxima' };
   }
 
   return null;

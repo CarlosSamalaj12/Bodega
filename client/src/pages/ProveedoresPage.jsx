@@ -11,6 +11,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { useForm } from '@/hooks/useForm';
 import api from '@/services/api';
 import { catalogosService } from '@/services/catalogos.service';
+import { Plus, Handshake, Pencil } from 'lucide-react';
 import './ProveedoresPage.scss';
 
 const ORDER_KEY = 'prov-order-v1';
@@ -105,7 +106,12 @@ function ProveedorForm({ open, onClose, editingId, editValues, onSaved }) {
   ];
 
   return (
-    <Modal open={open} onClose={() => !submitting && onClose()} title={editingId ? 'Editar proveedor' : 'Nuevo proveedor'}>
+    <Modal
+      open={open}
+      onClose={() => !submitting && onClose()}
+      title={editingId ? 'Editar proveedor' : 'Nuevo proveedor'}
+      icon={<Handshake size={20} strokeWidth={1.8} />}
+    >
       <form onSubmit={handleSubmit} className="proveedores-page__form">
         {error && <div className="proveedores-page__form-error">{error}</div>}
         <div className="proveedores-page__form-grid">
@@ -230,7 +236,10 @@ export default function ProveedoresPage() {
         title="Proveedores"
         subtitle={`${items.length} proveedor${items.length === 1 ? '' : 'es'}`}
         actions={
-          <Button onClick={openCreate}>Nuevo proveedor</Button>
+          <Button onClick={openCreate}>
+            <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+            <span>Nuevo proveedor</span>
+          </Button>
         }
       />
 
@@ -242,9 +251,14 @@ export default function ProveedoresPage() {
         {loading ? (
           <div className="proveedores-page__state"><Spinner size={20} label="Cargando proveedores…" /></div>
         ) : filtered.length === 0 ? (
-          <EmptyState icon="◊" title={search ? 'Sin resultados' : 'Sin proveedores'}
+          <EmptyState icon={<Handshake size={36} strokeWidth={1.5} />} title={search ? 'Sin resultados' : 'Sin proveedores'}
             message={search ? 'Intenta con otro término.' : 'Agrega el primer proveedor.'}
-            action={!search ? <Button onClick={openCreate}>Crear proveedor</Button> : null} />
+            action={!search ? (
+              <Button onClick={openCreate}>
+                <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+                <span>Crear proveedor</span>
+              </Button>
+            ) : null} />
         ) : (
           <div className="proveedores-page__list">
             {filtered.map((row) => (
@@ -266,8 +280,9 @@ export default function ProveedoresPage() {
                   <Button size="sm" variant={Number(row.activo) === 1 ? 'subtle' : 'ghost'} onClick={() => handleToggle(row)} title={Number(row.activo) === 1 ? 'Desactivar' : 'Activar'}>
                     {Number(row.activo) === 1 ? 'Desactivar' : 'Activar'}
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => openEdit(row)} title="Editar">✎</Button>
-            
+                  <Button size="sm" variant="ghost" onClick={() => openEdit(row)} title="Editar">
+                    <Pencil size={14} strokeWidth={1.8} aria-hidden="true" />
+                  </Button>
                 </div>
               </DragItem>
             ))}

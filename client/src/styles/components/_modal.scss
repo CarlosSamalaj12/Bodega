@@ -44,8 +44,17 @@
   }
 
   &--xl {
-    width: min(1100px, calc(100vw - 32px));
+    width: min(1200px, calc(100vw - 32px));
     max-width: calc(100vw - 32px);
+  }
+
+  &--despacho {
+    width: min(1200px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+
+    .modal__body {
+      padding: $space-4 $space-4;
+    }
   }
 
   // ---------- Móvil / tablet portrait: bottom sheet full-width ----------
@@ -93,10 +102,45 @@
     padding: $space-5;
     border-bottom: 1px solid $color-stroke;
     flex-shrink: 0;
+    gap: $space-4;
 
     @media (max-width: $bp-md) {
       padding: $space-4;
     }
+  }
+
+  &__header-left {
+    display: flex;
+    align-items: center;
+    gap: $space-3;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: $radius-md;
+    flex-shrink: 0;
+    background: $color-accent-soft;
+    color: $color-accent;
+  }
+
+  &__header-actions {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    flex-shrink: 0;
+  }
+
+  &__subtitle {
+    margin: 2px 0 0 0;
+    font-size: $font-size-xs;
+    color: $color-text-muted;
+    line-height: 1.4;
   }
 
   &__title {
@@ -105,6 +149,10 @@
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+    flex-wrap: wrap;
   }
 
   &__close {

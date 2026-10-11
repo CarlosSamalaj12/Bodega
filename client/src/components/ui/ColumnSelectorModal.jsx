@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { Modal } from './Modal';
 import { Button } from './Button';
+import { SlidersHorizontal, RotateCcw, X } from 'lucide-react';
 import './ColumnSelectorModal.scss';
 
 /** Resaltar texto que coincide con la búsqueda */
@@ -191,6 +192,7 @@ export function ColumnSelectorModal({ open, onClose, columns, defaultSelected, o
       open={open}
       onClose={onClose}
       title="Columnas a exportar"
+      icon={<SlidersHorizontal size={20} strokeWidth={1.8} />}
       size="md"
       footer={
         <div className="column-selector__footer">
@@ -241,8 +243,10 @@ export function ColumnSelectorModal({ open, onClose, columns, defaultSelected, o
             className="column-selector__reset-btn"
             onClick={handleReset}
             title="Restablecer valores predeterminados"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
           >
-            ↺ Restablecer
+            <RotateCcw size={12} strokeWidth={1.8} />
+            <span>Restablecer</span>
           </button>
         </div>
         <div className="column-selector__search">
@@ -261,7 +265,7 @@ export function ColumnSelectorModal({ open, onClose, columns, defaultSelected, o
               onClick={() => setSearchQuery('')}
               aria-label="Limpiar búsqueda"
             >
-              ✕
+              <X size={14} strokeWidth={1.8} />
             </button>
           )}
         </div>

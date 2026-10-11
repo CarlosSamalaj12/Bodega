@@ -27,4 +27,25 @@ export const catalogosService = {
     const { data } = await api.get('/api/motivos', { signal });
     return data;
   },
+  async getMotivosJustificacion(signal) {
+    const { data } = await api.get('/api/motivos-justificacion', { signal });
+    return data;
+  },
+  async crearMotivoJustificacion(texto) {
+    const { data } = await api.post('/api/motivos-justificacion', { texto });
+    return data;
+  },
+  async actualizarMotivoJustificacion(id, texto) {
+    const { data } = await api.put(`/api/motivos-justificacion/${id}`, { texto });
+    return data;
+  },
+  async eliminarMotivoJustificacion(id) {
+    const { data } = await api.delete(`/api/motivos-justificacion/${id}`);
+    return data;
+  },
+  async restablecerMotivosJustificacion() {
+    const { data } = await api.post('/api/motivos-justificacion/restablecer');
+    return data;
+  },
 };
+

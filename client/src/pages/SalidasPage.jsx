@@ -20,6 +20,7 @@ import { MovimientosListTable } from '@/components/shared/MovimientosListTable';
 import { ColumnSelectorModal } from '@/components/ui/ColumnSelectorModal';
 import { PinModal } from '@/components/ui/PinModal';
 import { downloadCSV, downloadXLSX, downloadPDF } from '@/utils/export';
+import { Plus, Download, ArrowUpFromLine } from 'lucide-react';
 import './SalidasPage.scss';
 
 export default function SalidasPage() {
@@ -145,7 +146,8 @@ export default function SalidasPage() {
         actions={
           <div className="salidas-page__header-actions">
             <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-              Exportar
+              <Download size={15} strokeWidth={1.8} aria-hidden="true" />
+              <span>Exportar</span>
             </Button>
             {canCreate && (
               <Button
@@ -153,7 +155,8 @@ export default function SalidasPage() {
                 onClick={() => setModalOpen(true)}
                 title={newCombo ? `Nueva salida (${newCombo})` : 'Nueva salida'}
               >
-                + Nueva salida
+                <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+                <span>Nueva salida</span>
                 {newCombo && <KeyboardKey combo={newCombo} />}
               </Button>
             )}
@@ -242,6 +245,7 @@ export default function SalidasPage() {
         open={modalOpen}
         onClose={() => !submitting && setModalOpen(false)}
         title="Nueva salida"
+        icon={<ArrowUpFromLine size={20} strokeWidth={1.8} />}
         size="xl"
       >
         {catalogError ? (

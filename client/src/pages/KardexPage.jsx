@@ -10,6 +10,7 @@ import { kardexService } from '@/services/kardex.service';
 import { productosService } from '@/services/productos.service';
 import { catalogosService } from '@/services/catalogos.service';
 import { getSocket } from '@/services/socket';
+import { FileSpreadsheet, MapPin, BookOpen, FolderTree, Inbox, Lightbulb, AlertTriangle } from 'lucide-react';
 import './KardexPage.scss';
 
 const TIPO_FILTRO = [
@@ -221,7 +222,12 @@ export default function KardexPage() {
           </span>
         </div>
         <div className="kardex-page__mov-meta">
-          {r.bodega_kardex && <span className="kardex-page__mov-bodega">📍 {r.bodega_kardex}</span>}
+          {r.bodega_kardex && (
+            <span className="kardex-page__mov-bodega">
+              <MapPin size={11} strokeWidth={1.8} style={{ marginRight: 2 }} aria-hidden="true" />
+              {r.bodega_kardex}
+            </span>
+          )}
           {r.lote && <span className="kardex-page__mov-lote">Lote: {r.lote}</span>}
           {r.no_documento && <code className="kardex-page__mov-doc">{r.no_documento}</code>}
         </div>
@@ -260,7 +266,8 @@ export default function KardexPage() {
         actions={
           <div className="kardex-page__header-actions">
             <Button variant="ghost" size="sm" onClick={() => navigate('/kardex-general')}>
-              Ver lista general
+              <FileSpreadsheet size={15} strokeWidth={1.8} aria-hidden="true" />
+              <span>Ver lista general</span>
             </Button>
           </div>
         }
@@ -331,7 +338,7 @@ export default function KardexPage() {
                     checked={todasLasBodegas}
                     onChange={(e) => setTodasLasBodegas(e.target.checked)}
                   />
-                  <span>📦 Todas las bodegas (con acceso)</span>
+                  <span>Todas las bodegas (con acceso)</span>
                 </label>
               </div>
             )}
@@ -342,7 +349,9 @@ export default function KardexPage() {
         {!producto && (
           <Card>
             <div className="kardex-page__empty">
-              <div className="kardex-page__empty-icon">📊</div>
+              <div className="kardex-page__empty-icon">
+                <BookOpen size={40} strokeWidth={1.5} aria-hidden="true" />
+              </div>
               <h3 className="kardex-page__empty-title">Selecciona un producto</h3>
               <p className="kardex-page__empty-msg">
                 Usá el buscador de arriba para encontrar un producto y ver su historial de movimientos.
@@ -367,7 +376,10 @@ export default function KardexPage() {
                       <code className="kardex-page__producto-sku">SKU: {productoHeader.sku}</code>
                     )}
                     {productoHeader?.categoria && (
-                      <span className="kardex-page__producto-cat">📂 {productoHeader.categoria}</span>
+                      <span className="kardex-page__producto-cat">
+                        <FolderTree size={13} strokeWidth={1.8} style={{ marginRight: 4 }} aria-hidden="true" />
+                        {productoHeader.categoria}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -407,7 +419,9 @@ export default function KardexPage() {
               /* ── Sin movimientos ── */
               <Card>
                 <div className="kardex-page__empty">
-                  <div className="kardex-page__empty-icon">📭</div>
+                  <div className="kardex-page__empty-icon">
+                    <Inbox size={40} strokeWidth={1.5} aria-hidden="true" />
+                  </div>
                   <h3 className="kardex-page__empty-title">Sin movimientos</h3>
                   <p className="kardex-page__empty-msg">
                     {hasActiveFilters
@@ -416,13 +430,15 @@ export default function KardexPage() {
                   </p>
                   {!todasLasBodegas && !hasActiveFilters && (
                     <p className="kardex-page__empty-hint">
-                      💡 Estás viendo solo tu bodega. Activá el toggle <strong>"📦 Todas las bodegas (con acceso)"</strong> arriba
+                      <Lightbulb size={13} strokeWidth={1.8} style={{ marginRight: 4 }} aria-hidden="true" />
+                      Estás viendo solo tu bodega. Activá el toggle <strong>"Todas las bodegas (con acceso)"</strong> arriba
                       para ver si el producto tiene movimientos en otras bodegas donde tenés acceso.
                     </p>
                   )}
                   {hasActiveFilters && !todasLasBodegas && (
                     <p className="kardex-page__empty-hint">
-                      💡 Probá desactivar los filtros de fecha o activar <strong>"Todas las bodegas"</strong> arriba.
+                      <Lightbulb size={13} strokeWidth={1.8} style={{ marginRight: 4 }} aria-hidden="true" />
+                      Probá desactivar los filtros de fecha o activar <strong>"Todas las bodegas"</strong> arriba.
                     </p>
                   )}
                 </div>
@@ -432,7 +448,8 @@ export default function KardexPage() {
               <>
                 {hasMore && (
                   <div className="kardex-page__more-banner">
-                    ⚠️ Mostrando los primeros {MAX_MOVIMIENTOS} movimientos.
+                    <AlertTriangle size={14} strokeWidth={1.8} style={{ marginRight: 4 }} aria-hidden="true" />
+                    Mostrando los primeros {MAX_MOVIMIENTOS} movimientos.
                     Aplicá filtros de fecha o tipo para acotar la vista.
                   </div>
                 )}

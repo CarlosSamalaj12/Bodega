@@ -107,11 +107,20 @@
     &:hover {
       background: $color-surface-hover;
       color: $color-text;
+
+      .sidebar__icon {
+        color: $color-accent;
+        transform: scale(1.06);
+      }
     }
 
     &--active {
       background: $color-accent-soft;
       color: $color-text;
+
+      .sidebar__icon {
+        color: $color-accent;
+      }
 
       &::before {
         content: '';
@@ -128,13 +137,19 @@
   }
 
   &__icon {
-    width: 20px;
-    height: 20px;
-    display: grid;
-    place-items: center;
-    font-size: $font-size-md;
-    color: inherit;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: $color-text-muted;
     flex-shrink: 0;
+    transition: color $transition-fast, transform $transition-fast;
+
+    svg {
+      display: block;
+      transition: transform $transition-fast, stroke $transition-fast;
+    }
   }
 
   &__label {

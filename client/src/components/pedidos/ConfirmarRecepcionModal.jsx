@@ -6,16 +6,17 @@ import { Input } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Spinner';
 import { toast } from '@/components/ui/Toast';
 import { pedidosService } from '@/services/pedidos.service';
+import { Check, X, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import './ConfirmarRecepcionModal.scss';
 
 function lineaEstado(l) {
   const estado = String(l.estado_linea || 'PENDIENTE').toUpperCase();
-  if (estado === 'ANULADO') return { icon: '✕', label: 'Anulada', cls: 'void' };
+  if (estado === 'ANULADO') return { icon: <X size={12} strokeWidth={2} />, label: 'Anulada', cls: 'void' };
   const surtida = Number(l.cantidad_surtida || 0);
   const solicitada = Number(l.cantidad_solicitada || 0);
-  if (surtida >= solicitada && solicitada > 0) return { icon: '✓', label: 'Completa', cls: 'ok' };
-  if (surtida > 0) return { icon: '⚠', label: 'Parcial', cls: 'warn' };
-  return { icon: '⚠', label: 'Sin entrega', cls: 'warn' };
+  if (surtida >= solicitada && solicitada > 0) return { icon: <Check size={12} strokeWidth={2} />, label: 'Completa', cls: 'ok' };
+  if (surtida > 0) return { icon: <AlertTriangle size={12} strokeWidth={2} />, label: 'Parcial', cls: 'warn' };
+  return { icon: <AlertTriangle size={12} strokeWidth={2} />, label: 'Sin entrega', cls: 'warn' };
 }
 
 /**
@@ -84,6 +85,7 @@ export function ConfirmarRecepcionModal({ open, pedido, onClose, onConfirmed }) 
       open={open}
       onClose={() => !submitting && onClose?.()}
       title={`Confirmar recepción — Pedido #${pedido.id_pedido}`}
+      icon={<CheckCircle2 size={20} strokeWidth={1.8} />}
       size="lg"
     >
       <div className="confirmar-recepcion" onKeyDown={handleKeyDown}>
@@ -148,10 +150,13 @@ export function ConfirmarRecepcionModal({ open, pedido, onClose, onConfirmed }) 
         </div>
 
         {totales.diferencias > 0 && (
-          <div className="confirmar-recepcion__warn">
-            ⚠ Este pedido se completó con diferencias en {totales.diferencias} línea(s)
-            {pedido.justificacion_despacho ? ` — Justificación: ${pedido.justificacion_despacho}` : ''}.
-            Al confirmar aceptas lo entregado.
+          <div className="confirmar-recepcion__warn" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <AlertTriangle size={15} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+            <span>
+              Este pedido se completó con diferencias en {totales.diferencias} línea(s)
+              {pedido.justificacion_despacho ? ` — Justificación: ${pedido.justificacion_despacho}` : ''}.
+              Al confirmar aceptas lo entregado.
+            </span>
           </div>
         )}
 
@@ -185,7 +190,12 @@ export function ConfirmarRecepcionModal({ open, pedido, onClose, onConfirmed }) 
             onClick={handleConfirm}
             disabled={submitting || pin.length < 6}
           >
-            {submitting ? <Spinner size={14} /> : '✓ Confirmar recepción'}
+            {submitting ? <Spinner size={14} /> : (
+              <>
+                <Check size={14} strokeWidth={1.8} />
+                <span>Confirmar recepción</span>
+              </>
+            )}
           </Button>
         </div>
       </div>

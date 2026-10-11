@@ -15,6 +15,17 @@ import { existenciasService } from '@/services/existencias.service';
 import { catalogosService } from '@/services/catalogos.service';
 import './AlertasPage.scss';
 
+import {
+  Calendar,
+  Package,
+  AlertCircle,
+  Flame,
+  Clock,
+  AlertTriangle,
+  Download,
+  RefreshCw,
+} from 'lucide-react';
+
 const DIAS_OPTIONS = [
   { value: 7, label: '7 días' },
   { value: 15, label: '15 días' },
@@ -24,8 +35,8 @@ const DIAS_OPTIONS = [
 ];
 
 const TABS = [
-  { key: 'vencimiento', label: 'Vencimiento', icon: '📅' },
-  { key: 'minimo', label: 'Stock Mínimo', icon: '📦' },
+  { key: 'vencimiento', label: 'Vencimiento', icon: <Calendar size={16} strokeWidth={1.8} /> },
+  { key: 'minimo', label: 'Stock Mínimo', icon: <Package size={16} strokeWidth={1.8} /> },
 ];
 
 // ──────────────────────────────────────────────────────────────
@@ -36,33 +47,33 @@ const TABS = [
 function getTipoAlerta(item) {
   const dias = item.dias_para_vencer;
   if (dias != null && dias < 0) {
-    return { label: 'Vencido', variant: 'danger', icon: '⛔', severity: 2, order: 0 };
+    return { label: 'Vencido', variant: 'danger', icon: <AlertCircle size={13} strokeWidth={2} />, severity: 2, order: 0 };
   }
   if (dias != null && dias <= 3) {
-    return { label: `Vence en ${dias}d`, variant: 'danger', icon: '🔥', severity: 2, order: 1 };
+    return { label: `Vence en ${dias}d`, variant: 'danger', icon: <Flame size={13} strokeWidth={2} />, severity: 2, order: 1 };
   }
   if (item.dias_restantes_regla != null && item.dias_restantes_regla <= 0) {
-    return { label: 'Regla vencida', variant: 'danger', icon: '⛔', severity: 2, order: 2 };
+    return { label: 'Regla vencida', variant: 'danger', icon: <AlertCircle size={13} strokeWidth={2} />, severity: 2, order: 2 };
   }
   if (item.dias_restantes_regla != null && item.dias_alerta_antes != null && item.dias_restantes_regla <= item.dias_alerta_antes) {
-    return { label: 'Regla próxima', variant: 'warning', icon: '⏰', severity: 1, order: 3 };
+    return { label: 'Regla próxima', variant: 'warning', icon: <Clock size={13} strokeWidth={2} />, severity: 1, order: 3 };
   }
   if (dias != null && item.dias_alerta_antes != null && dias <= item.dias_alerta_antes) {
-    return { label: `Vence en ${dias}d`, variant: 'warning', icon: '📅', severity: 1, order: 4 };
+    return { label: `Vence en ${dias}d`, variant: 'warning', icon: <Calendar size={13} strokeWidth={2} />, severity: 1, order: 4 };
   }
-  return { label: `${dias != null ? dias + 'd' : '—'}`, variant: 'info', icon: '🕒', severity: 0, order: 5 };
+  return { label: `${dias != null ? dias + 'd' : '—'}`, variant: 'info', icon: <Clock size={13} strokeWidth={2} />, severity: 0, order: 5 };
 }
 
 function getMinimoAlerta(r) {
   const diff = Number(r.diferencia_minimo || 0);
   const stock = Number(r.stock || 0);
   if (stock <= 0) {
-    return { label: 'Sin stock', variant: 'danger', icon: '⛔', severity: 2, order: 0 };
+    return { label: 'Sin stock', variant: 'danger', icon: <AlertCircle size={13} strokeWidth={2} />, severity: 2, order: 0 };
   }
   if (diff >= 5) {
-    return { label: `Muy bajo (−${diff})`, variant: 'danger', icon: '🔥', severity: 2, order: 1 };
+    return { label: `Muy bajo (−${diff})`, variant: 'danger', icon: <Flame size={13} strokeWidth={2} />, severity: 2, order: 1 };
   }
-  return { label: `Bajo mínimo (−${diff})`, variant: 'warning', icon: '⚠️', severity: 1, order: 2 };
+  return { label: `Bajo mínimo (−${diff})`, variant: 'warning', icon: <AlertTriangle size={13} strokeWidth={2} />, severity: 1, order: 2 };
 }
 
 /**
@@ -460,19 +471,21 @@ export default function AlertasPage() {
             ? 'Cargando…'
             : `${currentRows.length} alerta${currentRows.length === 1 ? '' : 's'}` +
               ` · ${resumen.totalStock} unidad${resumen.totalStock !== 1 ? 'es' : ''}` +
-              (tipo === 'vencimiento' && resumen.vencidos > 0 ? ` · 🔴 ${resumen.vencidos} crítico${resumen.vencidos !== 1 ? 's' : ''}` : '') +
-              (tipo === 'vencimiento' && resumen.proximos > 0 ? ` · 🟡 ${resumen.proximos} próximo${resumen.proximos !== 1 ? 's' : ''}` : '') +
-              (tipo === 'minimo' && resumen.criticos > 0 ? ` · 🔴 ${resumen.criticos} crítico${resumen.criticos !== 1 ? 's' : ''}` : '')
+              (tipo === 'vencimiento' && resumen.vencidos > 0 ? ` · ${resumen.vencidos} crítico${resumen.vencidos !== 1 ? 's' : ''}` : '') +
+              (tipo === 'vencimiento' && resumen.proximos > 0 ? ` · ${resumen.proximos} próximo${resumen.proximos !== 1 ? 's' : ''}` : '') +
+              (tipo === 'minimo' && resumen.criticos > 0 ? ` · ${resumen.criticos} crítico${resumen.criticos !== 1 ? 's' : ''}` : '')
         }
         actions={
           <div className="alertas-page__header-actions">
             {currentRows.length > 0 && !loading && (
               <Button variant="ghost" size="sm" onClick={() => setShowColumnSelector(true)}>
-                Exportar
+                <Download size={14} strokeWidth={1.8} />
+                <span>Exportar</span>
               </Button>
             )}
             <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={loading}>
-              {loading ? 'Cargando…' : 'Refrescar'}
+              <RefreshCw size={14} strokeWidth={1.8} />
+              <span>{loading ? 'Cargando…' : 'Refrescar'}</span>
             </Button>
           </div>
         }
@@ -654,7 +667,7 @@ export default function AlertasPage() {
               ? 'No hay productos próximos a vencer en el rango seleccionado.'
               : 'Todos los productos tienen stock suficiente. Revisa Límites para configurar mínimos.'
           }
-          emptyIcon="⚠"
+          emptyIcon={<AlertTriangle size={36} strokeWidth={1.5} />}
         />
         {!loading && currentRows.length > 0 && (
           <p className="alertas-page__row-hint">

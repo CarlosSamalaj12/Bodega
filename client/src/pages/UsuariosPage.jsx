@@ -12,6 +12,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { usuariosService } from '@/services/usuarios.service';
 import { catalogosService } from '@/services/catalogos.service';
+import { Plus, Users, Pencil, KeyRound, Hash, UserX, Copy } from 'lucide-react';
 import './UsuariosPage.scss';
 
 const ORDER_KEY = 'usr-order-v1';
@@ -514,7 +515,8 @@ export default function UsuariosPage() {
         subtitle={`${filtered.length} usuario${filtered.length === 1 ? '' : 's'}`}
         actions={
           <Button size={isMobile ? 'sm' : 'md'} onClick={openCreate}>
-            Nuevo usuario
+            <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+            <span>Nuevo usuario</span>
           </Button>
         }
       />
@@ -546,10 +548,15 @@ export default function UsuariosPage() {
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState
-            icon="◐"
+            icon={<Users size={36} strokeWidth={1.5} />}
             title={search ? 'Sin resultados' : 'Sin usuarios'}
             message={search ? 'Intenta con otros términos de búsqueda.' : 'No hay usuarios registrados todavía.'}
-            action={!search ? <Button onClick={openCreate}>Crear usuario</Button> : null}
+            action={!search ? (
+              <Button onClick={openCreate}>
+                <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+                <span>Crear usuario</span>
+              </Button>
+            ) : null}
           />
         ) : (
           <div className="usuarios-page__list">
@@ -577,11 +584,19 @@ export default function UsuariosPage() {
                 </div>
                 <div className="usuarios-page__item-actions">
                   <div className="usuarios-page__item-actions-row">
-                    <Button size="sm" variant="ghost" onClick={() => openEdit(row)} title="Editar">✎</Button>
-                    <Button size="sm" variant="ghost" onClick={() => openResetPw(row)} title="Cambiar contraseña">🔑</Button>
-                    <Button size="sm" variant="ghost" onClick={() => openResetPin(row)} title="Resetear PIN">🔢</Button>
+                    <Button size="sm" variant="ghost" onClick={() => openEdit(row)} title="Editar">
+                      <Pencil size={14} strokeWidth={1.8} aria-hidden="true" />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => openResetPw(row)} title="Cambiar contraseña">
+                      <KeyRound size={14} strokeWidth={1.8} aria-hidden="true" />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => openResetPin(row)} title="Resetear PIN">
+                      <Hash size={14} strokeWidth={1.8} aria-hidden="true" />
+                    </Button>
                     {Number(row.active) === 1 && (
-                      <Button size="sm" variant="ghost" onClick={() => handleDeactivate(row)} title="Desactivar">⛔</Button>
+                      <Button size="sm" variant="ghost" onClick={() => handleDeactivate(row)} title="Desactivar">
+                        <UserX size={14} strokeWidth={1.8} aria-hidden="true" />
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -596,6 +611,7 @@ export default function UsuariosPage() {
         open={modalOpen}
         onClose={() => !submitting && setModalOpen(false)}
         title={editingId ? 'Editar usuario' : 'Nuevo usuario'}
+        icon={<Users size={20} strokeWidth={1.8} />}
         size="lg"
       >
         <form onSubmit={handleSubmit} className="usuarios-page__form">
@@ -824,7 +840,8 @@ export default function UsuariosPage() {
                         disabled={usuariosCopiables.length === 0}
                         title={usuariosCopiables.length === 0 ? 'No hay otros usuarios para usar como fuente' : 'Copiar permisos de otro usuario'}
                       >
-                        📋 Copiar de…
+                        <Copy size={13} strokeWidth={1.8} />
+                        <span>Copiar de…</span>
                       </Button>
                       <Button size="sm" variant="primary" onClick={savePermisos} disabled={permisosSaving}>
                         {permisosSaving ? <Spinner size={14} /> : 'Guardar permisos'}
@@ -893,6 +910,7 @@ export default function UsuariosPage() {
         open={resetPwOpen}
         onClose={() => !resetPwSubmitting && setResetPwOpen(false)}
         title={`Cambiar contraseña — ${resetPwUser?.full_name || resetPwUser?.username || ''}`}
+        icon={<KeyRound size={20} strokeWidth={1.8} />}
       >
         <form onSubmit={handleResetPw} className="usuarios-page__form">
           <div className="usuarios-page__field">
@@ -925,6 +943,7 @@ export default function UsuariosPage() {
         open={resetPinOpen}
         onClose={() => !resetPinSubmitting && setResetPinOpen(false)}
         title={`Resetear PIN de pedidos — ${resetPinUser?.full_name || resetPinUser?.username || ''}`}
+        icon={<Hash size={20} strokeWidth={1.8} />}
       >
         <form onSubmit={handleResetPin} className="usuarios-page__form">
           <div className="usuarios-page__field">
@@ -958,6 +977,7 @@ export default function UsuariosPage() {
         open={copyOpen}
         onClose={() => !copySubmitting && setCopyOpen(false)}
         title={`Copiar permisos — ${form.full_name || form.username || ''}`}
+        icon={<Copy size={20} strokeWidth={1.8} />}
         size="md"
       >
         <div className="usuarios-page__form">

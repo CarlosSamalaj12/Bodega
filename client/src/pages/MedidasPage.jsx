@@ -11,6 +11,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { useForm } from '@/hooks/useForm';
 import api from '@/services/api';
 import { catalogosService } from '@/services/catalogos.service';
+import { Plus, Ruler, Pencil } from 'lucide-react';
 import './MedidasPage.scss';
 
 const ORDER_KEY = 'med-order-v1';
@@ -92,7 +93,12 @@ function MedidaForm({ open, onClose, editingId, editValues, onSaved }) {
   }, [open, editingId]);
 
   return (
-    <Modal open={open} onClose={() => !submitting && onClose()} title={editingId ? 'Editar medida' : 'Nueva medida'}>
+    <Modal
+      open={open}
+      onClose={() => !submitting && onClose()}
+      title={editingId ? 'Editar medida' : 'Nueva medida'}
+      icon={<Ruler size={20} strokeWidth={1.8} />}
+    >
       <form onSubmit={handleSubmit} className="medidas-page__form">
         {error && <div className="medidas-page__form-error">{error}</div>}
         <div className="medidas-page__field">
@@ -181,7 +187,12 @@ export default function MedidasPage() {
       <Header
         title="Medidas"
         subtitle={`${items.length} medida${items.length === 1 ? '' : 's'}`}
-        actions={<Button onClick={openCreate}>Nueva medida</Button>}
+        actions={
+          <Button onClick={openCreate}>
+            <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+            <span>Nueva medida</span>
+          </Button>
+        }
       />
 
       <div className="medidas-page">
@@ -192,9 +203,14 @@ export default function MedidasPage() {
         {loading ? (
           <div className="medidas-page__state"><Spinner size={20} label="Cargando medidas…" /></div>
         ) : filtered.length === 0 ? (
-          <EmptyState icon="⊟" title={search ? 'Sin resultados' : 'Sin medidas'}
+          <EmptyState icon={<Ruler size={36} strokeWidth={1.5} />} title={search ? 'Sin resultados' : 'Sin medidas'}
             message={search ? 'Intenta con otro término.' : 'Agrega la primera medida.'}
-            action={!search ? <Button onClick={openCreate}>Crear medida</Button> : null} />
+            action={!search ? (
+              <Button onClick={openCreate}>
+                <Plus size={16} strokeWidth={1.8} aria-hidden="true" />
+                <span>Crear medida</span>
+              </Button>
+            ) : null} />
         ) : (
           <div className="medidas-page__list">
             {filtered.map((row) => (
@@ -202,7 +218,9 @@ export default function MedidasPage() {
                 <span className="medidas-page__drag-handle" title="Arrastrar para reordenar">⠿</span>
                 <span className="medidas-page__item-name">{row.nombre_medida}</span>
                 <div className="medidas-page__item-actions">
-                  <Button size="sm" variant="ghost" onClick={() => openEdit(row)} title="Editar">✎</Button>
+                  <Button size="sm" variant="ghost" onClick={() => openEdit(row)} title="Editar">
+                    <Pencil size={14} strokeWidth={1.8} aria-hidden="true" />
+                  </Button>
                 </div>
               </DragItem>
             ))}

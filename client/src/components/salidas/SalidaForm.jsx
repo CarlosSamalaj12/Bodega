@@ -14,6 +14,7 @@ import { toast } from '@/components/ui/Toast';
 import { salidasService } from '@/services/salidas.service';
 import { existenciasService } from '@/services/existencias.service';
 import { preventNumberWheel } from '@/utils/inputWheel';
+import { Info } from 'lucide-react';
 import './SalidaForm.scss';
 
 const EMPTY_LINE = {
@@ -423,7 +424,8 @@ export function SalidaForm({
         )}
 
         <p className="salida-form__hint">
-          ℹ️ El lote se asigna automáticamente del más antiguo disponible (FEFO).
+          <Info size={14} strokeWidth={1.8} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+          El lote se asigna automáticamente del más antiguo disponible (FEFO).
           Al expandir el movimiento en la lista verás qué lote se usó en cada línea.
         </p>
       </div>
