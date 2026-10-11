@@ -16,7 +16,7 @@
     flex-wrap: wrap;
     gap: $space-2;
     padding: $space-3;
-    background: var(--color-bg-subtle, rgba(0, 0, 0, 0.02));
+    background: $color-bg-2;
     border: 1px solid $color-stroke;
     border-radius: $radius-md;
   }
@@ -26,7 +26,7 @@
     align-items: center;
     gap: 6px;
     padding: 3px 10px;
-    background: var(--color-bg-surface);
+    background: $color-surface;
     border: 1px solid $color-stroke;
     border-radius: $radius-pill;
     font-size: $font-size-xs;
@@ -36,18 +36,30 @@
       background: rgba(234, 88, 12, 0.1);
       border-color: rgba(234, 88, 12, 0.3);
       color: #ea580c;
+
+      [data-theme='dark'] & {
+        color: #fb923c;
+      }
     }
 
     &--void {
       background: rgba(239, 68, 68, 0.1);
       border-color: rgba(239, 68, 68, 0.3);
       color: #ef4444;
+
+      [data-theme='dark'] & {
+        color: #f87171;
+      }
     }
 
     &--info {
       background: rgba(59, 130, 246, 0.1);
       border-color: rgba(59, 130, 246, 0.3);
       color: #2563eb;
+
+      [data-theme='dark'] & {
+        color: #60a5fa;
+      }
     }
   }
 
@@ -82,7 +94,7 @@
     font-size: 11px;
     font-weight: $font-weight-medium;
     color: $color-text-muted;
-    background: var(--color-bg-surface);
+    background: $color-surface;
     border: 1px dashed $color-stroke;
     border-radius: $radius-pill;
     cursor: pointer;
@@ -118,7 +130,7 @@
     font-size: $font-size-xs;
     font-weight: $font-weight-medium;
     color: $color-text;
-    background: var(--color-bg-surface);
+    background: $color-surface;
     border: 1px solid $color-stroke;
     border-radius: $radius-pill;
     cursor: pointer;
@@ -152,7 +164,7 @@
     flex-direction: column;
     gap: $space-2;
     padding: $space-3;
-    background: var(--color-bg-subtle, rgba(0, 0, 0, 0.02));
+    background: $color-bg-2;
     border: 1px solid $color-stroke;
     border-radius: $radius-md;
   }
@@ -200,7 +212,7 @@
       width: 4px;
     }
     &::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.15);
+      background: var(--scrollbar-thumb, rgba(0, 0, 0, 0.15));
       border-radius: 4px;
     }
   }
@@ -211,13 +223,13 @@
     justify-content: space-between;
     gap: $space-2;
     padding: 6px 10px;
-    background: var(--color-bg-surface);
+    background: $color-surface;
     border: 1px solid $color-stroke;
     border-radius: $radius-sm;
     transition: all $transition-fast;
 
     &:hover {
-      border-color: rgba(0, 0, 0, 0.18);
+      border-color: $color-stroke-strong;
     }
 
     &--editing {
@@ -264,7 +276,7 @@
 
     &:hover {
       color: $color-text;
-      background: rgba(0, 0, 0, 0.06);
+      background: $color-surface-hover;
     }
 
     &--save {
@@ -278,7 +290,7 @@
     &--cancel {
       &:hover {
         color: $color-text;
-        background: rgba(0, 0, 0, 0.08);
+        background: $color-surface-active;
       }
     }
 

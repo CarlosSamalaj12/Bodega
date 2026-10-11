@@ -24,6 +24,10 @@
   --color-text-subtle: #6b6b6b;
   --color-text-inverse: #0a0a0a;
 
+  // Aliases de compatibilidad para superficies y fondos sutiles
+  --color-bg-surface: #1a1a1a;
+  --color-bg-subtle: #161616;
+
   --scrollbar-thumb: #3a3a3a;
   --scrollbar-track: #161616;
 
@@ -48,6 +52,10 @@
   --color-text-muted: #525252;
   --color-text-subtle: #a3a3a3;
   --color-text-inverse: #ffffff;
+
+  // Aliases de compatibilidad para superficies y fondos sutiles
+  --color-bg-surface: #ffffff;
+  --color-bg-subtle: #f4f4f4;
 
   --scrollbar-thumb: #d4d4d4;
   --scrollbar-track: #fafafa;

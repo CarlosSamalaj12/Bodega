@@ -283,7 +283,7 @@
     padding: 0;
     border: 1px solid $color-stroke;
     border-radius: $radius-md;
-    background: var(--color-bg-surface, #ffffff);
+    background: $color-surface;
     color: $color-text-muted;
     cursor: pointer;
     transition: all $transition-fast;
